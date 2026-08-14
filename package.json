@@ -1,0 +1,39 @@
+{
+  "name": "@ayapapa-npm/file-locking-js)",
+  "version": "0.1.0",
+  "description": "File-based mutual exclusion using mutex files for cross-process locking",
+  "license": "MIT",
+  "author": "ayapapa",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.js --format esm,cjs --out-dir dist --clean --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:debug": "vitest --inspect-brk --run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run build && npm run test",
+    "release:check": "npm run typecheck && npm run build && npm run test",
+    "prepublishOnly": "npm run release:check"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@ayapapa-npm/contracts-js": "^0.3.0",
+    "@ayapapa-npm/pretty-console-js": "^0.1.5"
+  }
+}
