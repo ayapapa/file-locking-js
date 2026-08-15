@@ -1,5 +1,5 @@
 {
-  "name": "@ayapapa-npm/file-locking-js)",
+  "name": "@ayapapa-npm/file-locking-js",
   "version": "0.1.0",
   "description": "File-based mutual exclusion using mutex files for cross-process locking",
   "license": "MIT",
@@ -27,13 +27,13 @@
     "prepublishOnly": "npm run release:check"
   },
   "devDependencies": {
+    "@ayapapa-npm/pretty-console-js": "^0.1.5",
     "@types/node": "^26.2.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@ayapapa-npm/contracts-js": "^0.3.0",
-    "@ayapapa-npm/pretty-console-js": "^0.1.5"
+    "@ayapapa-npm/contracts-js": "^0.3.0"
   }
 }

@@ -1,4 +1,4 @@
-import { BaseUserOptions } from './LockImpl';
+import { BaseUserOptions } from './BaseUserOptions';
 
 // User options for FileLock (inherits from BaseUserOptions)
 export interface FileLockUserOptions extends BaseUserOptions {
@@ -60,4 +60,5 @@ export interface FileLockUserOptions extends BaseUserOptions {
    *  Cannot be used together with retryIntervalSec. Default is 100.
    */
   retryIntervalMs?:number;
+
 }

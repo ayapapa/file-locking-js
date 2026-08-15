@@ -1,4 +1,6 @@
-import { LockImpl, type BaseUserOptions, type BaseOptionsResolver, type CallbackOnLock } from "./LockImpl";
+import { LockImpl, type CallbackOnLock } from "./LockImpl";
+//import { type BaseUserOptions } from "./BaseUserOptions";
+//import { type BaseOptionsResolver } from "./BaseOptionsResolver";
 import { FileLockUserOptions } from './FileLockUserOptions';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver";
 
@@ -14,10 +16,18 @@ export class FileLock extends LockImpl {
    */
 
   /** Lock key */
-  private key: string = null;
+  private key: string;
 
   /** Heartbeat timer id */
-  private heartbeatTimer: number = null;
+  private heartbeatTimer?: number;
+
+  /**
+   * Key - instance map
+   * キー毎にインスタンスを紐づけて、Mapにキャッシュする。
+   * これによりキー識別と、再入ロック検出の実現を可能とする。
+   * キャッシュされたインスタンスは、一定の確率で掃除（その時点において、紐づいたロックファイルが無いものは削除）される（予定）。
+   */
+  private keyInstanceMap: Map<string, object> = new Map();
 
   /**
    * Constructor.
@@ -58,15 +68,20 @@ export class FileLock extends LockImpl {
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}) {
     const optResolver = new FileLockUserOptionsResolver(options);
-    // 管理キー生成
-    // キー毎のインスタンス管理
-    // これによりキー識別と、再入ロック検出の実現を可能とする
     /*
     if (!KeyFileLockMap.has(key)) {
       KeyFileLockMap.set(key, new FileLockImpl(key));
     }
     return KeyFileLockMap.get(key).withLock(onLockFn, options);
     */
-   return null;
+   return "test_001"; // 一時的にテスト用に！！
+  }
+
+  /**
+   * 
+   * @returns デフォルトオプションを取得する
+   */
+  public static getDefaultOptions() {
+    return FileLockUserOptionsResolver.getDefaultOptions();
   }
 }
