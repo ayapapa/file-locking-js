@@ -119,3 +119,9 @@ interface InternalState {
 export type AllOptions<T extends BaseUserOptions = BaseUserOptions> = T & InternalState;
 export type AllOptionsKey<T extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<T>;
 
+/** Enumerate typed object keys. */
+export function typedKeys<T extends object>(obj: T): Array<keyof T> {
+  return Object.keys(obj) as Array<keyof T>;
+}
+
+

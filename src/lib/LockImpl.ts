@@ -29,12 +29,7 @@ interface InternalState {
   monitor?: Monitor;
 }
 
-// The general type for Options (accepting a generic T)
-//export type AllOptions<T extends BaseUserOptions = BaseUserOptions> = T & InternalState;
-//export type AllOptionsKey<T extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<T>;
-
-
-
+/** 再入ロック検出用のコンテキストオブジェクト */
 interface ReentrantContext  {
   /** Set of reentrant context ids */
   heldLocks: Set<string>;

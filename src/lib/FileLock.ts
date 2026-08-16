@@ -1,8 +1,38 @@
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+
 import { LockImpl, type CallbackOnLock } from "./LockImpl";
 //import { type BaseUserOptions } from "./BaseUserOptions";
 //import { type BaseOptionsResolver } from "./BaseOptionsResolver";
-import { FileLockUserOptions } from './FileLockUserOptions';
+import { FileLockUserOptions, typedKeys } from './FileLockUserOptions';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver";
+import { LockError } from './FileLockErrors';
+
+export interface Config {
+  /**
+   * Specifies the directory path to stored locking imformations.
+   * If it has been specified, use this as the top priority.
+   * The directory is determined based on the following order of priority:<br>
+   *  1. Specified via an `Config` (user's explicit intent)
+   *  2. Specified via an environment variable, `'AYPP_FILELOCK_DIR'`, (system administrator or CI/CD configuration)
+   *  3. `process.cwd()` (current working directory at runtime)
+   *  4. `__dirname` (location of this script)
+   * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.
+   */
+  lockDirectory?: string;
+
+  /** 
+   * Whether to enable caching for FileLockI instances associated with a key.
+   * Default is `true`.
+   */
+  chache?: boolean;
+
+  /**
+   * User default options used with `withLock()`.
+   * Default is 'FileLock.getDefaultOptions()'. 
+   */
+  defaultOptions?: FileLockUserOptions;
+}
 
 /**
 * File locking. 
@@ -15,48 +45,34 @@ export class FileLock extends LockImpl {
    * Instance fields
    */
 
+  private static config: Config = { chache: true, defaultOptions: FileLock.getDefaultOptions()};
+  //private static dirPath: string;
+  private baseFilePath?: string;
+  private filePath?: string;
+
   /** Lock key */
   private key: string;
-
   /** Heartbeat timer id */
   private heartbeatTimer?: number;
 
   /**
-   * Key - instance map
+   * Keyに紐づけられたインスタスのキャッシュ。
    * キー毎にインスタンスを紐づけて、Mapにキャッシュする。
    * これによりキー識別と、再入ロック検出の実現を可能とする。
    * キャッシュされたインスタンスは、一定の確率で掃除（その時点において、紐づいたロックファイルが無いものは削除）される（予定）。
    */
-  private keyInstanceMap: Map<string, object> = new Map();
+  private static cache: Map<string, FileLock> = new Map();
+
+  public static setCondig(config: Config): void {
+    Object.assign(FileLock.config, JSON.parse(JSON.stringify(config)));
+  }
+
+  public static getCondig(): Config {
+    // Return copied config.
+    return JSON.parse(JSON.stringify(FileLock.config));
+  }
 
   /**
-   * Constructor.
-   * @param {string}  key  
-   */
-  constructor(key: string) {
-    super();
-    this.key = key;
-    /*
-    this._filePath = this.constructor._getBasePath(this.#key);
-    this._lockFilePath      = this._filePath + '.lock';
-    this._lockMetaFilePath  = path.join(this._filePath + '.json');
-    */
-  }
-
-  private async withLock(onLockFn: CallbackOnLock, options: FileLockUserOptions) {
-    // 管理キー生成
-    // キー毎のインスタンス管理
-    // これによりキー識別と、再入ロック検出の実現を可能とする
-    /*
-    if (!KeyFileLockMap.has(key)) {
-      KeyFileLockMap.set(key, new FileLockImpl(key));
-    }
-    return KeyFileLockMap.get(key).withLock(onLockFn, options);
-    */
-   return null;
-  }
-
-   /**
    * Acquires a lock for the specified key,
    * executes the function `onLockFn` under exclusive control, and returns a Promise that resolves with the return value of `onLockFn` after the lock is released. 
    *
@@ -67,14 +83,11 @@ export class FileLock extends LockImpl {
    * @abstract
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}) {
-    const optResolver = new FileLockUserOptionsResolver(options);
-    /*
-    if (!KeyFileLockMap.has(key)) {
-      KeyFileLockMap.set(key, new FileLockImpl(key));
+    const rOpt = new FileLockUserOptionsResolver(options, FileLock.config?.defaultOptions).getOptions();
+    if (!FileLock.cache.has(key)) {
+      FileLock.cache.set(key, new FileLock(key));
     }
-    return KeyFileLockMap.get(key).withLock(onLockFn, options);
-    */
-   return "test_001"; // 一時的にテスト用に！！
+    return (FileLock.cache.get(key))?.withLock(onLockFn, rOpt);
   }
 
   /**
@@ -84,4 +97,92 @@ export class FileLock extends LockImpl {
   public static getDefaultOptions() {
     return FileLockUserOptionsResolver.getDefaultOptions();
   }
+
+  public static removeCache() {
+    this.cache.clear();
+  }
+
+  /**
+   * ロックファイル格納ディレクトリパスを取得する。
+   * 以下の優先順位でディレクトリを決定する。<br>
+   * 1. 引数で指定された場合 (ユーザーの明示的な意図)
+   * 2. 環境変数で指定された場合 (システム管理者やCI/CDの設定)
+   * 3. process.cwd() (実行時のカレントディレクトリ)
+   * 4. __dirname (スクリプトの配置場所)
+   * Note: 意図的指定（下記、1または2）されたケースでは、指定のディレクトリが無く、かつ、その作成に失敗したときは、エラー。
+   * @returns ロックファイル格納ディレクトリパス
+   */
+  private static getLockDirPath() {
+    const candies = {
+      'config.lockDirectory' : FileLock.config.lockDirectory,
+      'process.env["AYPP_FILELOCK_DIR"]': process.env["AYPP_FILELOCK_DIR"],
+      'process.cwd()': path.join(process.cwd(), '.lock'),
+      '__dirname': path.join(__dirname, '.lock')
+    };
+    // ロックディレクトリ探索開始
+    let candidates: string = '';
+    const keys = typedKeys(candies);
+    for(let i = 0; i < keys.length; i++) {
+      const dir = candies[keys[i]];
+      // ディレクトリ指定なしなら次
+      if (!dir) continue;
+      candidates += "\n" + `- ${dir}`;
+      // ディレクトリが存在するなら、それに決定。
+      if (fs.existsSync(String(dir))) return dir;
+      // 無い場合は、ディレクトリを作成できたなら、それに決定。
+      try {
+        fs.mkdirSync(String(dir), {recursive:true});
+        return dir;
+      }
+      catch (err) {
+        // ユーザー指定のケースでは、エラー
+        if (i <= 2) {
+          // ロックディレクトリ生成失敗
+          throw new LockError("ロックファイル格納ディレクトリの作成に失敗しました",
+            { code: 'ECREATELOCKDIR', props: { dirPath: dir } });
+        }
+        // それ以外は次を試す
+        continue;
+      }
+    };
+    // ロックディレクトリ生成失敗
+    throw new LockError(
+      "ロックファイル格納ディレクトリの作成に失敗しました。" +
+      "次の順で探索および作成にトライしました。" +
+      candidates,
+      { code: 'ECREATELOCKDIR' }
+    );
+  }
+
+  /**
+   * Constructor.
+   * @param {string}  key  
+   */
+  constructor(key: string) {
+    super();
+    // ★★★★★　dirPathは、ここで、きめるのは、ダメ。withLockのたびに、ディレクトリを確認しないと、途中の設定の変更を確認できない！！！！★★★★★
+    // だとすると、パスは、インスタンスプロパティではダメなのかな？？？　だって、インスタンスで覚えちゃうからね。
+    // ★★なので、都度、決めるしかなくなるね！！！って、本当？？？　ちゃんと、設計の見直しを考えよう！！！★★
+    // となると、以下の、パス関連は、インスタンスではなく、都度、作る感じだな！！！
+    this.key = key;
+    /*
+    this.dirPath      = FileLock.getLockDirPath();
+    this.baseFilePath = path.join(this.dirPath, this.key);
+    this.filePath     = this.baseFilePath + '.json';
+    */
+  }
+
+
+  private async withLock(onLockFn: CallbackOnLock, options: FileLockUserOptions) {
+    // ロック情報pathはスタティックインスタンスから取得。などなど、、、、、
+    // 基本的に、ロックディレクトリはスタティック設定で決まる！！　なので、ロックファイルも、スタティックに来まる！
+    // ★★★★これ、コメントに記載すべき★★★★　その代わり、設定（ロックディレクトリ）変更後は、たとえ同キーだとしても、「変更前の同キーと排他制御できない」ことが、注意事項。
+    const  dirPath      = FileLock.getLockDirPath();
+    this.baseFilePath = path.join(dirPath, this.key);
+    this.filePath     = this.baseFilePath + '.json';
+    
+
+   return "test_001"; // 一時的にテスト用として
+  }
+
 }

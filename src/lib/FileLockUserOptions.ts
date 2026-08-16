@@ -1,4 +1,4 @@
-import { BaseUserOptions } from './BaseUserOptions';
+import { BaseUserOptions, typedKeys } from './BaseUserOptions';
 
 // User options for FileLock (inherits from BaseUserOptions)
 export interface FileLockUserOptions extends BaseUserOptions {
@@ -61,4 +61,11 @@ export interface FileLockUserOptions extends BaseUserOptions {
    */
   retryIntervalMs?:number;
 
+  /**
+   * Directory for storing lock files.  
+   */
+  //lockDirectory?:string;
+
 }
+
+export { typedKeys };

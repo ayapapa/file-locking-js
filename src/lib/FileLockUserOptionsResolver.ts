@@ -13,8 +13,8 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
    * Constructor.
    * @param options User options.
    */
-  constructor(options: FileLockUserOptions) {
-    super(options);
+  constructor(options: FileLockUserOptions, defaultOptions?: FileLockUserOptions ) {
+    super(options, defaultOptions);
     /*this.options = {
       ...this.options,
       ...options,

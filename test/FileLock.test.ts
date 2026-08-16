@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLock, FileLockUserOptions, LogProvider } from '../src/index';
@@ -95,7 +97,6 @@ describe('FileLock', () => {
   it("When the lock with options other than time-related ones,  internally resolved options are valid.", async () => {
     const retVal = "test_001", key = retVal;
     const logger: LogProvider = new PrettyConsole();
-    const it = typeof logger;
     const opts =  { allowReentry: true, logger: logger, retriesOnIOErr: 2 } as any;
     expect(await FileLock.withLock(key, 
       async () => {
@@ -127,7 +128,41 @@ describe('FileLock', () => {
     expect(opts._resolvedOpts.resolved).toBe(true);
   });
 
-  /*
+  it("ロックディレクトリが出来ることをテスト１.", async () => {
+    const retVal = "test_001", key = retVal;
+    const dir = path.join(process.cwd(), '.lock');
+    //const dir = path.join(__dirname, '.lock');
+    const config = { lockDirectory: dir };
+    FileLock.setCondig(config);
+    fs.rmSync(dir, { force: true, recursive: true });
+    expect(fs.existsSync(dir)).toBe(false);
+    expect(await FileLock.withLock(key, 
+      async () => {
+        await sleepAsync(3000);
+        return retVal
+      },
+      {}
+    )).toBe(retVal);
+    expect(fs.existsSync(dir)).toBe(true);
+    fs.rmSync(dir, { force: true, recursive: true });
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  it("ロックディレクトリが出来ることをテスト２.", async () => {
+  });
+
+  it("ロックディレクトリが出来ることをテスト３.", async () => {
+  });
+
+  it("ロックディレクトリが出来ることをテスト４.", async () => {
+  });
+
+  it("ロックディレクトリが出来ない（すでにファイルで存在、途中パスがファイル名になっているとか、最後が既にあるけれどファイルだったりとか、など）をテスト１.", async () => {
+  });
+
+
+
+  /* 以下、資産管理プロジェクトから持ってこい！！
   it("test_InterProcessLock_success"), () => {
     // 非同期で3秒スリープする関数を、別キーで複数回呼び出してみる
     const a =  FileLock.withLock("testKey1", 

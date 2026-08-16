@@ -1,7 +1,7 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-import { type BaseUserOptions, type KeyTypeMap, type AllOptions, type AllOptionsKey, type TimeBasedKey, type MsKey, type SecKey } from './BaseUserOptions';
+import { typedKeys, type BaseUserOptions, type KeyTypeMap, type AllOptions, type AllOptionsKey, type TimeBasedKey, type MsKey, type SecKey } from './BaseUserOptions';
 import { LockError } from './FileLockErrors';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
@@ -75,13 +75,13 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
    * コンストラクタ
    * @param opts
    */
-  constructor(opts: T) {
+  constructor(opts: T, defaultOpts?: T) {
      this.options = {
       ...opts,
       resolved: false,
     } as AllOptions<T>;
 
-    this.resolveOptions();
+    this.resolveOptions(defaultOpts);
   }
 
   public getOptions(): AllOptions<T> {
@@ -92,9 +92,9 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
    * ユーザーオプションを検証後、内部用に一部変更・補完した結果を取得する。
    * @param {ojbect} defaultOpts  デフォルトオプション
    */
-  resolveOptions() {
+  resolveOptions(defaultOpts?: T) {
     this.validateOptions();
-    this.normalizeOptions();
+    this.normalizeOptions(defaultOpts);
     this.options.resolved = true;
   }
 
@@ -119,11 +119,12 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
    * @param {BaseUserOptions} defaultOpts  デフォルトオプション
    * @return {objects}
    */
-  normalizeOptions() {
+  normalizeOptions(defaultOpts?: T) {
     // 単位変換
     this.convSecToMs();
     // デフォルト埋め ★★★　defaultOptionsのオーバーライド！！！
-    Object.assign(this.options, {...this.getDefaultOptions(), ...this.options});
+    const defOpts = defaultOpts || this.getDefaultOptions();
+    Object.assign(this.options, {...defOpts, ...this.options});
   }
 
   protected getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
@@ -146,18 +147,13 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
     
   }
 
-  /** Enumerate typed object keys. */
-  private typedKeys<T extends object>(obj: T): Array<keyof T> {
-    return Object.keys(obj) as Array<keyof T>;
-  }
-
-  /**
+    /**
    * ユーザーオプションの値の型をチェックする
    */
   checkTypes() {
     const pairs = this.getCheckTypePairs();
 
-    this.typedKeys(pairs).forEach(key => {
+    typedKeys(pairs).forEach(key => {
       const t = pairs[key];
       const v = this.options[key];
       REQUIRE(!v || typeof t === 'function' && t(v) || typeof v === t, 
