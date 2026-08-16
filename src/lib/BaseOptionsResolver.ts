@@ -1,8 +1,17 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-import { typedKeys, type BaseUserOptions, type KeyTypeMap, type AllOptions, type AllOptionsKey, type TimeBasedKey, type MsKey, type SecKey } from './BaseUserOptions';
-import { LockError } from './FileLockErrors';
+import { 
+  typedKeys, 
+  type BaseUserOptions, 
+  type KeyTypeMap, 
+  type AllOptions, 
+  type AllOptionsKey, 
+  type TimeBasedKey, 
+  type MsKey, 
+  type SecKey 
+} from './BaseUserOptions.ts';
+import { LockError } from './FileLockErrors.ts';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
 const logger = new PrettyConsole();

@@ -1,12 +1,12 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
-import { LockImpl, type CallbackOnLock } from "./LockImpl";
+import { LockImpl, type CallbackOnLock } from "./LockImpl.ts";
 //import { type BaseUserOptions } from "./BaseUserOptions";
 //import { type BaseOptionsResolver } from "./BaseOptionsResolver";
-import { FileLockUserOptions, typedKeys } from './FileLockUserOptions';
-import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver";
-import { LockError } from './FileLockErrors';
+import { FileLockUserOptions, typedKeys } from './FileLockUserOptions.ts';
+import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
+import { LockError } from './FileLockErrors.ts';
 
 export interface Config {
   /**

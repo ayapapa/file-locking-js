@@ -9,7 +9,8 @@
     "emitDeclarationOnly": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
   },
   "include": [
     "src/**/*"

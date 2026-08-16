@@ -3,9 +3,9 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 import { AnyMxRecord } from 'node:dns';
-import { LockError, DeadlockDetected, TTLExceeded, AlreadyLocked} from './FileLockErrors';
-import { type BaseUserOptions, type AllOptions } from './BaseUserOptions';
-import { BaseOptionsResolver } from './BaseOptionsResolver';
+import { LockError, DeadlockDetected, TTLExceeded, AlreadyLocked} from './FileLockErrors.ts';
+import { type BaseUserOptions, type AllOptions } from './BaseUserOptions.ts';
+import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
 const logger = new PrettyConsole();

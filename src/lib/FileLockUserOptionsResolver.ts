@@ -1,6 +1,6 @@
-import { type KeyTypeMap, type AllOptions, type TimeBasedKey } from './BaseUserOptions';
-import { BaseOptionsResolver } from './BaseOptionsResolver';
-import { FileLockUserOptions } from './FileLockUserOptions';
+import { type KeyTypeMap, type AllOptions, type TimeBasedKey } from './BaseUserOptions.ts';
+import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
+import { FileLockUserOptions } from './FileLockUserOptions.ts';
 
 //type FileLockTimeBasedKey extends TimeBasedKey = 'pollInterval' | 'heartbeatInterval' | 'heartbeatTimeout' | 'retryInterval';
 //type FileLockTimeBasedKey = 'timeout' | 'ttl' | 'pollInterval' | 'heartbeatInterval' | 'heartbeatTimeout' | 'retryInterval';

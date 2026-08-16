@@ -1,4 +1,4 @@
-import { BaseUserOptions, typedKeys } from './BaseUserOptions';
+import { BaseUserOptions, typedKeys } from './BaseUserOptions.ts';
 
 // User options for FileLock (inherits from BaseUserOptions)
 export interface FileLockUserOptions extends BaseUserOptions {

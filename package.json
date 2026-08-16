@@ -17,8 +17,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.js --format esm,cjs --out-dir dist --clean --dts",
-    "typecheck": "tsc --noEmit",
+    "build": "tsup src/index.ts --format esm,cjs --out-dir dist --clean --dts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:debug": "vitest --inspect-brk --run",
     "test:watch": "vitest",
