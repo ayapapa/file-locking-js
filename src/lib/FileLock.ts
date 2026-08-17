@@ -1,12 +1,12 @@
-import * as path from 'node:path';
-import * as fs from 'node:fs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 import { LockImpl, type CallbackOnLock } from "./LockImpl.ts";
 //import { type BaseUserOptions } from "./BaseUserOptions";
 //import { type BaseOptionsResolver } from "./BaseOptionsResolver";
 import { FileLockUserOptions, typedKeys } from './FileLockUserOptions.ts';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
-import { LockError } from './FileLockErrors.ts';
+import { FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from './FileLockErrors.ts';
 
 export interface Config {
   /**
@@ -25,7 +25,7 @@ export interface Config {
    * Whether to enable caching for FileLockI instances associated with a key.
    * Default is `true`.
    */
-  chache?: boolean;
+  cache?: boolean;
 
   /**
    * User default options used with `withLock()`.
@@ -45,7 +45,8 @@ export class FileLock extends LockImpl {
    * Instance fields
    */
 
-  private static config: Config = { chache: true, defaultOptions: FileLock.getDefaultOptions()};
+  private static readonly defaultConfig: Config = { cache: true, defaultOptions: FileLock.getDefaultOptions()};
+  private static config: Config = FileLock.defaultConfig;
   //private static dirPath: string;
   private baseFilePath?: string;
   private filePath?: string;
@@ -63,13 +64,18 @@ export class FileLock extends LockImpl {
    */
   private static cache: Map<string, FileLock> = new Map();
 
-  public static setCondig(config: Config): void {
-    Object.assign(FileLock.config, JSON.parse(JSON.stringify(config)));
+  public static setConfig(config: Config): void {
+    const dConf = JSON.parse(JSON.stringify(config));
+    FileLock.config = { ...FileLock.defaultConfig, ...dConf };
   }
 
-  public static getCondig(): Config {
+  public static getConfig(): Config {
     // Return copied config.
     return JSON.parse(JSON.stringify(FileLock.config));
+  }
+
+  public static getDefaultConfig(): Config {
+    return JSON.parse(JSON.stringify(FileLock.defaultConfig));
   }
 
   /**
@@ -103,22 +109,44 @@ export class FileLock extends LockImpl {
   }
 
   /**
-   * ロックファイル格納ディレクトリパスを取得する。
-   * 以下の優先順位でディレクトリを決定する。<br>
-   * 1. 引数で指定された場合 (ユーザーの明示的な意図)
-   * 2. 環境変数で指定された場合 (システム管理者やCI/CDの設定)
-   * 3. process.cwd() (実行時のカレントディレクトリ)
-   * 4. __dirname (スクリプトの配置場所)
-   * Note: 意図的指定（下記、1または2）されたケースでは、指定のディレクトリが無く、かつ、その作成に失敗したときは、エラー。
-   * @returns ロックファイル格納ディレクトリパス
+   * Get a directory path for storing files containing lock information.
+   * If it has been specified, use this as the top priority.
+   * The directory is determined based on the following order of priority:<br>
+   *  1. Specified via an `Config` (user's explicit intent)
+   *  2. Specified via an environment variable, `'AYPP_FILELOCK_DIR'`, (system administrator or CI/CD configuration)
+   *  3. `process.cwd()` (current working directory at runtime)
+   *  4. `__dirname` (location of this script)
+   * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.
+   * @returns A directory path for storing files containing lock information.
    */
   private static getLockDirPath() {
+    const existsDir = (name: string): boolean => {
+      try {
+        const stat = fs.statSync(name);
+        if (stat.isDirectory()) return true;
+        throw Object.assign(new Error(`'${name}' is not a directory.`), { code: 'ENOTDIR' });
+      }
+      catch (err) {
+        if (err.code === 'ENOENT') return false;
+        throw new LockDirectoryStatFailed(err.message, { path: name, props: { fsErrorCode: err.code } } );
+      }
+    }
+    const mkdir = (name: string): void => {
+      try {
+        fs.mkdirSync(name,  { recursive: true });
+      }
+      catch (err) {
+        // ロックディレクトリアクセス失敗
+        throw new LockDirectoryCreationFailed(err.message, { path: name, props: { path: name, fsErrorCode: err.code } });
+      }
+    }
     const candies = {
       'config.lockDirectory' : FileLock.config.lockDirectory,
       'process.env["AYPP_FILELOCK_DIR"]': process.env["AYPP_FILELOCK_DIR"],
       'process.cwd()': path.join(process.cwd(), '.lock'),
       '__dirname': path.join(__dirname, '.lock')
     };
+    const isSpecified = (i: number) => i < 2;
     // ロックディレクトリ探索開始
     let candidates: string = '';
     const keys = typedKeys(candies);
@@ -127,30 +155,23 @@ export class FileLock extends LockImpl {
       // ディレクトリ指定なしなら次
       if (!dir) continue;
       candidates += "\n" + `- ${dir}`;
-      // ディレクトリが存在するなら、それに決定。
-      if (fs.existsSync(String(dir))) return dir;
-      // 無い場合は、ディレクトリを作成できたなら、それに決定。
       try {
-        fs.mkdirSync(String(dir), {recursive:true});
+        // ディレクトリが存在するなら、それに決定。
+        if (existsDir(dir)) return dir;
+        mkdir(dir);
         return dir;
       }
       catch (err) {
-        // ユーザー指定のケースでは、エラー
-        if (i <= 2) {
-          // ロックディレクトリ生成失敗
-          throw new LockError("ロックファイル格納ディレクトリの作成に失敗しました",
-            { code: 'ECREATELOCKDIR', props: { dirPath: dir } });
-        }
-        // それ以外は次を試す
+        if (isSpecified(i)) throw err;
         continue;
       }
     };
     // ロックディレクトリ生成失敗
-    throw new LockError(
-      "ロックファイル格納ディレクトリの作成に失敗しました。" +
-      "次の順で探索および作成にトライしました。" +
+    throw new LockDirectoryCreationFailed(
+      "Failed to create the lock information storage directory." +
+      "\nAttempted to locate and create it in the following order:" +
       candidates,
-      { code: 'ECREATELOCKDIR' }
+      { props: { candidates } }
     );
   }
 

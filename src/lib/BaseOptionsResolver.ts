@@ -11,7 +11,7 @@ import {
   type MsKey, 
   type SecKey 
 } from './BaseUserOptions.ts';
-import { LockError } from './FileLockErrors.ts';
+import { LockError } from './LockErrors.ts';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
 const logger = new PrettyConsole();

@@ -8,18 +8,19 @@ A file-based lock for coordinating exclusive access between processes.
   ```
 
 
-# 特徴
-* 複数プロセス間において、直列化すべき「資源等へのアクセス処理」を排他的に実行できる。<br>
-  例えば、「特定サービスのアクセスを、一度に一回のみ実施する」、「ドキュメントの更新を他プロセスに干渉されずに更新する」、など。
-* シンプルで安全なユーザーインターフェイス。　
-  利用者は、これを呼ぶだけ: 
+# Features
+* Enables exclusive execution of "resource access operations" that require serialization across multiple processes.<br>
+Examples include "limiting access to a specific service to one instance at a time" or "updating a document without interference from other processes."
+* Features a simple and safe user interface. <br>
+Users simply call it like this:
   ```js
-  const ret = await FileLock.withLock('lock key', () => { 'ロック中に実行すべき処理'; return result; }, options); 
-  // Offcouse you can get callback functions return values.
+  const ret = await FileLock.withLock('lock key', () => { 'process to run while locked'; return result; }, options);
+  // Of course, you can retrieve return values ​​from the callback function.
   ```
-  このため、ロック解除忘れの心配がない。これは、利用者にとっては親切な設計だと思う。
-* 同一プロセス内におけるデッドロックを防ぐことができる。 <br>
-  AsyncLocalStorageを利用し同じキーにおける再入ロックを検出可能とした。これにより、慎重なオプション（デフォルト(`{allowReentry: false}`)）では、デッドロック検出エラーとなる。
-  もちろん、オプションで、再入ロック可能を指定することも出来る(`{allowReentry: true}`)。この場合、再入ロックについては、ロックをせずに、処理を実施する。ただし、この場合、前段のロック中の処理との干渉が無き事は利用者側で保証する必要がある。
-* 堅牢で著名な`proper-filelock`を利用し、本ライブラリの内部で行われる種々のファイルアクセスの排他制御に利用しており、そのおかげで堅牢なプロセス間排他制御を実現できている。
-* ロック用に作成したファイルにメタ情報を格納しているため、ロック時点の`Ttl`(Time to live)や`heartbeat timeout`(実行中の処理が終わってからのタイムアウト時間)を格納しているので、ロックの有効性の確認を前段ロックの意向を反映している。
+  This eliminates the risk of forgetting to release the lock—a design choice that prioritizes user convenience.
+* Prevents deadlocks within the same process.<br>
+It uses `AsyncLocalStorage` to detect re-entrant locks on the same key. Consequently, the default configuration (`{allowReentry: false}`) triggers an error upon deadlock detection.<br>
+Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`). In this mode, the operation proceeds without acquiring a new lock for the re-entrant call; however, the user is responsible for ensuring there is no interference with the ongoing operation protected by the initial lock.
+* Leverages the robust and well-known `proper-filelock` library to handle the underlying file access synchronization, ensuring reliable inter-process mutual exclusion.
+* By storing the lock's `TTL` (time-to-live) and `heartbeat timeout` (the timeout period following operation completion) within the lock file itself, it is possible to verify the lock's validity based on the parameters defined when the lock was acquired.
+* Supports caching of created lock instances to reduce performance overhead. Additionally, users can specify a maximum number of cache entries, allowing for a balanced trade-off regarding memory usage.

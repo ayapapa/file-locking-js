@@ -143,5 +143,8 @@ vite.config.ts.timestamp-*
 .vite/
 [h|H]owTo*.txt
 
-test/tmp/*
+test/tmp/
 generalClassDefinition.txt
+.lock/
+.cache/
+

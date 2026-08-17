@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockUserOptions, LogProvider } from '../src/index';
+import { Config, FileLock, FileLockError, FileLockUserOptions, LogProvider } from '../src/index';
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -128,39 +128,210 @@ describe('FileLock', () => {
     expect(opts._resolvedOpts.resolved).toBe(true);
   });
 
-  it("ロックディレクトリが出来ることをテスト１.", async () => {
-    const retVal = "test_001", key = retVal;
+  it("`FileLock.setConfig()` works correctly.", async () => {
+    const orgConf = FileLock.getConfig();
+    expect.assertions(3);
+    try {
+      FileLock.setConfig({});
+      expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
+      const lockDirectory = 'hogehoge';
+      let config: Config = {...FileLock.getDefaultConfig(), lockDirectory, cache: false };
+      FileLock.setConfig(config);
+      expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
+      config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
+      FileLock.setConfig(config);
+      expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
+  async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
+    set();
+    try {
+      const retVal = "test_001", key = retVal;
+      fs.rmSync(dir, { force: true, recursive: true });
+      expect(fs.existsSync(dir)).toBe(false);
+      expect(await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(3000);
+          return retVal;
+        },
+        {}
+      )).toBe(retVal);
+      expect(fs.existsSync(dir)).toBe(true);
+      expect(fs.statSync(dir).isDirectory()).toBe(true);
+      fs.rmSync(dir, { force: true, recursive: true });
+      expect(fs.existsSync(dir)).toBe(false);
+    }
+    finally {
+      reset();
+    }
+  }
+
+  it("The directory specified in `FileLock.setCondig()` is created.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    //const dir = path.join(__dirname, '.lock');
-    const config = { lockDirectory: dir };
-    FileLock.setCondig(config);
-    fs.rmSync(dir, { force: true, recursive: true });
-    expect(fs.existsSync(dir)).toBe(false);
-    expect(await FileLock.withLock(key, 
-      async () => {
-        await sleepAsync(3000);
-        return retVal
+    let orgConf: Config;
+    testLockDirectoryCreation(
+      dir,
+      () => {
+        orgConf = FileLock.getConfig();
+        FileLock.setConfig({ lockDirectory: dir });
       },
-      {}
-    )).toBe(retVal);
-    expect(fs.existsSync(dir)).toBe(true);
-    fs.rmSync(dir, { force: true, recursive: true });
-    expect(fs.existsSync(dir)).toBe(false);
+      () => FileLock.setConfig(orgConf),
+    );
   });
 
-  it("ロックディレクトリが出来ることをテスト２.", async () => {
+  it("The directory specified by the environment variable `'AYPP_FILELOCK_DIR'` is created.", async () => {
+    const dir = path.join(process.cwd(), '.lock');
+    let orgDir: string | undefined;
+    testLockDirectoryCreation(
+      dir,
+      () => {
+        orgDir = process.env['AYPP_FILELOCK_DIR'];
+        process.env['AYPP_FILELOCK_DIR'] = dir;
+      },
+      () => { if (orgDir) process.env['AYPP_FILELOCK_DIR'] = orgDir; },
+    );
   });
 
-  it("ロックディレクトリが出来ることをテスト３.", async () => {
+  it("If the user does not specify a lock directory, a lock directory is created based on `process.cwd()`.", async () => {
+    const dir = path.join(process.cwd(), '.lock');
+    let orgConf: Config;
+    let orgDir: string | undefined;
+    testLockDirectoryCreation(
+      dir,
+      () => {
+        orgConf = FileLock.getConfig();
+        FileLock.setConfig({});
+        orgDir = process.env['AYPP_FILELOCK_DIR'];
+        delete process.env['AYPP_FILELOCK_DIR'];
+      },
+      () => {
+        FileLock.setConfig(orgConf);
+        if (orgDir) process.env['AYPP_FILELOCK_DIR'] = orgDir;
+      }
+    );
   });
 
-  it("ロックディレクトリが出来ることをテスト４.", async () => {
+  it("If the user does not specify a lock directory and an error occurs while attempting to create one based on `process.cwd()`," +
+    " the lock directory is created in the directory containing the `FileLock` script.", async () => {
+    const dir = path.join(process.cwd(), 'src/lib', '.lock');
+    const dummyPath = path.join(process.cwd(), '.lock');
+    let orgConf: Config;
+    let orgDir: string | undefined;
+    testLockDirectoryCreation(
+      dir,
+      () => {
+        orgConf = FileLock.getConfig();
+        FileLock.setConfig({});
+        orgDir = process.env['AYPP_FILELOCK_DIR'];
+        delete process.env['AYPP_FILELOCK_DIR'];
+        fs.writeFileSync(dummyPath, "");
+      },
+      () => {
+        FileLock.setConfig(orgConf);
+        if (orgDir) process.env['AYPP_FILELOCK_DIR'] = orgDir;
+        fs.rmSync(dummyPath);
+      }
+    );
   });
 
-  it("ロックディレクトリが出来ない（すでにファイルで存在、途中パスがファイル名になっているとか、最後が既にあるけれどファイルだったりとか、など）をテスト１.", async () => {
+  it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {
+    const eCode = 'EHOGEHOGE';
+    const eMsg = 'Hogehoge error!!';
+    const spy = vi.spyOn(fs, 'statSync').mockImplementation(() => {
+      const err = Object.assign(new Error(eMsg), { code: eCode });
+      throw err;
+    });
+    expect.assertions(3);
+    try {
+      const retVal = "test_001", key = retVal;
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(3000);
+          return retVal;
+        }
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof FileLockError).toBe(true);
+      expect(err.fsErrorCode).toBe(eCode);
+      expect(err.fsErrorMsg).toBe(eMsg);
+    }
+    finally {
+      spy.mockRestore();
+    }
   });
 
+  it("The lock directory path does not exist, so an attempt is made to create it, but an error occurs.", async () => {
+    const eCode = 'EHOGEHOGE';
+    const eMsg = 'Hogehoge error!!';
+    const spy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+      const err = Object.assign(new Error(eMsg), { code: eCode });
+      throw err;
+    });
+    expect.assertions(3);
+    const dir = path.join(process.cwd(), '.lock');
+    const orgConf = FileLock.getConfig();
+    FileLock.setConfig({ lockDirectory: dir });
+    try {
+      const retVal = "test_001", key = retVal;
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(3000);
+          return retVal;
+        }
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof FileLockError).toBe(true);
+      expect(err.fsErrorCode).toBe(eCode);
+      expect(err.fsErrorMsg).toBe(eMsg);
+    }
+    finally {
+      spy.mockRestore();
+      FileLock.setConfig(orgConf);
+    }
+  });
 
+  it("An error occurs because the directory path specified in `FileLock.setCondig()` already exists but is not a directory.", async () => {
+    const dir = path.join(process.cwd(), '.lock');
+    fs.writeFileSync(dir, "");
+    expect.assertions(4); // 例外は1回おきるはず
+    try {
+      const retVal = "test_001", key = retVal;
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(3000);
+          return retVal;
+        }
+      )
+    }
+    catch (err: any) {
+      expect(err instanceof FileLockError).toBe(true);
+      expect(err.fsErrorCode).toBe('ENOTDIR');
+      expect(err.fsErrorMsg.includes(dir)).toBe(true);
+      expect(err.fsErrorMsg.includes('not a directory')).toBe(true);
+    }
+    finally {
+      fs.rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  it("キャッシュをリセットして有効化したあとにロックすると、キャッシュエントリー数が1になっている。", async () => {
+    // as any　で反則のプライベートメンバーアクセス！！
+  });
+
+  it("キャッシュをリセットして無効化したあとにロックしても、キャッシュエントリー数が0になっている。", async () => {
+    // as any　で反則のプライベートメンバーアクセス！！
+  });
+
+  it("キャッシュ最大数を1にした時、2回別キーでロックしても、キャッシュエントリー数が1になっており、かつ、2回目のキーのキャッシュが残っている。", async () => {
+    // as any　で反則のプライベートメンバーアクセス！！
+    // アイデア：　マップは、オブジェクトで持つけれど、順番は、配列で持つ。配列にキーを積んで、上限に達したら、先頭から削除（配列とマップを削除）していく！！
+  });
 
   /* 以下、資産管理プロジェクトから持ってこい！！
   it("test_InterProcessLock_success"), () => {

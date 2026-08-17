@@ -1,68 +1,55 @@
+import { LockError } from './LockErrors.ts';
+
 /**
  * Basic lock handling error. 
  */
-export class LockError extends Error {
+export class FileLockError extends LockError {
   /**
    * Constructor.
    * @param msg   Error message.
    * @param params  Parameters.
+   */
+  constructor(msg: string | null, params?: {code?: string, props?: { [key: string]: any } }) {
+    super(msg, params);
+  }
+};
+
+class LockDirectoryAccessFailed extends FileLockError {
+  /**
+   * Constructor.
+   * @param operation   Operation on the lock information storage directory.
    * @param code  Error code string.
-   * @param props A set of arbitrary properties to be attached to the error instance.
-   */
-  constructor(msg = '', params?: {code?: string, props?: { [key: string]: any } }) {
-    super(msg);
-    const props = {...params?.props};
-    const code = (params?.code) ?? 'ELOCK';
-    Object.assign(this, { code, ...props });
-  }
-};
-
-/**
- * Deadlock detection error. 
- */
-export class DeadlockDetected extends LockError {
-  /**
-   * Constructor.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { props?: { [key: string]: any } }) {
-    msg = msg || 'A deadlock was detected.';
-    super(msg, { code: 'EDEADLK' , props: params?.props });
-  }
-};
-
-/**
- * TTL exceeded error.
- */
-export class TTLExceeded extends LockError {
-  /**
-   * Constructor.
-   * @param params  Parameters.
-   * @param props A set of arbitrary properties to be attached to the error instance.
-   */
-  constructor(msg?: string | null, params?: { ttlMs: string, props?: {[key: string]: any} }) {
-    const ttlMs = params?.ttlMs;
-    msg = msg || `The maximum processing time(${ttlMs ?? "options.ttlMs"} milliseconds) while locked has been exceeded.`;
-    const props = {...params?.props};
-    if (ttlMs) props[ttlMs] = ttlMs;
-    super(msg, { code: 'ETTLEXCEEDED', props });
-  }
-};
-
-/** Already locked error. */
-export class AlreadyLocked extends LockError {
-  /**
-   * Constructor.
-   * @param code    Error code string.
-   * @param key     Lock key.
-   * @param params  Parameters.
-   */
-  constructor(msg?: string | null, params?: {key: string, props?: {[key: string]: any} } ) {
-    const key = params?.key;
-    msg = msg || `Could not lock because the '${key ?? "key"}' is already locked.`;
-    const props = {...params?.props};
-    if (key) props[key] = key;
-    super(msg, { code:'ELOCKED' , props });
+  constructor(fsErrorMsg: string | null, operation: string, code: string, params?: {path?: string, props?: { [key: string]: any } }) {
+    const path = params?.path;
+    const props = { ...params?.props };
+    if (path != null) props.path = path;
+    if (fsErrorMsg != null) props.fsErrorMsg = fsErrorMsg;
+    super(`Failed to ${operation} the lock information storage directory${path ? '('+path+')' : ""}.`, { code , props });
   }
 }
 
+export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
+  /**
+   * Constructor.
+   * @param orgMsg   Original error message.
+   * @param code  Error code string.
+   * @param params  Parameters.
+   */
+  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
+    super(fsErrorMsg, 'check the status of', 'ELOCKDIRSTAT', params);
+  }
+}
+
+export class LockDirectoryCreationFailed extends LockDirectoryAccessFailed {
+  /**
+   * Constructor.
+   * @param orgMsg  Original error message.
+   * @param code    Error code string.
+   * @param params  Parameters.
+   */
+  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
+    super(fsErrorMsg, 'create', 'ELOCKDIRCREATE', params);
+  }
+}
