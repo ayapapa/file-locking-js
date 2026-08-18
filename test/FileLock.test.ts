@@ -210,6 +210,7 @@ describe('FileLock', () => {
     FileLock.setConfig({});
     fs.rmSync(dir, { force: true, recursive: true });
     fs.writeFileSync(dir, "");
+    expect.assertions(2);
     try {
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
@@ -230,16 +231,17 @@ describe('FileLock', () => {
     }
   });
 
-  it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {
+  async function testFsErrorBySpyOn(spyOnFnName: 'statSync' | 'mkdirSync', config: Config, ErrorClass: new (...args:any[]) => Error): Promise<void>
+  {
     const eCode = 'EHOGEHOGE';
     const eMsg = 'Hogehoge error!!';
-    const spy = vi.spyOn(fs, 'statSync').mockImplementation(() => {
+    const spy = vi.spyOn(fs, spyOnFnName).mockImplementation(() => {
       const err = Object.assign(new Error(eMsg), { code: eCode });
       throw err;
     });
     expect.assertions(3);
     const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ lockDirectory: 'hogehoge' });
+    FileLock.setConfig(config);
     try {
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
@@ -250,7 +252,7 @@ describe('FileLock', () => {
       );
     }
     catch (err: any) {
-      expect(err instanceof LockDirectoryStatFailed).toBe(true);
+      expect(err instanceof ErrorClass).toBe(true);
       expect(err.fsErrorCode).toBe(eCode);
       expect(err.fsErrorMsg).toBe(eMsg);
     }
@@ -258,40 +260,17 @@ describe('FileLock', () => {
       spy.mockRestore();
       FileLock.setConfig(orgConf);
     }
-  });
+  }
+
+  it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {
+    await testFsErrorBySpyOn('statSync', { lockDirectory: 'hogehoge' }, LockDirectoryStatFailed);
+ });
 
   it("The lock directory path does not exist, so an attempt is made to create it, but an error occurs.", async () => {
-    const eCode = 'EHOGEHOGE';
-    const eMsg = 'Hogehoge error!!';
-    const spy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
-      const err = Object.assign(new Error(eMsg), { code: eCode });
-      throw err;
-    });
-    expect.assertions(3);
-    const dir = path.join(process.cwd(), '.lock');
-    const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ lockDirectory: dir });
-    try {
-      const retVal = "test_001", key = retVal;
-      await FileLock.withLock(key, 
-        async () => {
-          await sleepAsync(500);
-          return retVal;
-        }
-      );
-    }
-    catch (err: any) {
-      expect(err instanceof FileLockError).toBe(true);
-      expect(err.fsErrorCode).toBe(eCode);
-      expect(err.fsErrorMsg).toBe(eMsg);
-    }
-    finally {
-      spy.mockRestore();
-      FileLock.setConfig(orgConf);
-    }
+    await testFsErrorBySpyOn('mkdirSync', { lockDirectory: path.join(process.cwd(), '.lock') }, LockDirectoryCreationFailed);
   });
 
-  it("An error occurs because the directory path specified in `FileLock.setCondig()` already exists but is not a directory.", async () => {
+  it("An error occurs because the directory path specified in `FileLock.setConfig()` already exists but is not a directory.", async () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.writeFileSync(dir, "");
     expect.assertions(5); // 例外は1回おきるはず
@@ -332,10 +311,10 @@ describe('FileLock', () => {
     expect((FileLock as any).cache.size).toBe(0);  
   });
 
-  it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
+  async function testCacheStatus(config: Config, checkStatus: () => Promise<void>): Promise<void> {
     FileLock.clearCache();
     const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ cache: true });
+    FileLock.setConfig(config);
     const retVal = "test_001", key = retVal;
     expect(
       await FileLock.withLock(key, 
@@ -344,49 +323,36 @@ describe('FileLock', () => {
         return retVal;
       }
     )).toBe(retVal);
-    expect((FileLock as any).cache.size).toBe(1);
+    await checkStatus();
+    //expect((FileLock as any).cache.size).toBe(1);
     FileLock.setConfig(orgConf);
- });
+  }
+
+  it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
+    await testCacheStatus({ cache: true }, async () => expect((FileLock as any).cache.size).toBe(1));
+   });
 
   it("If the cache is reset, then disabled, and subsequently locked, the cache does not exist.", async () => {
-    FileLock.clearCache();
-    const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ cache: false });
-    const retVal = "test_001", key = retVal;
-    expect(
-      await FileLock.withLock(key, 
-      async () => {
-        await sleepAsync(500);
-        return retVal;
-      }
-    )).toBe(retVal);
-    expect((FileLock as any).cache).toBeNull();
-    FileLock.setConfig(orgConf);
+    await testCacheStatus({ cache: false }, async () => expect((FileLock as any).cache).toBeNull());
   });
 
   it("When the maximum cache size is set to 1, even after locking twice with different keys, " +
     "the number of cache entries remains 1, and the cache for the second key persists.", async () => {
-    FileLock.clearCache();
-    const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ cache: true, cacheMaxNum: 1 });
-    const retVal = "test_001", key1 = retVal;
-    expect(
-      await FileLock.withLock(key1, 
+    const retVal = "test_001";
+    await testCacheStatus(
+      { cache: true, cacheMaxNum: 1  }, 
       async () => {
-        await sleepAsync(500);
-        return retVal;
+        const key2 = 'test_002';
+        expect(
+          await FileLock.withLock(key2, 
+          async () => {
+            await sleepAsync(500);
+            return retVal;
+          }
+        )).toBe(retVal);
+        expect((FileLock as any).cache.size).toBe(1);
       }
-    )).toBe(retVal);
-    const key2 = 'test_002';
-    expect(
-      await FileLock.withLock(key2, 
-      async () => {
-        await sleepAsync(500);
-        return retVal;
-      }
-    )).toBe(retVal);
-    expect((FileLock as any).cache.size).toBe(1);
-    FileLock.setConfig(orgConf);
+    );
   });
 
   /* 以下、資産管理プロジェクトから持ってこい！！
