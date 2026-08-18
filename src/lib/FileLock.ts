@@ -1,10 +1,14 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
+import { LRUCache } from 'lru-cache';
+import { Contracts } from '@ayapapa-npm/contracts-js';
+const { REQUIRE, REQUIRE_DEBUG } = Contracts;
+
 import { LockImpl, type CallbackOnLock } from "./LockImpl.ts";
 //import { type BaseUserOptions } from "./BaseUserOptions";
 //import { type BaseOptionsResolver } from "./BaseOptionsResolver";
-import { FileLockUserOptions, typedKeys } from './FileLockUserOptions.ts';
+import { FileLockUserOptions, typedKeys, type AllOptions } from './FileLockUserOptions.ts';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
 import { FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from './FileLockErrors.ts';
 
@@ -22,10 +26,17 @@ export interface Config {
   lockDirectory?: string;
 
   /** 
-   * Whether to enable caching for FileLockI instances associated with a key.
+   * Whether to enable caching for FileLock instances associated with a key.
    * Default is `true`.
    */
   cache?: boolean;
+
+  /**
+   * Maximum number that can be cached. 
+   * If unspecified, null, or negative, there is no upper limit. `0` means `cache` is disabled, even if `cache` is true.
+   * Default is unlmited.
+   */
+  cacheMaxNum?: number | null;
 
   /**
    * User default options used with `withLock()`.
@@ -45,9 +56,11 @@ export class FileLock extends LockImpl {
    * Instance fields
    */
 
-  private static readonly defaultConfig: Config = { cache: true, defaultOptions: FileLock.getDefaultOptions()};
+  private static readonly defaultConfig: Config = { cache: true, cacheMaxNum: 100, defaultOptions: FileLock.getDefaultOptions()};
   private static config: Config = FileLock.defaultConfig;
   //private static dirPath: string;
+  private static initialized: boolean = false;
+
   private baseFilePath?: string;
   private filePath?: string;
 
@@ -62,20 +75,58 @@ export class FileLock extends LockImpl {
    * これによりキー識別と、再入ロック検出の実現を可能とする。
    * キャッシュされたインスタンスは、一定の確率で掃除（その時点において、紐づいたロックファイルが無いものは削除）される（予定）。
    */
-  private static cache: Map<string, FileLock> = new Map();
+  private static cache: LRUCache<string, FileLock>;
 
+  /** 
+   * キャッシュされたkeyをキャッシュ順に保持した配列
+   */
+  //private static readonly cachedKeys: Array<string> = [];
+
+  /** 初期化。必ず一度は呼ばれなければならない。 */
+  public static initialize() {
+    FileLock.resetConfig();
+    FileLock.initialized = true;
+  }
+
+  /**
+   * 各種設定を行う。
+   * 同時に、キャッシュはクリアされる。
+   * @param config 
+   */
   public static setConfig(config: Config): void {
-    const dConf = JSON.parse(JSON.stringify(config));
-    FileLock.config = { ...FileLock.defaultConfig, ...dConf };
+    const dConf = FileLock.copyConfig(config);
+    FileLock.config = { ...FileLock.getDefaultConfig(), ...dConf };
+    if (FileLock.config.cache && FileLock.config.cacheMaxNum === 0) FileLock.config.cache = false;
+
+    if (FileLock.cache) this.cache.clear();
+
+    if (FileLock.config.cache) {
+      const opts/*: LRUCache.Options<string, FileLock, unknown>*/ = {} as any;
+      if (FileLock.config.cacheMaxNum > 0) opts.max = FileLock.config.cacheMaxNum;
+      opts.ttl = 50000;
+      this.cache = new LRUCache<string, FileLock>(opts);
+    }
+    else this.cache = null;
+
+    //FileLock.dirPath = FileLock.getLockDirPath();
+  }
+
+  public static resetConfig(): void {
+    FileLock.setConfig(FileLock.getDefaultConfig());
   }
 
   public static getConfig(): Config {
-    // Return copied config.
-    return JSON.parse(JSON.stringify(FileLock.config));
+    return FileLock.copyConfig(FileLock.config);
   }
 
   public static getDefaultConfig(): Config {
-    return JSON.parse(JSON.stringify(FileLock.defaultConfig));
+    return FileLock.copyConfig(FileLock.defaultConfig);
+  }
+
+  private static copyConfig(config: Config): Config {
+    const ret = { ...config };
+    if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
+    return ret;
   }
 
   /**
@@ -90,10 +141,7 @@ export class FileLock extends LockImpl {
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}) {
     const rOpt = new FileLockUserOptionsResolver(options, FileLock.config?.defaultOptions).getOptions();
-    if (!FileLock.cache.has(key)) {
-      FileLock.cache.set(key, new FileLock(key));
-    }
-    return (FileLock.cache.get(key))?.withLock(onLockFn, rOpt);
+    return FileLock.getLock(key).withLock(onLockFn, rOpt);
   }
 
   /**
@@ -104,8 +152,24 @@ export class FileLock extends LockImpl {
     return FileLockUserOptionsResolver.getDefaultOptions();
   }
 
-  public static removeCache() {
+  public static clearCache() {
     this.cache.clear();
+  }
+
+  private static hasCache(key: string) {
+    return FileLock.cache && FileLock.cache.has(key);
+  }
+
+  private static setCache(key: string, lock: FileLock) {
+    if (FileLock.cache) FileLock.cache.set(key, lock);
+  }
+
+  private static getLock(key: string) {
+    if (FileLock.hasCache(key)) return FileLock.cache.get(key);
+
+    const lock = new FileLock(key);
+    FileLock.setCache(key, lock);
+    return lock;
   }
 
   /**
@@ -113,9 +177,7 @@ export class FileLock extends LockImpl {
    * If it has been specified, use this as the top priority.
    * The directory is determined based on the following order of priority:<br>
    *  1. Specified via an `Config` (user's explicit intent)
-   *  2. Specified via an environment variable, `'AYPP_FILELOCK_DIR'`, (system administrator or CI/CD configuration)
-   *  3. `process.cwd()` (current working directory at runtime)
-   *  4. `__dirname` (location of this script)
+   *  2. `process.cwd()` (current working directory at runtime)
    * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.
    * @returns A directory path for storing files containing lock information.
    */
@@ -142,11 +204,9 @@ export class FileLock extends LockImpl {
     }
     const candies = {
       'config.lockDirectory' : FileLock.config.lockDirectory,
-      'process.env["AYPP_FILELOCK_DIR"]': process.env["AYPP_FILELOCK_DIR"],
       'process.cwd()': path.join(process.cwd(), '.lock'),
-      '__dirname': path.join(__dirname, '.lock')
     };
-    const isSpecified = (i: number) => i < 2;
+    const isSpecified = (i: number) => i === 0;
     // ロックディレクトリ探索開始
     let candidates: string = '';
     const keys = typedKeys(candies);
@@ -158,6 +218,7 @@ export class FileLock extends LockImpl {
       try {
         // ディレクトリが存在するなら、それに決定。
         if (existsDir(dir)) return dir;
+        // 無ければ作る
         mkdir(dir);
         return dir;
       }
@@ -193,17 +254,28 @@ export class FileLock extends LockImpl {
     */
   }
 
-
-  private async withLock(onLockFn: CallbackOnLock, options: FileLockUserOptions) {
-    // ロック情報pathはスタティックインスタンスから取得。などなど、、、、、
-    // 基本的に、ロックディレクトリはスタティック設定で決まる！！　なので、ロックファイルも、スタティックに来まる！
-    // ★★★★これ、コメントに記載すべき★★★★　その代わり、設定（ロックディレクトリ）変更後は、たとえ同キーだとしても、「変更前の同キーと排他制御できない」ことが、注意事項。
-    const  dirPath      = FileLock.getLockDirPath();
+  private prepare(): void {
+    if (FileLock.initialized !== true) FileLock.initialize(); // 念のため
+    const  dirPath    = FileLock.getLockDirPath();
     this.baseFilePath = path.join(dirPath, this.key);
     this.filePath     = this.baseFilePath + '.json';
-    
+  }
 
-   return "test_001"; // 一時的にテスト用として
+  private async withLock(onLockFn: CallbackOnLock, options: FileLockUserOptions) {
+    REQUIRE_DEBUG(
+      (options as AllOptions).resolved, 
+      "オプションが不完全です（デバッグ用エラー）。", 
+      FileLockError, 
+      { code: 'EINVALIDOPTIONS', props: options }
+    );
+    this.prepare();
+
+    // いよいよロック関数を呼ぶ
+
+    return "test_001"; // 一時的にテスト用として
   }
 
 }
+
+// Initialize
+FileLock.initialize();

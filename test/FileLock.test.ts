@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { Config, FileLock, FileLockError, FileLockUserOptions, LogProvider } from '../src/index';
+import { Config, FileLock, FileLockError, FileLockUserOptions, LogProvider, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -39,7 +39,7 @@ describe('FileLock', () => {
     const opts =  {timeoutSec : 1 } as any;
     expect(await FileLock.withLock(key, 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
         return retVal
       },
       opts
@@ -51,7 +51,7 @@ describe('FileLock', () => {
     const opts =  {} as any;
     expect(await FileLock.withLock(key, 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
         return retVal
       },
       opts
@@ -66,7 +66,7 @@ describe('FileLock', () => {
     const opts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213} as any;
     expect(await FileLock.withLock(key, 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
         return retVal
       },
       opts
@@ -100,7 +100,7 @@ describe('FileLock', () => {
     const opts =  { allowReentry: true, logger: logger, retriesOnIOErr: 2 } as any;
     expect(await FileLock.withLock(key, 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
         return retVal
       },
       opts
@@ -155,7 +155,7 @@ describe('FileLock', () => {
       expect(fs.existsSync(dir)).toBe(false);
       expect(await FileLock.withLock(key, 
         async () => {
-          await sleepAsync(3000);
+          await sleepAsync(500);
           return retVal;
         },
         {}
@@ -183,19 +183,6 @@ describe('FileLock', () => {
     );
   });
 
-  it("The directory specified by the environment variable `'AYPP_FILELOCK_DIR'` is created.", async () => {
-    const dir = path.join(process.cwd(), '.lock');
-    let orgDir: string | undefined;
-    testLockDirectoryCreation(
-      dir,
-      () => {
-        orgDir = process.env['AYPP_FILELOCK_DIR'];
-        process.env['AYPP_FILELOCK_DIR'] = dir;
-      },
-      () => { if (orgDir) process.env['AYPP_FILELOCK_DIR'] = orgDir; },
-    );
-  });
-
   it("If the user does not specify a lock directory, a lock directory is created based on `process.cwd()`.", async () => {
     const dir = path.join(process.cwd(), '.lock');
     let orgConf: Config;
@@ -215,27 +202,32 @@ describe('FileLock', () => {
     );
   });
 
-  it("If the user does not specify a lock directory and an error occurs while attempting to create one based on `process.cwd()`," +
-    " the lock directory is created in the directory containing the `FileLock` script.", async () => {
-    const dir = path.join(process.cwd(), 'src/lib', '.lock');
-    const dummyPath = path.join(process.cwd(), '.lock');
+  it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
+    " a error is throwed.", async () => {
+    const dir = path.join(process.cwd(), '.lock');
     let orgConf: Config;
-    let orgDir: string | undefined;
-    testLockDirectoryCreation(
-      dir,
-      () => {
-        orgConf = FileLock.getConfig();
-        FileLock.setConfig({});
-        orgDir = process.env['AYPP_FILELOCK_DIR'];
-        delete process.env['AYPP_FILELOCK_DIR'];
-        fs.writeFileSync(dummyPath, "");
-      },
-      () => {
-        FileLock.setConfig(orgConf);
-        if (orgDir) process.env['AYPP_FILELOCK_DIR'] = orgDir;
-        fs.rmSync(dummyPath);
-      }
-    );
+    orgConf = FileLock.getConfig();
+    FileLock.setConfig({});
+    fs.rmSync(dir, { force: true, recursive: true });
+    fs.writeFileSync(dir, "");
+    try {
+      const retVal = "test_001", key = retVal;
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(500);
+          return retVal;
+        },
+        {}
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof LockDirectoryCreationFailed).toBe(true);
+      expect(err.code).toBe('ELOCKDIRCREATE')
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+      fs.rmSync(dir);
+    }
   });
 
   it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {
@@ -246,22 +238,25 @@ describe('FileLock', () => {
       throw err;
     });
     expect.assertions(3);
+    const orgConf = FileLock.getConfig();
+    FileLock.setConfig({ lockDirectory: 'hogehoge' });
     try {
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
         async () => {
-          await sleepAsync(3000);
+          await sleepAsync(500);
           return retVal;
         }
       );
     }
     catch (err: any) {
-      expect(err instanceof FileLockError).toBe(true);
+      expect(err instanceof LockDirectoryStatFailed).toBe(true);
       expect(err.fsErrorCode).toBe(eCode);
       expect(err.fsErrorMsg).toBe(eMsg);
     }
     finally {
       spy.mockRestore();
+      FileLock.setConfig(orgConf);
     }
   });
 
@@ -280,7 +275,7 @@ describe('FileLock', () => {
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
         async () => {
-          await sleepAsync(3000);
+          await sleepAsync(500);
           return retVal;
         }
       );
@@ -299,38 +294,99 @@ describe('FileLock', () => {
   it("An error occurs because the directory path specified in `FileLock.setCondig()` already exists but is not a directory.", async () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.writeFileSync(dir, "");
-    expect.assertions(4); // 例外は1回おきるはず
+    expect.assertions(5); // 例外は1回おきるはず
+    const orgConf = FileLock.getConfig();
     try {
+      FileLock.setConfig({ lockDirectory: dir });
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
         async () => {
-          await sleepAsync(3000);
+          await sleepAsync(500);
           return retVal;
         }
       )
     }
     catch (err: any) {
-      expect(err instanceof FileLockError).toBe(true);
+      expect(err instanceof LockDirectoryStatFailed).toBe(true);
+      expect(err.code).toBe('ELOCKDIRSTAT');
       expect(err.fsErrorCode).toBe('ENOTDIR');
       expect(err.fsErrorMsg.includes(dir)).toBe(true);
       expect(err.fsErrorMsg.includes('not a directory')).toBe(true);
     }
     finally {
       fs.rmSync(dir, { force: true, recursive: true });
+      FileLock.setConfig(orgConf);
     }
   });
 
-  it("キャッシュをリセットして有効化したあとにロックすると、キャッシュエントリー数が1になっている。", async () => {
-    // as any　で反則のプライベートメンバーアクセス！！
+  it("After clearing the cache, the number of cache entries is 0.", async () => {
+    const retVal = "test_001", key = retVal;
+    expect(await FileLock.withLock(key, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      }
+    )).toBe(retVal);
+    expect((FileLock as any).cache.size > 0).toBe(true);  
+    FileLock.clearCache();
+    expect((FileLock as any).cache.size).toBe(0);  
   });
 
-  it("キャッシュをリセットして無効化したあとにロックしても、キャッシュエントリー数が0になっている。", async () => {
-    // as any　で反則のプライベートメンバーアクセス！！
+  it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
+    FileLock.clearCache();
+    const orgConf = FileLock.getConfig();
+    FileLock.setConfig({ cache: true });
+    const retVal = "test_001", key = retVal;
+    expect(
+      await FileLock.withLock(key, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      }
+    )).toBe(retVal);
+    expect((FileLock as any).cache.size).toBe(1);
+    FileLock.setConfig(orgConf);
+ });
+
+  it("If the cache is reset, then disabled, and subsequently locked, the cache does not exist.", async () => {
+    FileLock.clearCache();
+    const orgConf = FileLock.getConfig();
+    FileLock.setConfig({ cache: false });
+    const retVal = "test_001", key = retVal;
+    expect(
+      await FileLock.withLock(key, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      }
+    )).toBe(retVal);
+    expect((FileLock as any).cache).toBeNull();
+    FileLock.setConfig(orgConf);
   });
 
-  it("キャッシュ最大数を1にした時、2回別キーでロックしても、キャッシュエントリー数が1になっており、かつ、2回目のキーのキャッシュが残っている。", async () => {
-    // as any　で反則のプライベートメンバーアクセス！！
-    // アイデア：　マップは、オブジェクトで持つけれど、順番は、配列で持つ。配列にキーを積んで、上限に達したら、先頭から削除（配列とマップを削除）していく！！
+  it("When the maximum cache size is set to 1, even after locking twice with different keys, " +
+    "the number of cache entries remains 1, and the cache for the second key persists.", async () => {
+    FileLock.clearCache();
+    const orgConf = FileLock.getConfig();
+    FileLock.setConfig({ cache: true, cacheMaxNum: 1 });
+    const retVal = "test_001", key1 = retVal;
+    expect(
+      await FileLock.withLock(key1, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      }
+    )).toBe(retVal);
+    const key2 = 'test_002';
+    expect(
+      await FileLock.withLock(key2, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      }
+    )).toBe(retVal);
+    expect((FileLock as any).cache.size).toBe(1);
+    FileLock.setConfig(orgConf);
   });
 
   /* 以下、資産管理プロジェクトから持ってこい！！
@@ -338,14 +394,14 @@ describe('FileLock', () => {
     // 非同期で3秒スリープする関数を、別キーで複数回呼び出してみる
     const a =  FileLock.withLock("testKey1", 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
       },
       {timeoutSec : 1 }
     );
     
     const b =  FileLock.withLock("testKey2", 
       async () => {
-        await sleepAsync(3000);
+        await sleepAsync(500);
       },
       {timeoutSec : 1 }
     );

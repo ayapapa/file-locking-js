@@ -1,4 +1,6 @@
-import { BaseUserOptions, typedKeys } from './BaseUserOptions.ts';
+import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT } from './BaseUserOptions.ts';
+
+export type AllOptions = AllOptionsT<FileLockUserOptions>;
 
 // User options for FileLock (inherits from BaseUserOptions)
 export interface FileLockUserOptions extends BaseUserOptions {
@@ -59,12 +61,7 @@ export interface FileLockUserOptions extends BaseUserOptions {
    * Interval between lock file operation retries [milliseconds]. 
    *  Cannot be used together with retryIntervalSec. Default is 100.
    */
-  retryIntervalMs?:number;
-
-  /**
-   * Directory for storing lock files.  
-   */
-  //lockDirectory?:string;
+  retryIntervalMs?: number;
 
 }
 

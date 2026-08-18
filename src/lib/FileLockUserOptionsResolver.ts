@@ -1,4 +1,4 @@
-import { type KeyTypeMap, type AllOptions, type TimeBasedKey } from './BaseUserOptions.ts';
+import { type KeyTypeMap, type AllOptions as AllOptionsT, type TimeBasedKey } from './BaseUserOptions.ts';
 import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 

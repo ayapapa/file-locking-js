@@ -1,6 +1,6 @@
 	import { FileLock, type Config } from './lib/FileLock.ts';
-	import { FileLockError } from './lib/FileLockErrors.ts';
+	import { FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from './lib/FileLockErrors.ts';
 	import { type LogProvider } from './lib/BaseUserOptions.ts';
-	import { FileLockUserOptions } from './lib/FileLockUserOptions.ts';
-	export { FileLock, FileLockError, FileLockUserOptions, type LogProvider, type Config };
+	import { type FileLockUserOptions } from './lib/FileLockUserOptions.ts';
+	export { FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, type Config, type FileLockUserOptions, type LogProvider };
 	export default FileLock;
