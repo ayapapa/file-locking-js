@@ -35,7 +35,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
       ttlMs:          10000,  // ロック有効期間(time to live)のデフォルトは10秒
       allowReentry:   false,  // 再入ロック禁止をデフォルトとする
       //resolved:       false,
-      logger:         console
+      //logger:         console
   }
 
   public static getDefaultOptions(): BaseUserOptions {
@@ -143,6 +143,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
       ttlSec:       `number`,
       ttlMs:        `number`,
       allowReentry: `boolean`,
+      /*
       logger:       (value: any) =>  {
         return typeof value === 'object' &&
           typeof (value as any).log   === 'function' &&
@@ -152,6 +153,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
           typeof (value as any).warn  === 'function' &&
           typeof (value as any).error === 'function';
       },
+      */
     };
     
   }

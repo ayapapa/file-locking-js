@@ -10,7 +10,8 @@ export class LockError extends Error {
    * @param props A set of arbitrary properties to be attached to the error instance.
    */
   constructor(msg = '', params?: {code?: string, props?: { [key: string]: any } }) {
-    super(msg);
+    Error.stackTraceLimit = 20;
+    super(msg, {  });
     const props = {...params?.props};
     const code = (params?.code) ?? 'ELOCK';
     Object.assign(this, { code, ...props });

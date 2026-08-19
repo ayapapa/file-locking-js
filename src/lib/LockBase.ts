@@ -4,35 +4,29 @@ import { Contracts } from '@ayapapa-npm/contracts-js';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 import { AnyMxRecord } from 'node:dns';
 import { LockError, DeadlockDetected, TTLExceeded, AlreadyLocked} from './LockErrors.ts';
-import { type BaseUserOptions, type AllOptions } from './BaseUserOptions.ts';
+import { type BaseUserOptions, type AllOptions, type Monitor } from './BaseUserOptions.ts';
 import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
 const logger = new PrettyConsole();
 
-/** Monitoring object passed to the callback function executed after acquiring the lock. */
-export interface Monitor {
-  /** Whether the operation was canceled. */
-  canceled: boolean;
-}
-
 /** Definition of the callback function to be executed after acquiring the lock. */
 export type CallbackOnLock = (monitor: Monitor) => any;
-
-interface InternalState {
-  /** Whether the BaseUserOptions was resolved. */
-  resolved?: boolean;
-
-  /** Lock owner id. */
-  ownerId?: string;
-
-  monitor?: Monitor;
-}
 
 /** 再入ロック検出用のコンテキストオブジェクト */
 export interface ReentrantContext  {
   /** Set of reentrant context ids */
   heldLocks: Set<string>;
+}
+
+export type LogProvider = Pick<Console, 'log' | 'trace' | 'debug' | 'info' | 'warn' | 'error' >;
+
+export interface Config {
+   /**
+    * Specifies external logger. 
+    * Default is `console`.
+    */
+   logger?: LogProvider;
 }
 
 /**
@@ -42,10 +36,9 @@ export interface ReentrantContext  {
  * 注意: AsyncLocalStorage によるリエントラントロック（再入ロック）の回避は、
  * 同一 Node プロセス内の同じ非同期コンテキストにのみ有効。
  * コンテキスト内にける別プロセス起動先でのロックの再入制御までは行えない。
- * @class LockImpl
- * @extends LockImplInterface
+ * @class LockBase
  */
-export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
+export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
 
   /** Static fieilds. */
 
@@ -65,12 +58,18 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
   /** コンテキストID（リエントラントロック検出用） */
   private contextId: string;
 
+  protected logger: LogProvider;
+
   /**
    * コンストラクタ。
    */
-  constructor() {
-    LockImpl.als.getStore()
+  constructor(config?: Config) {
     this.contextId  = crypto.randomUUID();
+    this.logger = config?.logger ?? console;
+    if (this.logger === console) {
+      this.logger = {...console as LogProvider};
+      this.logger.trace = this.logger.debug;
+    }
   }
 
   /**
@@ -132,7 +131,7 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
       // 再入ロックチェック
       if (this.isReentry()) {
         if (!rOpts.allowReentry) throw new DeadlockDetected();
-        logger.trace("options.allowReentryに従い再入ロックを許可");
+        this.logger.trace("options.allowReentryに従い再入ロックを許可");
         rOpts.ownerId = this.ownerId;
         // ロックカウンターをインクリメントして処理実行
         this.incReantryCount(rOpts);
@@ -177,7 +176,7 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
     const childContext: ReentrantContext = { heldLocks: new Set(rc?.heldLocks) };
     childContext.heldLocks.add(this.contextId);
     // 子コンテキストでロック取得＆onLockFn 実行
-    return LockImpl.als.run(childContext, async () => onLockFn());
+    return LockBase.als.run(childContext, async () => onLockFn());
   }
 
   /**
@@ -194,13 +193,13 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
    */
   runInNewContext(fn: () => any) {
     const initialContext: ReentrantContext = { heldLocks: new Set() };
-    return LockImpl.als.run(initialContext, () => {
+    return LockBase.als.run(initialContext, () => {
       return fn();
     });
   }
 
   private getReentrantContext() : ReentrantContext {
-    return LockImpl.als.getStore();
+    return LockBase.als.getStore();
   }
 
 

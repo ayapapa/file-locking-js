@@ -1,4 +1,4 @@
-import { LockError } from './LockErrors.ts';
+import { LockError, AlreadyLocked, DeadlockDetected, TTLExceeded } from './LockErrors.ts';
 
 /**
  * Basic lock handling error. 
@@ -17,6 +17,7 @@ export class FileLockError extends LockError {
 class LockDirectoryAccessFailed extends FileLockError {
   /**
    * Constructor.
+   * @param fsErrorMsg   fs's error message.
    * @param operation   Operation on the lock information storage directory.
    * @param code  Error code string.
    * @param params  Parameters.
@@ -33,8 +34,7 @@ class LockDirectoryAccessFailed extends FileLockError {
 export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
-   * @param orgMsg   Original error message.
-   * @param code  Error code string.
+   * @param fsErrorMsg   fs's error message.
    * @param params  Parameters.
    */
   constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
@@ -45,11 +45,28 @@ export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
 export class LockDirectoryCreationFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
-   * @param orgMsg  Original error message.
-   * @param code    Error code string.
+   * @param fsErrorMsg   fs's error message.
    * @param params  Parameters.
    */
   constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
     super(fsErrorMsg, 'create', 'ELOCKDIRCREATE', params);
   }
 }
+
+/** Lock is compromised. */
+export class LockCompromised extends FileLockError {
+  /**
+   * コンストラクタ
+   * @param reason エラー内容
+   * @param params  エラーインスタンスに付与するプロパティ群
+   */
+  constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any }  }) {
+    const key: string = params?.key;
+    const props = { ...params?.props };
+    if (key) props.key = key;
+    super(`The lock${key ? '(key: ' + key + ')' : ""} has been compromised. ${reason ?? ''}`, {code: `ECOMPROMISED`, props: params?.props });
+    }
+}
+
+
+export { AlreadyLocked, DeadlockDetected, TTLExceeded };

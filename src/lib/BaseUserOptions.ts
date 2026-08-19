@@ -4,9 +4,6 @@ import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
 const logger = new PrettyConsole();
 
-export type LogProvider = Pick<Console, 'debug'>;
-/** Monitoring object passed to the callback function executed after acquiring the lock. */
-
 export interface BaseUserOptions {
   /** 
    * Maximum wait time (in seconds) to acquire the lock. 
@@ -65,12 +62,6 @@ export interface BaseUserOptions {
    *    (such as read-only operations or operations where repeating the same action causes no inconsistencies). 
    */
    allowReentry?: boolean;
-
-   /**
-    * Specifies external logger. 
-    * Default is `console`.
-    */
-   logger?: LogProvider;
 }
 
 /** Type of `Options` key */
@@ -97,6 +88,7 @@ export type KeyTypeMap<T> = Record<OptionsKey<T>, any>;
 
 export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
+/** Monitoring object passed to the callback function executed after acquiring the lock. */
 export interface Monitor {
   /** Whether the operation was canceled. */
   canceled: boolean;
@@ -113,6 +105,8 @@ interface InternalState {
   ownerId?: string;
 
   monitor?: Monitor;
+
+  release?: () => void;
 }
 
 // The general type for Options (accepting a generic T)
