@@ -6,12 +6,13 @@ import { Contracts } from '@ayapapa-npm/contracts-js';
 const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockImpl, type CallbackOnLock } from "./LockImpl.ts";
-//import { type BaseUserOptions } from "./BaseUserOptions";
-//import { type BaseOptionsResolver } from "./BaseOptionsResolver";
 import { FileLockUserOptions, typedKeys, type AllOptions } from './FileLockUserOptions.ts';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
 import { FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from './FileLockErrors.ts';
 
+/**
+ * FileLock cofiguration. 
+ */
 export interface Config {
   /**
    * Specifies the directory path to stored locking imformations.
@@ -34,7 +35,7 @@ export interface Config {
   /**
    * Maximum number that can be cached. 
    * If unspecified, null, or negative, there is no upper limit. `0` means `cache` is disabled, even if `cache` is true.
-   * Default is unlmited.
+   * Default is `100`.
    */
   cacheMaxNum?: number | null;
 
@@ -52,35 +53,31 @@ export interface Config {
 * Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed. 
 */
 export class FileLock extends LockImpl {
-  /**
-   * Instance fields
-   */
+ 
+  /** Static fields */
 
-  private static readonly defaultConfig: Config = { cache: true, cacheMaxNum: 100, defaultOptions: FileLock.getDefaultOptions()};
+  /** Default configuration. */
+  private static readonly defaultConfig: Config = {
+    cache: true,
+    cacheMaxNum: 100,
+    defaultOptions: FileLock.getDefaultOptions()
+  };
+
+  /** Current configuration. */
   private static config: Config = FileLock.defaultConfig;
-  //private static dirPath: string;
+
+  /** Whether or not initialization has been performed. */
   private static initialized: boolean = false;
 
-  private baseFilePath?: string;
-  private filePath?: string;
-
-  /** Lock key */
-  private key: string;
-  /** Heartbeat timer id */
-  private heartbeatTimer?: number;
-
   /**
-   * Keyに紐づけられたインスタスのキャッシュ。
-   * キー毎にインスタンスを紐づけて、Mapにキャッシュする。
-   * これによりキー識別と、再入ロック検出の実現を可能とする。
-   * キャッシュされたインスタンスは、一定の確率で掃除（その時点において、紐づいたロックファイルが無いものは削除）される（予定）。
+   * FileLock instance cache associated with a key. 
+   * Uses `LRUCache`, providing features to set a maximum cache size and prune (remove) infrequently accessed elements.
    */
   private static cache: LRUCache<string, FileLock>;
 
-  /** 
-   * キャッシュされたkeyをキャッシュ順に保持した配列
-   */
-  //private static readonly cachedKeys: Array<string> = [];
+  /** Static methods */
+
+
 
   /** 初期化。必ず一度は呼ばれなければならない。 */
   public static initialize() {
@@ -96,19 +93,20 @@ export class FileLock extends LockImpl {
   public static setConfig(config: Config): void {
     const dConf = FileLock.copyConfig(config);
     FileLock.config = { ...FileLock.getDefaultConfig(), ...dConf };
-    if (FileLock.config.cache && FileLock.config.cacheMaxNum === 0) FileLock.config.cache = false;
+    FileLock.config.cache = FileLock.config.cacheMaxNum === 0 ? false: FileLock.config.cache
 
+    // Clear chache
     if (FileLock.cache) this.cache.clear();
 
+    // If cache is enabled, (Re)create cache.
     if (FileLock.config.cache) {
       const opts/*: LRUCache.Options<string, FileLock, unknown>*/ = {} as any;
       if (FileLock.config.cacheMaxNum > 0) opts.max = FileLock.config.cacheMaxNum;
       opts.ttl = 50000;
       this.cache = new LRUCache<string, FileLock>(opts);
     }
+    // or set null to chache.
     else this.cache = null;
-
-    //FileLock.dirPath = FileLock.getLockDirPath();
   }
 
   public static resetConfig(): void {
@@ -145,10 +143,10 @@ export class FileLock extends LockImpl {
   }
 
   /**
-   * 
-   * @returns デフォルトオプションを取得する
+   * Get deault options(`FileLockUserOptions`).
+   * @returns Deault options.
    */
-  public static getDefaultOptions() {
+  public static getDefaultOptions(): FileLockUserOptions  {
     return FileLockUserOptionsResolver.getDefaultOptions();
   }
 
@@ -235,6 +233,22 @@ export class FileLock extends LockImpl {
       { props: { candidates } }
     );
   }
+
+  /** Instance fields. */
+
+  /** File path for storing lock information (without extension) */
+  private baseFilePath?: string;
+
+  /** File path for storing lock information (with extension) */
+  private filePath?: string;
+
+  /** Lock key */
+  private key: string;
+
+  /** Heartbeat timer id */
+  private heartbeatTimer?: number;
+
+  /** Instance methods. */
 
   /**
    * Constructor.

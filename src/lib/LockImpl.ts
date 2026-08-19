@@ -30,7 +30,7 @@ interface InternalState {
 }
 
 /** 再入ロック検出用のコンテキストオブジェクト */
-interface ReentrantContext  {
+export interface ReentrantContext  {
   /** Set of reentrant context ids */
   heldLocks: Set<string>;
 }
@@ -46,15 +46,21 @@ interface ReentrantContext  {
  * @extends LockImplInterface
  */
 export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
+
+  /** Static fieilds. */
+
   /**
-   * フィールド
+   * AsyncLocalStorage. 
+   * Used for reentrant lock detection.
+   * Since the goal is to share reentrancy context information (via `getStore()`) regardless of the specific instance, 
+   * it is implemented as a static property to enable sharing across instances.  
    */
+  private static als: AsyncLocalStorage<ReentrantContext> = new AsyncLocalStorage<ReentrantContext>();
+
+  /** Static methods */
 
   /** Lock owner id. */
   protected ownerId: string = '';
-
-  /** AsyncLocalStorage（リエントラントロック検出に利用） */
-  private als: AsyncLocalStorage<ReentrantContext>;
 
   /** コンテキストID（リエントラントロック検出用） */
   private contextId: string;
@@ -63,7 +69,7 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
    * コンストラクタ。
    */
   constructor() {
-    this.als = new AsyncLocalStorage<ReentrantContext>();
+    LockImpl.als.getStore()
     this.contextId  = crypto.randomUUID();
   }
 
@@ -118,8 +124,8 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
 
     const execDependingOnReentry = () => {
       // 再帰ロックチェック準備
-      const store = this.als.getStore();
-      if (!store) {
+      const rc = this.getReentrantContext();
+      if (!rc) {
         // まだ再入ロック検知のためのコンテキストがないので「新コンテキストを作って、その中でwithLockし直す」
         return this.runInNewContext(() => execDependingOnReentry());
       }
@@ -167,18 +173,18 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
    */
   private execCallback(onLockFn: () => any) {
     // この呼び出し専用の子コンテキストを作る
-    const store = this.als.getStore();
-    const childContext: ReentrantContext = { heldLocks: new Set(store?.heldLocks) };
+    const rc = this.getReentrantContext();
+    const childContext: ReentrantContext = { heldLocks: new Set(rc?.heldLocks) };
     childContext.heldLocks.add(this.contextId);
     // 子コンテキストでロック取得＆onLockFn 実行
-    return this.als.run(childContext, async () => onLockFn());
+    return LockImpl.als.run(childContext, async () => onLockFn());
   }
 
   /**
    * 再入ロックか否かをチェックする
    */
   private isReentry(): boolean {
-    return Boolean(this.als.getStore()?.heldLocks.has(this.contextId));
+    return Boolean(this.getReentrantContext()?.heldLocks.has(this.contextId));
   }
 
   /**
@@ -188,10 +194,15 @@ export class LockImpl <T extends BaseUserOptions = BaseUserOptions>  {
    */
   runInNewContext(fn: () => any) {
     const initialContext: ReentrantContext = { heldLocks: new Set() };
-    return this.als.run(initialContext, () => {
+    return LockImpl.als.run(initialContext, () => {
       return fn();
     });
   }
+
+  private getReentrantContext() : ReentrantContext {
+    return LockImpl.als.getStore();
+  }
+
 
 }
 

@@ -4,6 +4,8 @@ import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { Config, FileLock, FileLockError, FileLockUserOptions, LogProvider, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
+import { LockImpl, type ReentrantContext } from '../src/lib/LockImpl.ts';
+
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -353,6 +355,22 @@ describe('FileLock', () => {
         expect((FileLock as any).cache.size).toBe(1);
       }
     );
+  });
+
+  it("The reentrancy context is shared even when the lock instances are different.", async () => {
+    const als = (LockImpl as any).als;
+    const rc: ReentrantContext = als.getStore();
+    const childContext: ReentrantContext = { heldLocks: new Set(rc?.heldLocks) };
+    const contextId = 'text-context';
+    childContext.heldLocks.add(contextId);
+    als.run(childContext, async () => {
+      const key1 = 'testKey1', key2 = 'testKey2';
+      const ins1 = (FileLock as any).getLock(key1) as LockImpl as any;
+      const ins2 = (FileLock as any).getLock(key2) as LockImpl as any;
+      expect(ins1 !== ins2).toBe(true);
+      expect(ins1.getReentrantContext().heldLocks.has(contextId)).toBe(true);
+      expect(ins2.getReentrantContext().heldLocks.has(contextId)).toBe(true);
+    });
   });
 
   /* 以下、資産管理プロジェクトから持ってこい！！
