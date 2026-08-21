@@ -21,9 +21,9 @@ import { Contracts } from '@ayapapa-npm/contracts-js';
 const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock, type Config as BaseConfig, type LogProvider } from "./LockBase.ts";
-import { FileLockUserOptions, typedKeys, type AllOptions } from './FileLockUserOptions.ts';
+import { FileLockUserOptions, typedKeys, type AllOptions, type Monitor } from './FileLockUserOptions.ts';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
-import {  AlreadyLocked, FileLockError, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
+import {  AlreadyLocked, CallStack, FileLockError, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 
 /**
  * FileLock cofiguration. 
@@ -102,12 +102,6 @@ export class FileLock extends LockBase {
 
   /** Static methods */
 
-
-  public static getCacheSize() {
-    return FileLock.cache.size;
-  }
-
-
   /** 初期化。必ず一度は呼ばれなければならない。 */
   public static initialize() {
     FileLock.resetConfig();
@@ -148,12 +142,6 @@ export class FileLock extends LockBase {
 
   public static getDefaultConfig(): Config {
     return FileLock.copyConfig(FileLock.defaultConfig);
-  }
-
-  private static copyConfig(config: Config): Config {
-    const ret = { ...config };
-    if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
-    return ret;
   }
 
   /**
@@ -263,6 +251,12 @@ export class FileLock extends LockBase {
     );
   }
 
+  private static copyConfig(config: Config): Config {
+    const ret = { ...config };
+    if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
+    return ret;
+  }
+
   /** Instance fields. */
 
   /** File path for storing lock information (without extension) */
@@ -270,9 +264,6 @@ export class FileLock extends LockBase {
 
   /** File path for storing lock information (with extension) */
   private filePath?: string;
-
-  /** Lock key */
-  private key: string;
 
   /** Heartbeat timer id */
   #heartbeatTimer?: NodeJS.Timeout;
@@ -285,13 +276,18 @@ export class FileLock extends LockBase {
    * Constructor.
    * @param {string}  key  
    */
-  constructor(key: string) {
-    super(FileLock.config);
+  private constructor(key: string) {
+    super(key, FileLock.config);
     // ★★★★★　dirPathは、ここで、きめるのは、ダメ。withLockのたびに、ディレクトリを確認しないと、途中の設定の変更を確認できない！！！！★★★★★
     // だとすると、パスは、インスタンスプロパティではダメなのかな？？？　だって、インスタンスで覚えちゃうからね。
     // ★★なので、都度、決めるしかなくなるね！！！って、本当？？？　ちゃんと、設計の見直しを考えよう！！！★★
     // となると、以下の、パス関連は、インスタンスではなく、都度、作る感じだな！！！
-    this.key = key;
+    // ★★★大注意「インスタンスの浸食発生！！」★★★
+    // あまり想定出来ないけれど、keyのロック処理中に、コンフィグを書き換えパスがかわったとすると、そのkeyのロックのあいだに、同じkeyでロックしようとした瞬間にパスが変更されてしまう。
+    //  ※いちおう、内部仕様上、コンフィグ設定時にキャッシュがクリアされるので、インスタンスが変わる。なので、上記の浸食は仕様上無い。。。が、問題はハックされないとは限らない。。
+    //  ↓↓↓
+    // オプションに持たせよう！
+    //this.key = key;
     /*
     this.dirPath      = FileLock.getLockDirPath();
     this.baseFilePath = path.join(this.dirPath, this.key);
@@ -299,28 +295,58 @@ export class FileLock extends LockBase {
     */
   }
 
-  private prepare(): void {
+  /**
+   * 再入ロックカウンターをインクリメント
+   * @param options 
+   */
+  protected override incReantryCount(options: AllOptions) {
+    const meta = this.#getMeta(options, true);
+    options.ownerId =  options.ownerId || meta.ownerId;
+    meta.counter = meta.counter || 0;
+    meta.counter++;
+    this.#setMeta(options, meta);
+  }
+
+  /**
+   * 再入ロックカウンターをデクリメントし、カウンターが０になったら、ロックを解放する
+   * @param options 
+   */
+  protected override decReantryCount(options: AllOptions) {
+    try {
+      const meta = this.#getMeta(options, true);
+      if (options.ownerId === meta.ownerId) {
+        if (meta.counter > 0) meta.counter--;
+        this.#setMeta(options, meta);
+        if (meta.counter === 0) {
+          this.#release(options);
+        }
+      }
+    }
+    catch (err) {
+      // 不正なメタデータファイルのためロックを解放する
+      this.#release(options);
+      throw err;
+    }
+  }
+
+  #prepare(options: AllOptions): void {
     if (FileLock.initialized !== true) FileLock.initialize(); // 念のため
     const  dirPath    = FileLock.getLockDirPath();
     this.baseFilePath = path.join(dirPath, this.key);
     this.filePath     = this.baseFilePath + '.json';
+    this.#newMonitor(options);
   }
 
-  private async withLock(onLockFn: CallbackOnLock, options: FileLockUserOptions) {
-    // いよいよロック関数を呼ぶ
-    //return "test_001"; // 一時的にテスト用として
+  private async withLock(onLockFn: CallbackOnLock, options: AllOptions) {
 
-    REQUIRE_DEBUG(
-      (options as AllOptions).resolved, 
-      "オプションが不完全です（デバッグ用エラー）。", 
-      FileLockError, 
-      { code: 'EINVALIDOPTIONS', props: options }
-    );
-    this.prepare();
-    const monitor = this.#newMonitor(options);
+    REQUIRE_DEBUG(options.resolved, "オプションが不完全です（デバッグ用エラー）。", 
+      FileLockError, { code: 'EINVALIDOPTIONS', props: options });
+
+    this.#prepare(options);
+
     return super._withLock(
-      () => {
-        // ★★★monitor付き、コールバックは、親クラスに閉じ込めたいな！！！！
+      (monitor) => {
+        // ★★★monitor付き、コールバックは、親クラスに閉じ込めたいな！！！！★★★
         return onLockFn(monitor);
       },
       async (cb, opts) => {// cb は、親クラスにてラッピングされたコールバック
@@ -345,7 +371,7 @@ export class FileLock extends LockBase {
           });
         }
         catch (err) {
-          this.#setMonitor({canceled: true, reason: err.code ?? 'NO_CODE', ttlMs: opts.ttlMs}, opts);
+          this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
           //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
           throw err;
         }
@@ -360,12 +386,12 @@ export class FileLock extends LockBase {
 
   /**
    * 新たにモニターを作成する
-   * @param {UserOptions} options
-   * @returns {Monitor}
+   * @param options
+   * @returns
    */
-  #newMonitor(options) {
+  #newMonitor(options: AllOptions): Monitor {
     this.#deleteMonitor(options);
-    return this.#setMonitor({canceled:false, reason:'', id: Math.random().toString(36).slice(2)}, options);
+    return this.#setMonitor({cancelled:false, reason:'', id: Math.random().toString(36).slice(2)}, options);
   }
 
   /**
@@ -373,7 +399,7 @@ export class FileLock extends LockBase {
    * @param {UserOptions} options
    */
   #deleteMonitor(options) {
-    options.monitor = null;
+    delete options.monitor;
   }
 
   /**
@@ -381,7 +407,7 @@ export class FileLock extends LockBase {
    * @param {UserOptions} options
    * @returns {Monitor} 値が反映されたモニター
    */
-  #setMonitor(mon, options) {
+  #setMonitor(mon: Monitor, options: AllOptions) {
     return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
   }
 
@@ -430,7 +456,7 @@ export class FileLock extends LockBase {
     this.#setMeta(
       options,
       {
-        ownerId: options.ownerId = this.ownerId= crypto.randomUUID(),// ★★★ownerIdはオプションにいれず、thisで持てば良いかも！！！！
+        ownerId: options.ownerId = this.ownerId = crypto.randomUUID(),// ★★★ownerIdはオプションにいれず、thisで持てば良いかも！！！！
         expirationTime: Date.now() + options.ttlMs,
         heartbeatTimeoutMs: options.heartbeatTimeoutMs,
         lastHeartbeatAt: Date.now(),
@@ -438,6 +464,9 @@ export class FileLock extends LockBase {
       },
       false
     );
+    this.logger.trace('lockMeta: CreatedLockFile', 
+      new CallStack({ props:{ key: this.key, optionsId: options.ownerId, instaceId: this.ownerId }
+    }));
     // ハートビートタイマー開始
     this.#startHeartbeat(options);
     // 解放関数を返す
@@ -457,7 +486,7 @@ export class FileLock extends LockBase {
    * @param {UserOptions} options 
    * @param {function} lockFn 
    */
-  async _waitPreviousAndLock(options, lockFn) {
+  private async _waitPreviousAndLock(options, lockFn) {
     const start = Date.now();
     const timeoutTime = start + options.timeoutMs;
     let release;
@@ -501,7 +530,7 @@ export class FileLock extends LockBase {
         catch (err) {
           this.logger.trace(`heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
           // モニターに中断をセット
-          const monitor = this.#setMonitor({canceled: true, reason: err.code ?? 'NO_CODE'}, options);
+          const monitor = this.#setMonitor({cancelled: true, reason: err.code ?? 'NO_CODE'}, options);
           this.logger.trace(`heartbeat update monitor at ${DateFormatter.format(new Date())}: `, monitor);
           // ロック処理継続のためここではハートビートを止めることはしない
         }
@@ -602,7 +631,7 @@ export class FileLock extends LockBase {
    * @param {UserOptions} options 
    * @param {string} [errMsg] 
    */
-  _accessMetaWithLock(name, methodCb, options, errMsg=null) {
+  private   _accessMetaWithLock(name, methodCb, options, errMsg=null) {
     // ★★★　下記リトライは、ロックファイルアクセスのためのロックのリトライ回数とする（名前変更せよ！）
     let retries = options.retriesOnIOErr + 1;
     while (retries >= 0) {
@@ -652,7 +681,7 @@ export class FileLock extends LockBase {
     if(options.ownerId && options.ownerId !== meta.ownerId) {
       const err = new LockCompromised(
         'The lock information storage file was overwritten by another lock.',
-        {key: this.key, props: { file: this.filePath } });
+        {key: this.key, props: { file: this.filePath, key: this.key, optionsId: options.ownerId, instanceId: this.ownerId, lockFileId: meta.ownerId } });
       this.logger.error(err);
       throw err;
     }

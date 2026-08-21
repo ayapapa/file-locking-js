@@ -36,18 +36,6 @@ describe('FileLock', () => {
     testToBeSameAsTheDefaultOptions(FileLock.getDefaultOptions());
   });
 
-  it("The lock is successfully acquired, and the return value of the callback is obtained.", async () => {
-    const retVal = "test_001", key = retVal;
-    const opts =  {timeoutSec : 1 } as any;
-    expect(await FileLock.withLock(key, 
-      async () => {
-        await sleepAsync(500);
-        return retVal
-      },
-      opts
-    )).toBe(retVal);
-  });
-
   it("When the lock with no options, internally resolved options are same as the default options.", async () => {
     const retVal = "test_001", key = retVal;
     const opts =  {} as any;

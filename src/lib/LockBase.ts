@@ -4,7 +4,7 @@ import { Contracts } from '@ayapapa-npm/contracts-js';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 import { AnyMxRecord } from 'node:dns';
 import { LockError, DeadlockDetected, TTLExceeded, AlreadyLocked} from './LockErrors.ts';
-import { type BaseUserOptions, type AllOptions, type Monitor } from './BaseUserOptions.ts';
+import { type AllOptions, type BaseUserOptions, type InternalState, type Monitor } from './BaseUserOptions.ts';
 import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
 
 const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
@@ -16,18 +16,26 @@ export type CallbackOnLock = (monitor: Monitor) => any;
 /** 再入ロック検出用のコンテキストオブジェクト */
 export interface ReentrantContext  {
   /** Set of reentrant context ids */
-  heldLocks: Set<string>;
+  heldLocks: Map<string, { monitor: Monitor }>;
 }
 
-export type LogProvider = Pick<Console, 'log' | 'trace' | 'debug' | 'info' | 'warn' | 'error' >;
+export type LogProvider = Pick<Console, 'log' | 'trace' | 'debug' | 'info' | 'warn' | 'error' > & {fatal?: (...args: any[]) => void};
 
 export interface Config {
    /**
-    * Specifies external logger. 
+    * External logger. 
     * Default is `console`.
     */
    logger?: LogProvider;
-}
+
+   /** 
+    * The number of stack frames collected in the stack trace of LockError and 
+    * its subclasses (DeadlockDetected, TTLExceeded, AlreadyLocked, LockCompromised, FileLockError, etc.).
+    * The default value is 10 but may be set to any valid JavaScript number. 
+    * If set to a non-number value, or set to a negative number, stack traces will not capture any frames.
+    */
+   ErrorStackTraceLimit?: number;
+ }
 
 /**
  * 排他制御（ロック）実装の基本クラス。
@@ -38,7 +46,7 @@ export interface Config {
  * コンテキスト内にける別プロセス起動先でのロックの再入制御までは行えない。
  * @class LockBase
  */
-export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
+export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends InternalState = InternalState>  {
 
   /** Static fieilds. */
 
@@ -52,32 +60,44 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
 
   /** Static methods */
 
+
+  /** Instance fieilds. */
+
+  protected logger: LogProvider;
+
+  /** Lock key */
+  protected key: string;
+
   /** Lock owner id. */
   protected ownerId: string = '';
 
   /** コンテキストID（リエントラントロック検出用） */
   private contextId: string;
 
-  protected logger: LogProvider;
+
+  /** Instance methods. */
 
   /**
    * コンストラクタ。
    */
-  constructor(config?: Config) {
-    this.contextId  = crypto.randomUUID();
+  protected constructor(key: string, config?: Config) {
+    this.key = key;
+    this.contextId  = key;// crypto.randomUUID();
     this.logger = config?.logger ?? console;
     if (this.logger === console) {
       this.logger = {...console as LogProvider};
       this.logger.trace = this.logger.debug;
     }
+    // 'fatal'が無いケースもあるので、その場合は、'error'を利用する。
+    if (!this.logger.fatal) this.logger.fatal = this.logger.error;
   }
 
   /**
    * デフォルトオプションを取得する
    * @returns {object}
    */
-  public defaultOptions(): BaseUserOptions {
-    return BaseOptionsResolver.getDefaultOptions();
+//  public defaultOptions(): BaseUserOptions {
+//    return BaseOptionsResolver.getDefaultOptions();
     /*
     return {
       timeoutMs:      5000,   // ロック解除待ち最大時間のデフォルトは5秒
@@ -87,7 +107,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
       logger:         console
     };
     */
-  }
+//  }
 
   /**
    * ユーザーオプションを検証後、内部用に一部変更・補完した結果を取得する。
@@ -95,7 +115,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * @param {function}      [optsCls]     オプションクラス
    * @returns {BaseUserOptions}
    */
-//  private resolveOptions(opts: T, optsCls = BaseOptionsResolver): AllOptions<T> {
+//  private resolveOptions(opts: T, optsCls = BaseOptionsResolver): AllOptions<T, I> {
 //    if (opts.resolved) return opts; // すでに解決済
 //    const resolved = new optsCls(opts)
 //    REQUIRE_DEBUG(resolved instanceof BaseOptionsResolver, "オプションクラス不正", LockError, {code: 'EINVAL'});
@@ -115,9 +135,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * @return {Promise<*>} onLockFn の戻り値で解決される Promise
    * @abstract
    */
-  async _withLock(onLockFn: () => any, execWithLock: (cb: () => any, opt: T) => any, options: AllOptions<T>) {
-    //const rOpts = this.resolveOptions(options) as AllOptions<T>;
-    const rOpts = {...options};
+  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: T) => any, options: AllOptions<T, I>) {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'onLockFn不正', LockError, {code: 'EINVAL'});
     REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'execWithLock不正', LockError, {code: 'EINVAL'});
 
@@ -130,20 +148,34 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
       }
       // 再入ロックチェック
       if (this.isReentry()) {
-        if (!rOpts.allowReentry) throw new DeadlockDetected();
-        this.logger.trace("options.allowReentryに従い再入ロックを許可");
-        rOpts.ownerId = this.ownerId;
-        // ロックカウンターをインクリメントして処理実行
-        this.incReantryCount(rOpts);
+        if (!options.allowReentry) throw new DeadlockDetected(null, { key: this.key });
+        this.logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
+        options.ownerId = this.ownerId;
+        // ロックカウンターをインクリメント
+        this.incReantryCount(options);
         try {
-          return this.execCallback(onLockFn);
+          return this.execCallback(onLockFn, options);
+        }
+        catch (err) {
+          //this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
+          Object.assign(options.monitor, { cancelled: true, reason: err.code ?? 'NO_CODE' });
+          //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
+          throw err;
         }
         finally {
-          this.decReantryCount(rOpts);
+          try {
+            this.decReantryCount(options);
+          }
+          catch (err) {
+            //this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
+            Object.assign(options.monitor, { cancelled: true, reason: err.code ?? 'NO_CODE' });
+            //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
+            throw err;
+          }
         }
       }
       // withLockを実行する
-      return execWithLock(() => this.execCallback(onLockFn), rOpts);
+      return execWithLock(() => this.execCallback(onLockFn, options), options);
     }
     
     return execDependingOnReentry();
@@ -153,7 +185,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * 再入ロックカウンターをインクリメント
    * @param {BaseUserOptions} options 
    */
-  protected incReantryCount(options: AllOptions<T>) {
+  protected incReantryCount(options: AllOptions<T, I>) {
     throw new Error("継承クラスで実装せよ")
   }
 
@@ -161,7 +193,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * 再入ロックカウンターをデクリメント
    * @param {BaseUserOptions} options 
    */
-  protected decReantryCount(options: AllOptions<T>) {
+  protected decReantryCount(options: AllOptions<T, I>) {
     throw new Error("継承クラスで実装せよ")
   }
 
@@ -170,13 +202,22 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * @param {function}  onLockFn  ロック中にコールバックする関数
    * @returns {Promise<*>}  onLockFnの戻り値を取得するPromise。
    */
-  private execCallback(onLockFn: () => any) {
-    // この呼び出し専用の子コンテキストを作る
-    const rc = this.getReentrantContext();
-    const childContext: ReentrantContext = { heldLocks: new Set(rc?.heldLocks) };
-    childContext.heldLocks.add(this.contextId);
-    // 子コンテキストでロック取得＆onLockFn 実行
-    return LockBase.als.run(childContext, async () => onLockFn());
+  private execCallback(onLockFn: CallbackOnLock, options: AllOptions) {
+    // この呼び出し専用のコンテキストを決定する
+    const parent = this.getReentrantContext();
+    let child: ReentrantContext;
+    if (parent.heldLocks.has(this.key)) {
+      // 再入ロック時は、monitorを親と共有
+      const monitor = parent.heldLocks.get(this.contextId).monitor;
+      options.monitor = monitor;
+      child = parent;
+    }
+    else {
+      child = { heldLocks: new Map(parent?.heldLocks) };
+      child.heldLocks.set(this.contextId, { monitor: options.monitor });
+    }
+    // 専用コンテキストでonLockFn()を実行
+    return LockBase.als.run(child, async () => onLockFn(options.monitor));
   }
 
   /**
@@ -191,8 +232,8 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
    * @param {function} fn 
    * @returns 
    */
-  runInNewContext(fn: () => any) {
-    const initialContext: ReentrantContext = { heldLocks: new Set() };
+  private runInNewContext(fn: () => any) {
+    const initialContext: ReentrantContext = { heldLocks: new Map() };
     return LockBase.als.run(initialContext, () => {
       return fn();
     });
@@ -201,7 +242,6 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions>  {
   private getReentrantContext() : ReentrantContext {
     return LockBase.als.getStore();
   }
-
 
 }
 

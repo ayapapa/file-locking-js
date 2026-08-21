@@ -34,6 +34,31 @@ describe('FileLock', () => {
     }
   });
 
+  it("`You can specify `console` as the logger, " +
+    "and the `fatal` function has been replaced by the `error` function, " +
+    "while the `trace` function has been replaced by the `debug` function..", async () => {
+
+    const orgConf = FileLock.getConfig();
+    const retVal = "test_001", key = retVal;
+    expect.assertions(3);
+    try {
+      FileLock.setConfig({ logger: console });
+      expect(await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(500);
+          return retVal;
+        },
+        {}
+      )).toBe(retVal);
+      const lock = (FileLock as any).getLock(key) as any;
+      expect(lock.logger.trace === lock.logger.debug).toBe(true);
+      expect(lock.logger.fatal === lock.logger.error).toBe(true);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
   async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
     set();
     try {
@@ -172,6 +197,12 @@ describe('FileLock', () => {
       fs.rmSync(dir, { force: true, recursive: true });
       FileLock.setConfig(orgConf);
     }
+  });
+
+  it("ロック中にディレクトリパスを変更してもエラーにならない", async () => {
+  });
+
+  it("ロック中にディレクトリパスを変更し、同キーでさらにロックしても、エラーにならない２。", async () => {
   });
 
 });

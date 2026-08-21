@@ -1,4 +1,4 @@
-import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT } from './BaseUserOptions.ts';
+import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT, Monitor } from './BaseUserOptions.ts';
 
 export type AllOptions = AllOptionsT<FileLockUserOptions>;
 
@@ -65,4 +65,4 @@ export interface FileLockUserOptions extends BaseUserOptions {
 
 }
 
-export { typedKeys };
+export { typedKeys, Monitor };

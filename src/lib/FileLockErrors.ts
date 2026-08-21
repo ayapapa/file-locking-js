@@ -60,7 +60,7 @@ export class LockCompromised extends FileLockError {
    * @param reason エラー内容
    * @param params  エラーインスタンスに付与するプロパティ群
    */
-  constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any }  }) {
+  constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any } }) {
     const key: string = params?.key;
     const props = { ...params?.props };
     if (key) props.key = key;
@@ -68,5 +68,15 @@ export class LockCompromised extends FileLockError {
     }
 }
 
+export class CallStack extends FileLockError {
+  /**
+   * コンストラクタ
+   * @param params  エラーインスタンスに付与するプロパティ群
+   */
+  constructor(params?: { props?: { [key: string]: any } }) {
+    const props = { ...params?.props };
+    super('', {code: `CALLSTACK`, props: params?.props });
+  }
+}
 
 export { AlreadyLocked, DeadlockDetected, TTLExceeded };

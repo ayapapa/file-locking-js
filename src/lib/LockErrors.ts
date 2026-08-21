@@ -10,11 +10,13 @@ export class LockError extends Error {
    * @param props A set of arbitrary properties to be attached to the error instance.
    */
   constructor(msg = '', params?: {code?: string, props?: { [key: string]: any } }) {
+    const org_stackTraceLimit = Error.stackTraceLimit;
     Error.stackTraceLimit = 20;
-    super(msg, {  });
+    super(msg);
     const props = {...params?.props};
     const code = (params?.code) ?? 'ELOCK';
     Object.assign(this, { code, ...props });
+    Error.stackTraceLimit = org_stackTraceLimit;
   }
 };
 
@@ -26,9 +28,11 @@ export class DeadlockDetected extends LockError {
    * Constructor.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { props?: { [key: string]: any } }) {
+  constructor(msg?: string | null, params?: { key: string, props?: { [key: string]: any } }) {
     msg = msg || 'A deadlock was detected.';
-    super(msg, { code: 'EDEADLK' , props: params?.props });
+    const props = { ...params?.props }
+    if (params?.key) props.key = params?.key;
+    super(msg, { code: 'EDEADLK' , props });
   }
 };
 

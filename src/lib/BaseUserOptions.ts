@@ -90,14 +90,18 @@ export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBas
 
 /** Monitoring object passed to the callback function executed after acquiring the lock. */
 export interface Monitor {
-  /** Whether the operation was canceled. */
-  canceled: boolean;
+  /** Whether the operation was cancelled. */
+  cancelled: boolean;
+
+  reason?: string;
+
+  id?: string;
 }
 
 /** Definition of the callback function to be executed after acquiring the lock. */
 //export type CallbackOnLock = (monitor: Monitor) => any;
 
-interface InternalState {
+export  interface InternalState {
   /** Whether the BaseUserOptions was resolved. */
   resolved?: boolean;
 
@@ -110,8 +114,11 @@ interface InternalState {
 }
 
 // The general type for Options (accepting a generic T)
-export type AllOptions<T extends BaseUserOptions = BaseUserOptions> = T & InternalState;
-export type AllOptionsKey<T extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<T>;
+export type AllOptions<
+  U extends BaseUserOptions = BaseUserOptions,
+  I extends InternalState = InternalState
+> = U & I;
+export type AllOptionsKey<U extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<U>;
 
 /** Enumerate typed object keys. */
 export function typedKeys<T extends object>(obj: T): Array<keyof T> {
