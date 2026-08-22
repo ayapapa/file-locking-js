@@ -2,6 +2,7 @@
  * Basic lock handling error. 
  */
 export class LockError extends Error {
+  public code:string = 'ELOCK';
   /**
    * Constructor.
    * @param msg   Error message.
@@ -14,8 +15,8 @@ export class LockError extends Error {
     Error.stackTraceLimit = 20;
     super(msg);
     const props = {...params?.props};
-    const code = (params?.code) ?? 'ELOCK';
-    Object.assign(this, { code, ...props });
+    this.code = (params?.code) ?? 'ELOCK';
+    Object.assign(this, props);
     Error.stackTraceLimit = org_stackTraceLimit;
   }
 };

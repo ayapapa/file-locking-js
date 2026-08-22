@@ -104,11 +104,12 @@ describe('FileLock', () => {
     expect.assertions(4);
     try {
       await FileLock.withLock(key, async () => {
-                  await sleepAsync(1000);
+                  await sleepAsync(500);
                 },
                 {timeoutSec : 1 }
               );
-    } catch (err: any) {
+    }
+    catch (err: any) {
       expect(err.code).toBe('ELOCKED');
       expect(err.key).toBe(key);
       expect(err instanceof AlreadyLocked).toBe(true);
@@ -136,7 +137,8 @@ describe('FileLock', () => {
     expect.assertions(4);
     try {
       await Promise.all([a, b]);
-    } catch (err: any) {
+    }
+    catch (err: any) {
       expect(err.code).toBe('ELOCKED');
       expect(err.key).toBe(key);
       expect(err instanceof AlreadyLocked).toBe(true);
@@ -439,7 +441,7 @@ describe('FileLock', () => {
 */      
   });
  
-  it("hogehoge", async () => {
+  it("`TTLExceeded` error occurs if the callback processing exceeds the TTL setting.", async () => {
     const key = "testKey";
     expect.assertions(4); 
     await waitCallbackCompletedByCancelled(
@@ -461,13 +463,71 @@ describe('FileLock', () => {
     );
   });
 
+  async function testIeinvalidLocknformationFile(target: string, v?: any ) {
+    const key = "testKey";
+    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 10*1000, heartbeatTimeoutMs:5000, lastHeartbeatAt: Date.now()};
+    const mt = {...meta} as any;
+    if (v) {
+      mt[target] = v;
+    } else {
+      delete mt[target];
+    }
+    setLockMeta(key, mt);
+    try {
+      await FileLock.withLock(
+        key,
+        async () => await sleepAsync(500),
+        {ttlMs: 1000}
+      );
+    } catch (err: any) {
+      expect(err instanceof LockCompromised).toBeTruthy();
+      expect(err.code).toBe('ECOMPROMISED');
+      expect(err.message.includes('has been compromised')).toBeTruthy();
+    }
+    finally {
+      removeLockFiles(key);
+    }
+  }
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No ownerId)", async () => {
+    await testIeinvalidLocknformationFile("ownerId");
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
+    await testIeinvalidLocknformationFile("counter");
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
+    await testIeinvalidLocknformationFile("expirationTime");
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No heartbeatTimeoutMs)", async () => {
+    await testIeinvalidLocknformationFile("heartbeatTimeoutMs");
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(Invalid ownerId)", async () => {
+    await testIeinvalidLocknformationFile("ownerId", 12345);
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
+    await testIeinvalidLocknformationFile("counter", 'hogehogehoge');
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
+    await testIeinvalidLocknformationFile("expirationTime", "nyannnyann");
+  });
+
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(No heartbeatTimeoutMs)", async () => {
+    await testIeinvalidLocknformationFile("heartbeatTimeoutMs", "miimii");
+  });
+
+
 
   /**
    * "Intentionally overwriting the lock information..." テストにて発覚：
    *  再入ロック許容時のエラー処理が不十分だったこえおｔ⇒　手当はしたが、リファクタリングが必要
    *  ↑の教訓として、finally処理(アンロック処理実行)におても、エラーが発生することが確認できた！　全部見直せ！！！
    * 　↑　対応でよいのか、そもそもdecXXXCounterの中に閉じ込めるべきなのか、、、、
-   * そして、setMonitorが、FileLockクラス側の#関数になっている件は、見逃せない！！　⇒　そもそも、LockBaseの機能であるべき！！！
   */
 
   it("hogehoge", async () => {

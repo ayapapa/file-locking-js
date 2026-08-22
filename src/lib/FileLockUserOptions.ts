@@ -1,4 +1,4 @@
-import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT, Monitor } from './BaseUserOptions.ts';
+import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT, type InternalState as BaseInternalState, type Monitor } from './BaseUserOptions.ts';
 
 export type AllOptions = AllOptionsT<FileLockUserOptions>;
 
@@ -62,6 +62,10 @@ export interface FileLockUserOptions extends BaseUserOptions {
    *  Cannot be used together with retryIntervalSec. Default is 100.
    */
   retryIntervalMs?: number;
+
+}
+
+export interface InternalState extends BaseInternalState {
 
 }
 

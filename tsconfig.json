@@ -11,6 +11,15 @@
     "outDir": "./dist",
     "types": ["node"],
     "allowImportingTsExtensions": true,
+
+    "strict": true,  // 全ての厳格チェックを有効化
+    "noImplicitReturns": true,  // 関数の全ての分岐で戻り値が返されているかチェック
+    "noFallthroughCasesInSwitch": true,  // switch文のbreak忘れを防止
+    "forceConsistentCasingInFileNames": true,  // ファイル名の大小文字統一
+    "strictNullChecks": true,  // null/undefined のチェックを厳格化
+    "noUnusedLocals": true,  // 使われていない変数をエラーに
+    "noUnusedParameters": true,  // 使われていない引数をエラーに
+    "exactOptionalPropertyTypes": true, //オプションプロパティの型チェックを厳格化
   },
   "include": [
     "src/**/*"

@@ -1,6 +1,5 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 import { 
   typedKeys, 
   type BaseUserOptions, 
@@ -13,9 +12,7 @@ import {
 } from './BaseUserOptions.ts';
 import { LockError } from './LockErrors.ts';
 
-const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
-const logger = new PrettyConsole();
-
+const {REQUIRE} = Contracts;
 
 // The general type for Options (accepting a generic T)
 //export type AllOptions<T extends BaseUserOptions = BaseUserOptions> = T & InternalState;
@@ -45,40 +42,6 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
   public getDefaultOptions(): BaseUserOptions {
     return BaseOptionsResolver.defaultOptions;
   }
-
-/** Whether the BaseUserOptions was resolved. */
-//resoleved: boolean = false;
-
-/** 
- * Maximum wait time (in seconds) to acquire the lock. 
- */
-//timeoutSec?: number;
-
-/**
- * Maximum wait time to acquire the lock [milliseconds]. 
- */
-//timeoutMs?: number;
-
-/**
- * Lock validity period (time to live)—i.e., the maximum time [seconds] from lock acquisition
- * until the callback function completes execution. An error (TTLExceeded) occurs if this period is exceeded.
- */
-//ttlSec?: number
-
-/**
- * Lock validity period (time to live): the maximum time [milliseconds] from lock acquisition
- *  until the callback function completes execution. An error (TTLExceeded) occurs if this
- *  period is exceeded. Cannot be used in conjunction with ttlSec. Default is 10000.
- */
-//ttlMs?: number;
-
-/**
- *  Controls the behavior when attempting to acquire a lock using the same key while already holding a lock for that key. 
- *  The default is false (re-entrant locking is prohibited; a DeadlockDetected error is thrown upon detection). 
- */
-//  allowReentry?: boolean;
-
-//  protected resolved: boolean = false;
 
   /**
    * コンストラクタ
@@ -114,7 +77,6 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
 */
   /**
    * オプションの妥当性をチェックする。
-   * @param {BaseUserOptions} opts  オプション
    */
   validateOptions() {
     // 型チェック
@@ -125,15 +87,16 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
 
   /**
    * オプションを内部用に一部変更・補完（デフォルト埋め、別名サポート、値の変換など）
-   * @param {BaseUserOptions} defaultOpts  デフォルトオプション
-   * @return {objects}
+   * @param defaultOpts  デフォルトオプション
    */
-  normalizeOptions(defaultOpts?: T) {
-    // 単位変換
+  normalizeOptions(defaultOpts?: T): void {
     this.convSecToMs();
-    // デフォルト埋め ★★★　defaultOptionsのオーバーライド！！！
-    const defOpts = defaultOpts || this.getDefaultOptions();
-    Object.assign(this.options, {...defOpts, ...this.options});
+
+    Object.assign(this.options, { ...defaultOpts,  ...this.options});
+    typedKeys(this.options).forEach(key => {
+      if (this.options[key] == null) delete this.options[key];
+    });
+    Object.assign(this.options, { ...this.getDefaultOptions(), ...this.options });
   }
 
   protected getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
@@ -158,7 +121,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
     
   }
 
-    /**
+  /**
    * ユーザーオプションの値の型をチェックする
    */
   checkTypes() {

@@ -1,8 +1,8 @@
-import { Contracts } from '@ayapapa-npm/contracts-js';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
+//import { Contracts } from '@ayapapa-npm/contracts-js';
+//import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
-const logger = new PrettyConsole();
+//const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
+//const logger = new PrettyConsole();
 
 export interface BaseUserOptions {
   /** 
@@ -95,18 +95,20 @@ export interface Monitor {
 
   reason?: string;
 
+  operation?: string;
+
   id?: string;
 }
 
 /** Definition of the callback function to be executed after acquiring the lock. */
 //export type CallbackOnLock = (monitor: Monitor) => any;
 
-export  interface InternalState {
+export interface InternalState {
   /** Whether the BaseUserOptions was resolved. */
-  resolved?: boolean;
+  resolved: boolean;
 
   /** Lock owner id. */
-  ownerId?: string;
+  ownerId?: string | null;
 
   monitor?: Monitor;
 

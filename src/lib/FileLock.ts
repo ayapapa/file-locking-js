@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import plockfile from 'proper-lockfile';
 // withLock定義
 const lockfile = {
-  withLock(file, cb, opts) {
+  withLock(file: string, cb: () => void, opts: plockfile.LockOptions) {
     plockfile.lockSync(file, opts);
     try {
       return cb();
@@ -18,10 +18,10 @@ const lockfile = {
 import { LRUCache } from 'lru-cache';
 import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-const { REQUIRE, REQUIRE_DEBUG } = Contracts;
+const { REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock, type Config as BaseConfig, type LogProvider } from "./LockBase.ts";
-import { FileLockUserOptions, typedKeys, type AllOptions, type Monitor } from './FileLockUserOptions.ts';
+import { FileLockUserOptions, typedKeys, type AllOptions, type InternalState } from './FileLockUserOptions.ts';
 import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
 import {  AlreadyLocked, CallStack, FileLockError, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 
@@ -49,10 +49,10 @@ export interface Config extends BaseConfig {
 
   /**
    * Maximum number that can be cached. 
-   * If unspecified, null, or negative, there is no upper limit. `0` means `cache` is disabled, even if `cache` is true.
+   * If unspecified, or negative, there is no upper limit. `0` means `cache` is disabled, even if `cache` is true.
    * Default is `100`.
    */
-  cacheMaxNum?: number | null;
+  cacheMaxNum?: number;
 
   /**
    * User default options used with `withLock()`.
@@ -61,11 +61,19 @@ export interface Config extends BaseConfig {
   defaultOptions?: FileLockUserOptions;
 }
 
+interface LockMetaData {
+  ownerId: string
+  expirationTime: number,
+  heartbeatTimeoutMs: number,
+  lastHeartbeatAt: number,
+  counter: number
+}
+
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function sleepSync(ms) {
+function sleepSync(ms: number) {
   const sab = new SharedArrayBuffer(4);
   const int32 = new Int32Array(sab);
   Atomics.wait(int32, 0, 0, ms);
@@ -77,7 +85,7 @@ function sleepSync(ms) {
 * While the file exists, no other lock can be acquired for the same key. 
 * Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed. 
 */
-export class FileLock extends LockBase {
+export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
  
   /** Static fields */
 
@@ -98,7 +106,7 @@ export class FileLock extends LockBase {
    * FileLock instance cache associated with a key. 
    * Uses `LRUCache`, providing features to set a maximum cache size and prune (remove) infrequently accessed elements.
    */
-  private static cache: LRUCache<string, FileLock>;
+  private static cache: LRUCache<string, FileLock> | null;
 
   /** Static methods */
 
@@ -123,8 +131,10 @@ export class FileLock extends LockBase {
 
     // If cache is enabled, (Re)create cache.
     if (FileLock.config.cache) {
-      const opts/*: LRUCache.Options<string, FileLock, unknown>*/ = {} as any;
-      if (FileLock.config.cacheMaxNum > 0) opts.max = FileLock.config.cacheMaxNum;
+      const opts: LRUCache.Options<string, FileLock, unknown> = {} as any;
+      if (FileLock.config.cacheMaxNum && FileLock.config.cacheMaxNum > 0) {
+        opts.max = FileLock.config.cacheMaxNum;
+      }
       opts.ttl = 50000;
       FileLock.cache = new LRUCache<string, FileLock>(opts);
     }
@@ -171,17 +181,18 @@ export class FileLock extends LockBase {
     if (FileLock.cache) FileLock.cache.clear();
   }
 
-  private static hasCache(key: string) {
-    return FileLock.cache && FileLock.cache.has(key);
+  private static hasCache(key: string): boolean {
+    return FileLock.cache != null && FileLock.cache.has(key);
   }
 
   private static setCache(key: string, lock: FileLock) {
     if (FileLock.cache) FileLock.cache.set(key, lock);
   }
 
-  private static getLock(key: string) {
-    if (FileLock.hasCache(key)) return FileLock.cache.get(key);
-
+  private static getLock(key: string): FileLock {
+    if (FileLock.hasCache(key)) {
+      return FileLock.cache?.get(key) as FileLock;
+    }
     const lock = new FileLock(key);
     FileLock.setCache(key, lock);
     return lock;
@@ -203,7 +214,7 @@ export class FileLock extends LockBase {
         if (stat.isDirectory()) return true;
         throw Object.assign(new Error(`'${name}' is not a directory.`), { code: 'ENOTDIR' });
       }
-      catch (err) {
+      catch (err: any) {
         if (err.code === 'ENOENT') return false;
         throw new LockDirectoryStatFailed(err.message, { path: name, props: { fsErrorCode: err.code } } );
       }
@@ -212,7 +223,7 @@ export class FileLock extends LockBase {
       try {
         fs.mkdirSync(name,  { recursive: true });
       }
-      catch (err) {
+      catch (err: any) {
         // ロックディレクトリアクセス失敗
         throw new LockDirectoryCreationFailed(err.message, { path: name, props: { path: name, fsErrorCode: err.code } });
       }
@@ -260,13 +271,13 @@ export class FileLock extends LockBase {
   /** Instance fields. */
 
   /** File path for storing lock information (without extension) */
-  private baseFilePath?: string;
+  private baseFilePath: string = '';
 
   /** File path for storing lock information (with extension) */
-  private filePath?: string;
+  private filePath: string = '';
 
   /** Heartbeat timer id */
-  #heartbeatTimer?: NodeJS.Timeout;
+  #heartbeatTimer?: NodeJS.Timeout | null;
 
   #released: boolean = true;
 
@@ -300,7 +311,7 @@ export class FileLock extends LockBase {
    * @param options 
    */
   protected override incReantryCount(options: AllOptions) {
-    const meta = this.#getMeta(options, true);
+    const meta = this.#getMeta(options);
     options.ownerId =  options.ownerId || meta.ownerId;
     meta.counter = meta.counter || 0;
     meta.counter++;
@@ -313,7 +324,7 @@ export class FileLock extends LockBase {
    */
   protected override decReantryCount(options: AllOptions) {
     try {
-      const meta = this.#getMeta(options, true);
+      const meta = this.#getMeta(options);
       if (options.ownerId === meta.ownerId) {
         if (meta.counter > 0) meta.counter--;
         this.#setMeta(options, meta);
@@ -323,18 +334,19 @@ export class FileLock extends LockBase {
       }
     }
     catch (err) {
+      this.onError(err, 'getMeta', options);
       // 不正なメタデータファイルのためロックを解放する
       this.#release(options);
       throw err;
     }
   }
 
-  #prepare(options: AllOptions): void {
+  protected override prepare(options: AllOptions): void {
+    super.prepare(options);
     if (FileLock.initialized !== true) FileLock.initialize(); // 念のため
     const  dirPath    = FileLock.getLockDirPath();
     this.baseFilePath = path.join(dirPath, this.key);
     this.filePath     = this.baseFilePath + '.json';
-    this.#newMonitor(options);
   }
 
   private async withLock(onLockFn: CallbackOnLock, options: AllOptions) {
@@ -342,41 +354,43 @@ export class FileLock extends LockBase {
     REQUIRE_DEBUG(options.resolved, "オプションが不完全です（デバッグ用エラー）。", 
       FileLockError, { code: 'EINVALIDOPTIONS', props: options });
 
-    this.#prepare(options);
+    this.prepare(options);
 
     return super._withLock(
-      (monitor) => {
+      onLockFn,
+      /*
+      (monitor: Monitor) => {
         // ★★★monitor付き、コールバックは、親クラスに閉じ込めたいな！！！！★★★
         return onLockFn(monitor);
       },
+      */
       async (cb, opts) => {// cb は、親クラスにてラッピングされたコールバック
-        //this.logger.trace(opts);
-        const lockfileRelease = await this.#lock(opts);
+
+        await this.#lock(opts);
 
         // 処理実行最大時間タイマー
-        let ttlTimeoutId;
+        let ttlTimeoutId: NodeJS.Timeout;
         const timeoutPr = new Promise((_, reject) => {
           ttlTimeoutId = setTimeout(() => {
-            reject(new TTLExceeded())
+            reject(new TTLExceeded(null, { ttlMs: opts.ttlMs as any }))
           },
           opts.ttlMs);
         });
 
         // ロック取得成功、コールバック関数を実行
-        let errCode;
         try {
           return await Promise.race([cb(), timeoutPr])
             .finally(() => {
               if (ttlTimeoutId !== undefined) clearTimeout(ttlTimeoutId);
-          });
+            }
+          );
         }
         catch (err) {
-          this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
-          //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
+          this.onError(err, 'Callback or Timer in withLock()', opts);
           throw err;
         }
         finally {
-          if (lockfileRelease) lockfileRelease();
+          this.#unlock(opts);
         }
       },
       options
@@ -385,46 +399,18 @@ export class FileLock extends LockBase {
   }
 
   /**
-   * 新たにモニターを作成する
-   * @param options
-   * @returns
-   */
-  #newMonitor(options: AllOptions): Monitor {
-    this.#deleteMonitor(options);
-    return this.#setMonitor({cancelled:false, reason:'', id: Math.random().toString(36).slice(2)}, options);
-  }
-
-  /**
-   * モニターを削除する
-   * @param {UserOptions} options
-   */
-  #deleteMonitor(options) {
-    delete options.monitor;
-  }
-
-  /**
-   * モニターに値をセットする
-   * @param {UserOptions} options
-   * @returns {Monitor} 値が反映されたモニター
-   */
-  #setMonitor(mon: Monitor, options: AllOptions) {
-    return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
-  }
-
-  /**
-   * ロックする。
    * 手前のロックがあればその解除を待った後に、ロックする。
    * 指定待ち時間を超えた場合はエラー（例外）
    * @param options  オプション
    * @returns ロック解放関数
    */
-  async #lock(options: AllOptions) {
-    const lockFn = () => {
+  async #lock(options: AllOptions): Promise<void> {
+    return this.#waitPreviousAndLock(options, () => {
       let release;// = { releaseMeta: () => void };
       // メタファイル作成
       try {
-        release = this.#lockMeta(options);
-        if (!release) return null; // 前段ロックが有効なので、ロックできなかった
+        release = this.#execLock(options);
+        if (!release) return false; // 前段ロックが有効なので、ロックできなかった
       }
       catch (err) {
         throw err;
@@ -432,33 +418,31 @@ export class FileLock extends LockBase {
       // ロック解放関数を返す
       options.release = release;
       this.#released = false;
-      return () => this.#unlock(options);
-    }
-
-    return this._waitPreviousAndLock(options, lockFn);
+      return true;
+    });
   }
 
   /**
-   * ロックファイルを生成する
-   * @param {UserOptions}  [options] オプション。利用するか否かは継承クラスに委ねる。
-   *  - retry: boolean型。ロック権獲得後、ロックに失敗した場合、一度だけリトライする。
+   * ロック実行。すなわち、ロック情報格納ファイルを作成する。
+   * @param options オプション。
    * @returns ロック取得の場合は解放用関数を、さもなくば、nullを返す
    */
-  #lockMeta(options: AllOptions): () => void | null {
-    //try {
+  #execLock(options: AllOptions): (() => void) | null {
     // 本インスタンスの解放フラグが経っていないなら、前段ロック中なのでnull
     if (this.#released === false) return null;
     // ファイルを確認し、有効ならnull
     if (fs.existsSync(this.filePath)) {
-      if (!this.#isMetaExpired(options)) return null;//有効な前段ロックあり
+      if (!this.#isLockExpired(options)) return null;//有効な前段ロックあり
     }
     // ロック獲得可能なためロック情報格納ファイル作成
+    const ttlMs: number = options.ttlMs ?? FileLock.getDefaultOptions().ttlMs as any;
+    const heartbeatTimeoutMs: number = options.heartbeatTimeoutMs as any
     this.#setMeta(
       options,
       {
-        ownerId: options.ownerId = this.ownerId = crypto.randomUUID(),// ★★★ownerIdはオプションにいれず、thisで持てば良いかも！！！！
-        expirationTime: Date.now() + options.ttlMs,
-        heartbeatTimeoutMs: options.heartbeatTimeoutMs,
+        ownerId: options.ownerId = this.ownerId = crypto.randomUUID(),
+        expirationTime: Date.now() + ttlMs,
+        heartbeatTimeoutMs: heartbeatTimeoutMs,
         lastHeartbeatAt: Date.now(),
         counter: 1
       },
@@ -470,8 +454,7 @@ export class FileLock extends LockBase {
     // ハートビートタイマー開始
     this.#startHeartbeat(options);
     // 解放関数を返す
-    const release = () => this.#unlockMeta(options)
-    return release;
+    return () => this.#unlockMeta(options)
   }
 
   /**
@@ -479,34 +462,33 @@ export class FileLock extends LockBase {
    * @param options オプション。
    */
   #unlock(options: AllOptions): void {
-    this.#decReantryCount(options);
+    this.decReantryCount(options);
   }
+
   /**
    * 前段ロックがある場合はその解除を待った後にロックする
    * @param {UserOptions} options 
    * @param {function} lockFn 
    */
-  private async _waitPreviousAndLock(options, lockFn) {
+  async #waitPreviousAndLock(options: AllOptions, tryLock: () => boolean): Promise<void> {
     const start = Date.now();
-    const timeoutTime = start + options.timeoutMs;
-    let release;
-    while (!(release = lockFn())) {
+    const timeoutTime = start + (options.timeoutMs as any);
+    while (!tryLock()) {
       if (Date.now() >= timeoutTime) {
         throw new AlreadyLocked(null, {key: this.key, props: { file: this.filePath } });
       }
-      await sleepAsync(options.pollIntervalMs);
+      await sleepAsync(options.pollIntervalMs as any);
     }
-    return release;
   }
 
   /**
    * メタファイルが有効期限切れ
    * @param options 
    */
-  #isMetaExpired(options: AllOptions): boolean {
+  #isLockExpired(options: AllOptions): boolean {
     // ★★★　メタ有効期限expirationTime　と ハートビート有効期限をチェック
     // 　options.expiredCheckByを使って判断する
-    const meta = this.#getMeta(options);
+    const meta = this.#getMetaOrNull(options);
     // とりあえず、メタ有効期限（実行開始時間＋最大実行時間）
     const expired = !meta || meta.expirationTime < Date.now();
     const dead = !meta || meta.lastHeartbeatAt + meta.heartbeatTimeoutMs < Date.now();
@@ -517,7 +499,7 @@ export class FileLock extends LockBase {
    * ハートビートタイマーを開始する
    * @param {UserOptions}
    */
-  #startHeartbeat(options) {
+  #startHeartbeat(options: AllOptions) {
     if (this.#heartbeatTimer) return; // 二重起動防止
     this.logger.trace(`start heartbeat at ${DateFormatter.format(new Date())}`);
     this.#heartbeatTimer = setInterval(
@@ -529,9 +511,7 @@ export class FileLock extends LockBase {
         }
         catch (err) {
           this.logger.trace(`heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
-          // モニターに中断をセット
-          const monitor = this.#setMonitor({cancelled: true, reason: err.code ?? 'NO_CODE'}, options);
-          this.logger.trace(`heartbeat update monitor at ${DateFormatter.format(new Date())}: `, monitor);
+          this.onError(err, 'updateHeartbeat', options);
           // ロック処理継続のためここではハートビートを止めることはしない
         }
         // 念のため更新後にもロック解放済フラグをチェック。
@@ -554,8 +534,8 @@ export class FileLock extends LockBase {
   /**
    * ハートビート時間を更新する
    */
-  #updateHeartbeat(options) {
-    const meta = this.#getMeta(options, true);
+  #updateHeartbeat(options: AllOptions) {
+    const meta = this.#getMeta(options);
     meta.lastHeartbeatAt = Date.now();
     this.#setMeta(options, meta);
     this.logger.trace(`update heartbeat at ${DateFormatter.format(new Date(meta.lastHeartbeatAt))}`);
@@ -566,10 +546,10 @@ export class FileLock extends LockBase {
    * @param options 
    * @param errMsg 
    */
-  #unlockMeta(options, errMsg?: string): void {
+  #unlockMeta(options: AllOptions, errMsg?: string): void {
     let meta;
     try {
-      meta = this.#getMeta(options);
+      meta = this.#getMetaOrNull(options);
       if (!meta) return;
     }
     catch (err) {
@@ -577,7 +557,7 @@ export class FileLock extends LockBase {
     }
     if (meta.ownerId !== options.ownerId) return; // 後段に浸食されているので解放しない
     // メタデータファイルを削除する
-    return this._accessMetaWithLock(
+    return this.#accessMetaWithLock(
       this.filePath,
       (name) => fs.rmSync(name/*,  {recursive: true, force: true}*/),
       options,
@@ -586,41 +566,17 @@ export class FileLock extends LockBase {
   };
 
   /**
-   * 再入ロックカウンターをデクリメントし、カウンターが０になったら、ロックを解放する
-   * @param options 
-   */
-  #decReantryCount(options: AllOptions) {
-    try {
-      const meta = this.#getMeta(options, true);
-      if (options.ownerId === meta.ownerId) {
-        if (meta.counter > 0) meta.counter--;
-        this.#setMeta(options, meta);
-        if (meta.counter === 0) {
-          this.#release(options);
-        }
-      }
-    }
-    catch (err) {
-      // 不正なメタデータファイルのためロックしょ継続出来ないので、解放する
-      this.#release(options);
-      throw err;
-    }
-  }
-
-/**
    * ロックを解除する
-   * @param {UserOptions & ReleaseLock} [options] オプション。
-   * @param {Promise<() => Promise<void>}  lelease
-   * @returns {void}
+   * @param options オプション。
    */
-  #release(options) {
+  #release(options: AllOptions) {
     if (options.release) options.release();
 
     this.#stopHeartbeat()
 
-    // ?????KeyFileLockMap.delete(this.#key); // ★★★これ本当にこれで良い？？　少しは残しておいてもいいでないかな？ ★　optionsのthisに持たせるべきものをすべて持たせたあとに実施せよ！！
-    options.release = null;
-    options.ownerId = this.ownerId = null;
+    delete options.release;
+    delete options.ownerId;
+    this.ownerId = null;
     this.#released = true;
   }
 
@@ -631,9 +587,8 @@ export class FileLock extends LockBase {
    * @param {UserOptions} options 
    * @param {string} [errMsg] 
    */
-  private   _accessMetaWithLock(name, methodCb, options, errMsg=null) {
-    // ★★★　下記リトライは、ロックファイルアクセスのためのロックのリトライ回数とする（名前変更せよ！）
-    let retries = options.retriesOnIOErr + 1;
+  #accessMetaWithLock(name: string, methodCb: (name:string) => any, options: AllOptions, errMsg: string | null = null): any {
+    let retries = options.retriesOnIOErr as any + 1;
     while (retries >= 0) {
       try {
         // ロックファイルでガードしたうえで操作する
@@ -643,10 +598,10 @@ export class FileLock extends LockBase {
           {realpath: false/*, retries: options._lockfileRetries?? 5*/} // lockSyncなのでretriesは指定できない（エラー）
         );
       }
-      catch (err) {
+      catch (err: any) {
         if (retries--) {
           // クリティカルセクションなので同期スリープを利用
-          sleepSync(options.retryIntervalMs);
+          sleepSync(options.retryIntervalMs as any);
           continue;
         }
         if (err.code === 'ELOCKED') {
@@ -658,26 +613,29 @@ export class FileLock extends LockBase {
     }
   }
 
+  #getMetaOrNull(options: AllOptions): LockMetaData | null {
+    if (!fs.existsSync(this.filePath)) {
+      return null;
+    }
+     return this.#getMeta(options);
+  }
   /**
    * ロックメタ情報を取得する
-   * @param {UserOptions} options 
-   * @param {boolean}     [errorIfNotExist] trueならロックメタファイルが無い時にLockCompromisedエラー
-   * @returns {MetaData}  errorIfNotExistがfalseの場合、未ロック（ロックメタファイルが無い）ならnull
+   * @param  options 
+   * @param  errorIfNotExist  trueならロックメタファイルが無い時にLockCompromisedエラー
+   * @returns errorIfNotExistがfalseの場合、未ロック（ロックメタファイルが無い）ならnull
    */
-  #getMeta(options, errorIfNotExist = false) {
+  #getMeta(options: AllOptions): LockMetaData {
     if (!fs.existsSync(this.filePath)) {
-      if (errorIfNotExist) {
-        throw new LockCompromised('The lock information storage file does not exist.', {key: this.key, props: { file: this.filePath } });
-      }
-      return null;
-     }
-    const contents = this._accessMetaWithLock(
+      throw new LockCompromised('The lock information storage file does not exist.', {key: this.key, props: { file: this.filePath } });
+    }
+    const contents = this.#accessMetaWithLock(
       this.filePath,
-      (name) => fs.readFileSync(name), 
+      (name: string) => fs.readFileSync(name), 
       options, 
       `Lock metafile read error.`
     );
-    const meta = contents ? JSON.parse(contents) : {};
+    const meta: LockMetaData = contents ? JSON.parse(contents) : {};
     if(options.ownerId && options.ownerId !== meta.ownerId) {
       const err = new LockCompromised(
         'The lock information storage file was overwritten by another lock.',
@@ -685,7 +643,7 @@ export class FileLock extends LockBase {
       this.logger.error(err);
       throw err;
     }
-    const check = (key, type) => {
+    const check = (key: keyof LockMetaData, type: string) => {
       if (!(key in meta && typeof meta[key] === type)) {
         throw new LockCompromised(`The lock information format is invalid.`, {key: this.key, props: { file: this.filePath } });
       }
@@ -704,21 +662,21 @@ export class FileLock extends LockBase {
    * @param {MetaData}  meta
    * @param {boolean}   withLock
    */
-  #setMeta(options, meta, withLock = true) {
+  #setMeta(options: AllOptions, meta: LockMetaData, withLock: boolean = true) {
     try {
       if (!withLock) {
         fs.writeFileSync(this.filePath, JSON.stringify(meta));
       }
       else {
-        this._accessMetaWithLock(
+        this.#accessMetaWithLock(
           this.filePath,
-          (name) => fs.writeFileSync(name, JSON.stringify(meta)),
+          (name: string) => fs.writeFileSync(name, JSON.stringify(meta)),
           options,
           `ロックメタファイル書き込みエラー`
         );
       }
     }
-    catch (err) {
+    catch (err: any) {
       if (err instanceof FileLockError === false) {
         err = new FileLockError('ロックメタファイル書き込みエラー', {code: err.code, props: { file: this.filePath } });
       } 

@@ -1,14 +1,10 @@
 // 利用モジュールの読み込み
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-import { AnyMxRecord } from 'node:dns';
-import { LockError, DeadlockDetected, TTLExceeded, AlreadyLocked} from './LockErrors.ts';
+import { LockError, DeadlockDetected } from './LockErrors.ts';
 import { type AllOptions, type BaseUserOptions, type InternalState, type Monitor } from './BaseUserOptions.ts';
-import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
 
-const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
-const logger = new PrettyConsole();
+const {REQUIRE_DEBUG} = Contracts;
 
 /** Definition of the callback function to be executed after acquiring the lock. */
 export type CallbackOnLock = (monitor: Monitor) => any;
@@ -69,7 +65,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
   protected key: string;
 
   /** Lock owner id. */
-  protected ownerId: string = '';
+  protected ownerId: string | null = null;
 
   /** コンテキストID（リエントラントロック検出用） */
   private contextId: string;
@@ -135,7 +131,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
    * @return {Promise<*>} onLockFn の戻り値で解決される Promise
    * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: T) => any, options: AllOptions<T, I>) {
+  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: AllOptions<T, I>) => any, options: AllOptions<T, I>) {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'onLockFn不正', LockError, {code: 'EINVAL'});
     REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'execWithLock不正', LockError, {code: 'EINVAL'});
 
@@ -157,23 +153,21 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
           return this.execCallback(onLockFn, options);
         }
         catch (err) {
-          //this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
-          Object.assign(options.monitor, { cancelled: true, reason: err.code ?? 'NO_CODE' });
-          //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
+          this.onError(err, 'Callback in LockBase._withLock()', options);
           throw err;
         }
         finally {
-          try {
+//          try {
             this.decReantryCount(options);
-          }
-          catch (err) {
-            //this.#setMonitor({ cancelled: true, reason: err.code ?? 'NO_CODE' }, opts);
-            Object.assign(options.monitor, { cancelled: true, reason: err.code ?? 'NO_CODE' });
-            //this.logger.error(' catch eror after update', err, '\nmonitor:', monitor);
+  //        }
+    /*
+          catch (err: any) {
+            this.onError(err, 'decReantryCount', options):
             throw err;
           }
+            */
         }
-      }
+     }
       // withLockを実行する
       return execWithLock(() => this.execCallback(onLockFn, options), options);
     }
@@ -186,7 +180,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
    * @param {BaseUserOptions} options 
    */
   protected incReantryCount(options: AllOptions<T, I>) {
-    throw new Error("継承クラスで実装せよ")
+    throw new LockError(`継承クラスで実装せよ${options}`)
   }
 
   /**
@@ -194,7 +188,15 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
    * @param {BaseUserOptions} options 
    */
   protected decReantryCount(options: AllOptions<T, I>) {
-    throw new Error("継承クラスで実装せよ")
+    throw new LockError(`継承クラスで実装せよ${options}`)
+  }
+
+  protected prepare(options: AllOptions<T, I>): void {
+    this.#newMonitor(options);
+  }
+  
+  protected onError(err: any, operation: string, options: AllOptions<T, I>) {
+    this.#setMonitor({ cancelled: true, reason: err.code ?? 'ELOCK', operation}, options)
   }
 
   /**
@@ -202,22 +204,24 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
    * @param {function}  onLockFn  ロック中にコールバックする関数
    * @returns {Promise<*>}  onLockFnの戻り値を取得するPromise。
    */
-  private execCallback(onLockFn: CallbackOnLock, options: AllOptions) {
+  private execCallback(onLockFn: CallbackOnLock, options: AllOptions<T, I>) {
     // この呼び出し専用のコンテキストを決定する
-    const parent = this.getReentrantContext();
+    const parent = this.getReentrantContext() as any;
     let child: ReentrantContext;
+    let monitor: Monitor;
     if (parent.heldLocks.has(this.key)) {
       // 再入ロック時は、monitorを親と共有
-      const monitor = parent.heldLocks.get(this.contextId).monitor;
+      monitor = parent.heldLocks.get(this.key)?.monitor as any;
       options.monitor = monitor;
       child = parent;
     }
     else {
       child = { heldLocks: new Map(parent?.heldLocks) };
-      child.heldLocks.set(this.contextId, { monitor: options.monitor });
+      monitor = options.monitor as any;
+      child.heldLocks.set(this.key, { monitor });
     }
     // 専用コンテキストでonLockFn()を実行
-    return LockBase.als.run(child, async () => onLockFn(options.monitor));
+    return LockBase.als.run(child, async () => onLockFn(monitor));
   }
 
   /**
@@ -239,9 +243,35 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
     });
   }
 
-  private getReentrantContext() : ReentrantContext {
-    return LockBase.als.getStore();
+  private getReentrantContext() : ReentrantContext | null {
+    return LockBase.als.getStore() ?? null;
   }
 
+  /**
+   * 新たにモニターを作成する
+   * @param options
+   * @returns
+   */
+  #newMonitor(options: AllOptions<T, I>): Monitor {
+    this.#deleteMonitor(options);
+    return this.#setMonitor({cancelled:false, reason:'', id: Math.random().toString(36).slice(2)}, options);
+  }
+
+  /**
+   * モニターを削除する
+   * @param {UserOptions} options
+   */
+  #deleteMonitor(options: AllOptions) {
+    delete options.monitor;
+  }
+
+  /**
+   * モニターに値をセットする
+   * @param {UserOptions} options
+   * @returns {Monitor} 値が反映されたモニター
+   */
+  #setMonitor(mon: Monitor, options: AllOptions<T, I>) {
+    return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
+  }
 }
 
