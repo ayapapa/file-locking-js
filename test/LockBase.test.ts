@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLock } from '../src/index';
@@ -17,9 +17,9 @@ describe('FileLock', () => {
   it("The reentrancy context is shared even when the lock instances are different.", async () => {
     const als = (LockBase as any).als;
     const rc: ReentrantContext = als.getStore();
-    const childContext: ReentrantContext = { heldLocks: new Set(rc?.heldLocks) };
+    const childContext: ReentrantContext = { heldLocks: new Map(rc?.heldLocks) };
     const contextId = 'text-context';
-    childContext.heldLocks.add(contextId);
+    childContext.heldLocks.set(contextId, { monitor: { cancelled: false } });
     als.run(childContext, async () => {
       const key1 = 'testKey1', key2 = 'testKey2';
       const ins1 = (FileLock as any).getLock(key1) as LockBase as any;

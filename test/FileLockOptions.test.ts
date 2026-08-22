@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLock, FileLockUserOptions } from '../src/index';
