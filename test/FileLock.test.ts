@@ -8,6 +8,7 @@ import { Config, AlreadyLocked, DeadlockDetected, FileLock, FileLockError,
   LockDirectoryStatFailed, TTLExceeded, type Monitor } from '../src/index';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { finalization } from 'node:process';
+import { randomUUID } from 'node:crypto';
 //import { AlreadyLocked, DeadlockDetected } from '../src/lib/LockErrors.ts';
 //import { LockCompromised } from '../src/lib/FileLockErrors.ts';
 
@@ -521,16 +522,92 @@ describe('FileLock', () => {
     await testIeinvalidLocknformationFile("heartbeatTimeoutMs", "miimii");
   });
 
+  it("Verify that the heartbeat is functioning correctly.", async () => {
+    const key = "testKey", retVal = key;
+    expect(await FileLock.withLock(
+      key,
+      async () => {
+        const meta1 = getLockMeta(key);
+        await sleepAsync(5000);
+        const meta2 = getLockMeta(key);
+        expect(meta2.lastHeartbeatAt).toBeGreaterThan(meta1.lastHeartbeatAt);
+        return retVal;
+      },
+      {ttlMs: 6000}
+    )).toBe(retVal);
+  });
+ 
+  it("If `expirationTime` is a past value and heartbeat is enabled, the lock cannot be acquired.", async () => {
+    const key = String(randomUUID());
+    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 1000, heartbeatTimeoutMs:5000, lastHeartbeatAt: Date.now()};
+    setLockMeta(key, meta);
 
+    expect.assertions(1);
+    try {
+      await FileLock.withLock(
+        key,
+        async () => {
+          await sleepAsync(1000);
+        },
+        {timeoutMs: 1000}
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof AlreadyLocked).toBe(true);
+    }
+    finally {
+      removeLockFiles(key);
+    }
+  });
 
-  /**
-   * "Intentionally overwriting the lock information..." テストにて発覚：
-   *  再入ロック許容時のエラー処理が不十分だったこえおｔ⇒　手当はしたが、リファクタリングが必要
-   *  ↑の教訓として、finally処理(アンロック処理実行)におても、エラーが発生することが確認できた！　全部見直せ！！！
-   * 　↑　対応でよいのか、そもそもdecXXXCounterの中に閉じ込めるべきなのか、、、、
-  */
+  it("If `expirationTime` is valid but heartbeat is disabled, the lock cannot be acquired.", async () => {
+    const key = String(randomUUID());
+    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 5000, heartbeatTimeoutMs:1000, lastHeartbeatAt: Date.now() - 2000};
+    setLockMeta(key, meta);
+
+    expect.assertions(1);
+    try {
+      await FileLock.withLock(
+        key,
+        async () => {
+          await sleepAsync(1000);
+        },
+        {timeoutMs: 1000}
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof AlreadyLocked).toBe(true);
+    }
+    finally {
+      removeLockFiles(key);
+    }
+  });
+
+  it("If both `expirationTime` and the heartbeat are disabled, the lock can be acquired.", async () => {
+    const key = String(randomUUID());
+    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 2000, heartbeatTimeoutMs:1000, lastHeartbeatAt: Date.now() - 2000};
+    setLockMeta(key, meta);
+
+    expect.assertions(1);
+    try {
+      const ret = await FileLock.withLock(
+        key,
+        async () => {
+          await sleepAsync(1000);
+          return key;
+        },
+        {timeoutMs: 1000}
+      );
+      expect(ret).toBe(key);
+    }
+    catch (err) {
+      logger.error(err);
+    }
+    finally {
+      removeLockFiles(key);
+    }
+  });
 
   it("hogehoge", async () => {
   });
-
 });
