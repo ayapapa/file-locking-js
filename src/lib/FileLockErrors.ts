@@ -1,4 +1,4 @@
-import { LockError, AlreadyLocked, DeadlockDetected, TTLExceeded } from './LockErrors.ts';
+import { LockError, AlreadyLocked, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockErrors.ts';
 
 /**
  * Basic lock handling error. 
@@ -9,7 +9,7 @@ export class FileLockError extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg: string | null, params?: {code?: string, props?: { [key: string]: any } }) {
+  constructor(msg?: string, params?: {code?: string, props?: { [key: string]: any } }) {
     super(msg, params);
   }
 };
@@ -61,10 +61,13 @@ export class LockCompromised extends FileLockError {
    * @param params  エラーインスタンスに付与するプロパティ群
    */
   constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any } }) {
-    const key: string = params?.key;
+    const key: string | null = params?.key ?? null;
     const props = { ...params?.props };
     if (key) props.key = key;
-    super(`The lock${key ? '(key: ' + key + ')' : ""} has been compromised. ${reason ?? ''}`, {code: `ECOMPROMISED`, props: params?.props });
+    super(
+      `The lock${key ? '(key: ' + key + ')' : ""} has been compromised. ${reason ?? ''}`,
+      {code: `ECOMPROMISED`, props }
+    );
     }
 }
 
@@ -75,8 +78,8 @@ export class CallStack extends FileLockError {
    */
   constructor(params?: { props?: { [key: string]: any } }) {
     const props = { ...params?.props };
-    super('', {code: `CALLSTACK`, props: params?.props });
+    super('', { code: `CALLSTACK`, props });
   }
 }
 
-export { AlreadyLocked, DeadlockDetected, TTLExceeded };
+export { AlreadyLocked, DeadlockDetected, InvalidOptions, TTLExceeded };

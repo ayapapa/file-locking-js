@@ -2,9 +2,27 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, DeadlockDetected, FileLock, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+import { AlreadyLocked, DeadlockDetected, FileLock, FileLockError, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
 
 describe('FileLock', () => {
+
+  it("An error occurs if `key` is not specified.", async () => {
+    let key;
+    expect.assertions(4);
+    try {
+      await FileLock.withLock(key as any, async () => {
+          await sleepAsync(500);
+        },
+        {timeoutSec : 1 }
+      );
+    }
+    catch (err: any) {
+      expect(err instanceof FileLockError).toBe(true);
+      expect(err.code).toBe('EINVAL');
+      expect(err.key).toBe(key);
+      expect(err.message.includes("Must specify `key`")).toBe(true);
+    }
+  });
 
   it("Forge lock information for the same `key` to trigger a timeout.", async () => {
     const key = "testKey";

@@ -1,11 +1,12 @@
 	import { FileLock, type Config, type LogProvider } from './lib/FileLock.ts';
-	import { FileLockError, LockDirectoryCreationFailed, LockCompromised, LockDirectoryStatFailed, AlreadyLocked, DeadlockDetected, TTLExceeded } from './lib/FileLockErrors.ts';
+	import { AlreadyLocked, DeadlockDetected, FileLockError, InvalidOptions, LockDirectoryCreationFailed, LockCompromised, LockDirectoryStatFailed, TTLExceeded } from './lib/FileLockErrors.ts';
 	import { type FileLockUserOptions, type Monitor } from './lib/FileLockUserOptions.ts';
 	export { 
 		AlreadyLocked, 
 		DeadlockDetected, 
 		FileLock, 
 		FileLockError, 
+		InvalidOptions,
 		LockCompromised, 
 		LockDirectoryCreationFailed, 
 		LockDirectoryStatFailed, 

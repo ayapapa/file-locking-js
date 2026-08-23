@@ -1,30 +1,22 @@
-import { type KeyTypeMap, type AllOptions as AllOptionsT, type TimeBasedKey } from './BaseUserOptions.ts';
-import { BaseOptionsResolver } from './BaseOptionsResolver.ts';
+import { type KeyTypeMap, type TimeBasedKey } from './BaseUserOptions.ts';
+import { BaseOptionsResolver, typedKeys } from './BaseOptionsResolver.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
+import { FileLockInternalState } from './FileLockInternalState.ts';
 
-//type FileLockTimeBasedKey extends TimeBasedKey = 'pollInterval' | 'heartbeatInterval' | 'heartbeatTimeout' | 'retryInterval';
-//type FileLockTimeBasedKey = 'timeout' | 'ttl' | 'pollInterval' | 'heartbeatInterval' | 'heartbeatTimeout' | 'retryInterval';
-
-
-export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUserOptions> {
+export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUserOptions, FileLockInternalState> {
   
-  //private options: FileLockUserOptions
   /**
    * Constructor.
    * @param options User options.
    */
   constructor(options: FileLockUserOptions, defaultOptions?: FileLockUserOptions ) {
     super(options, defaultOptions);
-    /*this.options = {
-      ...this.options,
-      ...options,
-      resolved: false,
-    };*/
 
     (options as any)._resolvedOpts = this.options;
   };
 
-  public static getDefaultOptions(): FileLockUserOptions {
+  /** Get default options. */
+  public static override getDefaultOptions(): FileLockUserOptions {
     return {
       ...super.getDefaultOptions(),
       pollIntervalMs: 100,
@@ -36,16 +28,6 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
   }
   override getDefaultOptions(): FileLockUserOptions {
     return FileLockUserOptionsResolver.getDefaultOptions();
-    /*
-    return {
-      ...super.getDefaultOptions(),
-      pollIntervalMs: 100,
-      heartbeatIntervalMs: 1000,
-      heartbeatTimeoutMs: 10000,
-      retriesOnIOErr: 1,
-      retryIntervalMs: 100,
-    }
-      */
   }
 
   override getCheckTypePairs(): KeyTypeMap<FileLockUserOptions> {
@@ -58,44 +40,18 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
       heartbeatIntervalMs:   "number",
       heartbeatTimeoutSec:   "number",
       heartbeatTimeoutMs:    "number",
-      //expiredCheckBy:        "string",
       retriesOnIOErr:        "number",
       retryIntervalSec:      "number",
       retryIntervalMs:       "number"
     };
-
-  
-
   }
   
-  override getTimeKeys(): TimeBasedKey<FileLockUserOptions>[] {
-    const bases = super.getTimeKeys();
+  protected override _getTimeKeys(): TimeBasedKey<FileLockUserOptions>[] {
+    const bases = super._getTimeKeys();
     bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTimeout', 'retryInterval');
     return bases;
   }
 
-/**
-   * ユーザーオプションの値の型をチェックする
-   */
-  /*
-  checkTypes() {
-    super.checkTypes();
-    const pairs = {
-       timeoutSec:   `number`,
-       timeoutMs:    `number`,
-       ttlSec:       `number`,
-       ttlMs:        `number`,
-       allowReentry: `boolean`,
-       logger:       `LogProvider`,
-    } as const satisfies KeyTypeMap;
-
-    typedKeys(pairs).forEach(key => {
-      const type = pairs[key];
-      const v = this.options[key];
-      REQUIRE(!v || typeof v === type, 
-        `オプションの${key}が${type}型ではありません`, LockError, {code: 'EINVAL', key});
-    })
-  }
-*/
-
 }
+
+export { typedKeys };

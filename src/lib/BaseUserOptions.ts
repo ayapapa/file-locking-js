@@ -115,16 +115,4 @@ export interface InternalState {
   release?: () => void;
 }
 
-// The general type for Options (accepting a generic T)
-export type AllOptions<
-  U extends BaseUserOptions = BaseUserOptions,
-  I extends InternalState = InternalState
-> = U & I;
-export type AllOptionsKey<U extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<U>;
-
-/** Enumerate typed object keys. */
-export function typedKeys<T extends object>(obj: T): Array<keyof T> {
-  return Object.keys(obj) as Array<keyof T>;
-}
-
 

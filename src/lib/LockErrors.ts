@@ -7,10 +7,8 @@ export class LockError extends Error {
    * Constructor.
    * @param msg   Error message.
    * @param params  Parameters.
-   * @param code  Error code string.
-   * @param props A set of arbitrary properties to be attached to the error instance.
    */
-  constructor(msg = '', params?: {code?: string, props?: { [key: string]: any } }) {
+  constructor(msg?: string, params?: { code?: string, props?: { [key: string]: any } }) {
     const org_stackTraceLimit = Error.stackTraceLimit;
     Error.stackTraceLimit = 20;
     super(msg);
@@ -27,6 +25,7 @@ export class LockError extends Error {
 export class DeadlockDetected extends LockError {
   /**
    * Constructor.
+   * @param msg   Error message.
    * @param params  Parameters.
    */
   constructor(msg?: string | null, params?: { key: string, props?: { [key: string]: any } }) {
@@ -43,10 +42,10 @@ export class DeadlockDetected extends LockError {
 export class TTLExceeded extends LockError {
   /**
    * Constructor.
+   * @param msg   Error message.
    * @param params  Parameters.
-   * @param props A set of arbitrary properties to be attached to the error instance.
    */
-  constructor(msg?: string | null, params?: { ttlMs: number, props?: {[key: string]: any} }) {
+  constructor(msg?: string | null, params?: { ttlMs: number, props?: { [key: string]: any } }) {
     const ttlMs = params?.ttlMs;
     msg = msg || `The maximum processing time(${ttlMs ?? "options.ttlMs"} milliseconds) while locked has been exceeded.`;
     const props = {...params?.props };
@@ -59,16 +58,30 @@ export class TTLExceeded extends LockError {
 export class AlreadyLocked extends LockError {
   /**
    * Constructor.
-   * @param code    Error code string.
-   * @param key     Lock key.
+   * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: {key: string, props?: {[key: string]: any} } ) {
+  constructor(msg?: string, params?: { key: string, props?: { [key: string]: any} } ) {
     const key = params?.key;
     msg = msg || `Could not lock because the '${key ?? "key"}' is already locked.`;
     const props = {...params?.props};
     if (key != null) props.key = key;
     super(msg, { code:'ELOCKED' , props });
   }
-}
+};
 
+/** Invalid options error. */
+export class InvalidOptions extends LockError {
+  /**
+   * Constructor.
+   * @param msg   Error message.
+   * @param params  Parameters.
+   */
+  constructor(msg?: string, params?: { name?: string, props?: { [key: string]: any} } ) {
+    const name: string | null = params?.name ?? null;
+    msg = msg || `The value${name ? '(' + name + ')' : ''} of the specified options is invalid.`;
+    const props = {...params?.props};
+    if (name) props.name = name;
+    super(msg, { code:'EINVAL' , props });
+  }
+};

@@ -18,12 +18,16 @@ const lockfile = {
 import { LRUCache } from 'lru-cache';
 import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-const { REQUIRE_DEBUG } = Contracts;
+const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock, type Config as BaseConfig, type LogProvider } from "./LockBase.ts";
-import { FileLockUserOptions, typedKeys, type AllOptions, type InternalState } from './FileLockUserOptions.ts';
-import { FileLockUserOptionsResolver } from "./FileLockUserOptionsResolver.ts";
+import { FileLockUserOptions } from './FileLockUserOptions.ts';
+import { FileLockInternalState } from './FileLockInternalState.ts';
+import { FileLockUserOptionsResolver, typedKeys } from "./FileLockUserOptionsResolver.ts";
 import {  AlreadyLocked, CallStack, FileLockError, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
+import { type AllOptions as AllOptionsT } from './AllOptions.ts';
+
+type AllOptions = AllOptionsT<FileLockUserOptions, FileLockInternalState>;
 
 /**
  * FileLock cofiguration. 
@@ -85,7 +89,7 @@ function sleepSync(ms: number) {
 * While the file exists, no other lock can be acquired for the same key. 
 * Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed. 
 */
-export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
+export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalState> {
  
   /** Static fields */
 
@@ -124,7 +128,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
   public static setConfig(config: Config): void {
     const dConf = FileLock.copyConfig(config);
     FileLock.config = { ...FileLock.getDefaultConfig(), ...dConf };
-    FileLock.config.cache = FileLock.config.cacheMaxNum === 0 ? false: FileLock.config.cache
+    if (FileLock.config.cacheMaxNum === 0) FileLock.config.cache = false;
 
     // Clear chache
     FileLock.clearCache();
@@ -165,6 +169,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
    * @abstract
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}) {
+    REQUIRE(Boolean(key), 'Must specify `key`.', FileLockError, { code: 'EINVAL' });
     const rOpt = new FileLockUserOptionsResolver(options, FileLock.config?.defaultOptions).getOptions();
     return FileLock.getLock(key).withLock(onLockFn, rOpt);
   }
@@ -266,15 +271,23 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     const ret = { ...config };
     if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
     return ret;
+    //return structuredClone(config);
+    /**
+     * structuredClone() は「構造化されたデータ」（JSON で表現できるようなデータ）のみをコピーできます。以下のタイプはコピー対象外です：
+     * 関数
+     * Date, Map, Set, RegExp などのビルトインオブジェクト（※一部サポートされていますが、関数は不可）
+     * DOM ノード
+     * バイナリデータ（ArrayBuffer は可、Blob は不可など）
+     */
   }
 
   /** Instance fields. */
 
   /** File path for storing lock information (without extension) */
-  private baseFilePath: string = '';
+  //private baseFilePath: string = '';
 
   /** File path for storing lock information (with extension) */
-  private filePath: string = '';
+  //private filePath: string = '';
 
   /** Heartbeat timer id */
   #heartbeatTimer?: NodeJS.Timeout | null;
@@ -345,8 +358,8 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     super.prepare(options);
     if (FileLock.initialized !== true) FileLock.initialize(); // 念のため
     const  dirPath    = FileLock.getLockDirPath();
-    this.baseFilePath = path.join(dirPath, this.key);
-    this.filePath     = this.baseFilePath + '.json';
+    const baseFilePath = path.join(dirPath, this.key);
+    options.filePath     = baseFilePath + '.json';
   }
 
   private async withLock(onLockFn: CallbackOnLock, options: AllOptions) {
@@ -431,7 +444,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     // 本インスタンスの解放フラグが経っていないなら、前段ロック中なのでnull
     if (this.#released === false) return null;
     // ファイルを確認し、有効ならnull
-    if (fs.existsSync(this.filePath)) {
+    if (fs.existsSync(options.filePath)) {
       if (!this.#isLockExpired(options)) return null;//有効な前段ロックあり
     }
     // ロック獲得可能なためロック情報格納ファイル作成
@@ -475,7 +488,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     const timeoutTime = start + (options.timeoutMs as any);
     while (!tryLock()) {
       if (Date.now() >= timeoutTime) {
-        throw new AlreadyLocked(null, {key: this.key, props: { file: this.filePath } });
+        throw new AlreadyLocked('', {key: this.key, props: { file: options.filePath } });
       }
       await sleepAsync(options.pollIntervalMs as any);
     }
@@ -558,7 +571,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     if (meta.ownerId !== options.ownerId) return; // 後段に浸食されているので解放しない
     // メタデータファイルを削除する
     return this.#accessMetaWithLock(
-      this.filePath,
+      options.filePath,
       (name) => fs.rmSync(name/*,  {recursive: true, force: true}*/),
       options,
       errMsg || `ロックメタファイル削除エラー`
@@ -605,7 +618,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
           continue;
         }
         if (err.code === 'ELOCKED') {
-          throw new AlreadyLocked(null, { key: this.key, props: { file: name } });
+          throw new AlreadyLocked('', { key: this.key, props: { file: name } });
         }
         errMsg = errMsg || `ロックメタファイルアクセスエラー`;
         throw new FileLockError(`${errMsg}(${err.message})`, {code: err.code, props: { file: name } });
@@ -614,7 +627,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
   }
 
   #getMetaOrNull(options: AllOptions): LockMetaData | null {
-    if (!fs.existsSync(this.filePath)) {
+    if (!fs.existsSync(options.filePath)) {
       return null;
     }
      return this.#getMeta(options);
@@ -626,11 +639,11 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
    * @returns errorIfNotExistがfalseの場合、未ロック（ロックメタファイルが無い）ならnull
    */
   #getMeta(options: AllOptions): LockMetaData {
-    if (!fs.existsSync(this.filePath)) {
-      throw new LockCompromised('The lock information storage file does not exist.', {key: this.key, props: { file: this.filePath } });
+    if (!fs.existsSync(options.filePath)) {
+      throw new LockCompromised('The lock information storage file does not exist.', {key: this.key, props: { file: options.filePath } });
     }
     const contents = this.#accessMetaWithLock(
-      this.filePath,
+      options.filePath,
       (name: string) => fs.readFileSync(name), 
       options, 
       `Lock metafile read error.`
@@ -639,13 +652,13 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     if(options.ownerId && options.ownerId !== meta.ownerId) {
       const err = new LockCompromised(
         'The lock information storage file was overwritten by another lock.',
-        {key: this.key, props: { file: this.filePath, key: this.key, optionsId: options.ownerId, instanceId: this.ownerId, lockFileId: meta.ownerId } });
+        {key: this.key, props: { file: options.filePath, key: this.key, optionsId: options.ownerId, instanceId: this.ownerId, lockFileId: meta.ownerId } });
       this.logger.error(err);
       throw err;
     }
     const check = (key: keyof LockMetaData, type: string) => {
       if (!(key in meta && typeof meta[key] === type)) {
-        throw new LockCompromised(`The lock information format is invalid.`, {key: this.key, props: { file: this.filePath } });
+        throw new LockCompromised(`The lock information format is invalid.`, {key: this.key, props: { file: options.filePath } });
       }
     };
     check("ownerId",             "string"); 
@@ -665,11 +678,11 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
   #setMeta(options: AllOptions, meta: LockMetaData, withLock: boolean = true) {
     try {
       if (!withLock) {
-        fs.writeFileSync(this.filePath, JSON.stringify(meta));
+        fs.writeFileSync(options.filePath, JSON.stringify(meta));
       }
       else {
         this.#accessMetaWithLock(
-          this.filePath,
+          options.filePath,
           (name: string) => fs.writeFileSync(name, JSON.stringify(meta)),
           options,
           `ロックメタファイル書き込みエラー`
@@ -678,7 +691,7 @@ export class FileLock extends LockBase<FileLockUserOptions, InternalState> {
     }
     catch (err: any) {
       if (err instanceof FileLockError === false) {
-        err = new FileLockError('ロックメタファイル書き込みエラー', {code: err.code, props: { file: this.filePath } });
+        err = new FileLockError('ロックメタファイル書き込みエラー', {code: err.code, props: { file: options.filePath } });
       } 
       throw err;
     }

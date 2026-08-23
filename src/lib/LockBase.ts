@@ -2,7 +2,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { LockError, DeadlockDetected } from './LockErrors.ts';
-import { type AllOptions, type BaseUserOptions, type InternalState, type Monitor } from './BaseUserOptions.ts';
+import { type AllOptions } from './AllOptions.ts';
+import { type BaseUserOptions, type InternalState, type Monitor } from './BaseUserOptions.ts';
 
 const {REQUIRE_DEBUG} = Contracts;
 

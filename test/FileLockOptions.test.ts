@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockUserOptions } from '../src/index';
+import { FileLock, FileLockUserOptions, InvalidOptions } from '../src/index';
+import { AnyCnameRecord } from 'node:dns';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -113,6 +115,137 @@ describe('FileLock', () => {
     expect(opts._resolvedOpts.retryIntervalSec).toBeUndefined();
     expect(opts._resolvedOpts.retryIntervalMs).toBe(defaultOpts.retryIntervalMs);
     expect(opts._resolvedOpts.resolved).toBe(true);
+  });
+
+  async function testOptionConflicting(name: string, eMsg: string) {
+    const retVal = "test_001", key = retVal;
+    const opts =  {} as any;
+    const keySec = `${name}Sec`;
+    const keyMs  = `${name}Ms`;
+    opts[keySec] = 1.5;
+    opts[keyMs] = 2000;
+    
+    try {
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(500);
+          return retVal
+        },
+        opts
+      );
+    }
+    catch(err: any) {
+      expect(err instanceof InvalidOptions).toBeTruthy();
+      expect(err.code).toBe('EINVAL');
+      expect(err.message).toContain(keyMs);
+      expect(err.message).toContain(keySec);
+      expect(err.message).toContain(eMsg);
+    }
+  }
+
+  it("`InvalidOptions` error when specifying conflicting options(timeout).", async () => {
+    await testOptionConflicting('timeout', 'cannot be specified at the same time')
+  });
+
+  it("`InvalidOptions` error when specifying conflicting options(ttl).", async () => {
+    await testOptionConflicting('ttl', 'cannot be specified at the same time')
+  });
+
+  it("`InvalidOptions` error when specifying conflicting options(pollInterval).", async () => {
+    await testOptionConflicting('pollInterval', 'cannot be specified at the same time')
+  });
+
+  it("`InvalidOptions` error when specifying conflicting options(heartbeatInterval).", async () => {
+    await testOptionConflicting('heartbeatInterval', 'cannot be specified at the same time')
+  });
+
+  it("`InvalidOptions` error when specifying conflicting options(heartbeatTimeout).", async () => {
+    await testOptionConflicting('heartbeatTimeout', 'cannot be specified at the same time')
+  });
+
+  it("`InvalidOptions` error when specifying conflicting options(retryInterval).", async () => {
+    await testOptionConflicting('retryInterval', 'cannot be specified at the same time')
+  });
+
+  async function testTypeErrorOption(name: string, value: any, eMsg: string = 'The type of option') {
+    const retVal = "test_001", key = retVal;
+    const opts =  {} as any;
+    opts[name] = value;
+    
+    try {
+      await FileLock.withLock(key, 
+        async () => {
+          sleepAsync(500);
+          return retVal
+        },
+        opts
+      );
+    }
+    catch(err: any) {
+      expect(err instanceof InvalidOptions).toBeTruthy();
+      expect(err.code).toBe('EINVAL');
+      expect(err.message).toContain(name);
+      expect(err.message).toContain(eMsg);
+    }
+  }
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(timeoutSec).", async () => {
+    await testTypeErrorOption('timeoutSec', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(timeoutMs).", async () => {
+    await testTypeErrorOption('timeoutMs', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(ttlSec).", async () => {
+    await testTypeErrorOption('ttlSec', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(ttlMs).", async () => {
+    await testTypeErrorOption('ttlMs', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(pollIntervalSec).", async () => {
+    await testTypeErrorOption('pollIntervalSec', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(pollIntervalMs).", async () => {
+    await testTypeErrorOption('pollIntervalMs', 'string');
+  });
+  
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(heartbeatIntervalSec).", async () => {
+    await testTypeErrorOption('heartbeatIntervalSec', 'string');
+  });
+  
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(heartbeatIntervalMs).", async () => {
+    await testTypeErrorOption('heartbeatIntervalMs', 'string');
+  });
+  
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(heartbeatTimeoutSec).", async () => {
+    await testTypeErrorOption('heartbeatTimeoutSec', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(heartbeatTimeoutMs).", async () => {
+    await testTypeErrorOption('heartbeatTimeoutMs', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(retryIntervalSec).", async () => {
+    await testTypeErrorOption('retryIntervalSec', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(retryIntervalMs).", async () => {
+    await testTypeErrorOption('retryIntervalMs', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(allowReentry).", async () => {
+    await testTypeErrorOption('allowReentry', 'string');
+  });
+
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(retriesOnIOErr).", async () => {
+    await testTypeErrorOption('retriesOnIOErr', 'string');
+  });
+
+  it("hogehoge", async () => {
   });
 
 });

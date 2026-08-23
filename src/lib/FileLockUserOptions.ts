@@ -1,6 +1,5 @@
-import { BaseUserOptions, typedKeys, type AllOptions as AllOptionsT, type InternalState as BaseInternalState, type Monitor } from './BaseUserOptions.ts';
-
-export type AllOptions = AllOptionsT<FileLockUserOptions>;
+import { BaseUserOptions, type InternalState as BaseInternalState, type Monitor } from './BaseUserOptions.ts';
+//import { type AllOptions as AllOptionsT } from './AllOptions.ts';
 
 // User options for FileLock (inherits from BaseUserOptions)
 export interface FileLockUserOptions extends BaseUserOptions {
@@ -69,4 +68,4 @@ export interface InternalState extends BaseInternalState {
 
 }
 
-export { typedKeys, Monitor };
+export { Monitor };

@@ -1,96 +1,132 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
+import { AllOptions, AllOptionsKey } from './AllOptions.ts';
 import { 
-  typedKeys, 
   type BaseUserOptions, 
   type KeyTypeMap, 
-  type AllOptions, 
-  type AllOptionsKey, 
   type TimeBasedKey, 
   type MsKey, 
   type SecKey 
 } from './BaseUserOptions.ts';
-import { LockError } from './LockErrors.ts';
+import { InvalidOptions } from './LockErrors.ts';
+import { BaseInternalState } from './BaseInternalState.ts';
 
 const {REQUIRE} = Contracts;
-
-// The general type for Options (accepting a generic T)
-//export type AllOptions<T extends BaseUserOptions = BaseUserOptions> = T & InternalState;
-//export type AllOptionsKey<T extends BaseUserOptions = BaseUserOptions> = keyof AllOptions<T>;
 
 /**
  * A class that resolves options.
  * Base class: Accepts a generic type T
  * T must inherit from BaseUserOptions (constraint) 
  */
-export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
-  
-  protected options: AllOptions<T>;
+export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I extends BaseInternalState = BaseInternalState> {
 
+  /** Static Fields. */
+  
+  /** Basic default options. */
   private static defaultOptions: BaseUserOptions = {
       timeoutMs:      5000,   // ロック解除待ち最大時間のデフォルトは5秒
       ttlMs:          10000,  // ロック有効期間(time to live)のデフォルトは10秒
       allowReentry:   false,  // 再入ロック禁止をデフォルトとする
-      //resolved:       false,
-      //logger:         console
   }
 
+  /** Static methods. */
+
+  /** Get basic default options. */
   public static getDefaultOptions(): BaseUserOptions {
     return BaseOptionsResolver.defaultOptions;
   }
 
+  /** Instance fields. */
+
+  /** Current options. */
+  protected options: AllOptions<T, I>;
+
+  /** Instance methods. */
+
+  /**
+   * Constructor
+   * @param opts        User options.
+   * @param defaultOpts Default options. If undefined or null, use getDefaultOptions()'s return values。
+   */
+  constructor(userOpts: T, defaultOpts?: T) {
+     this.options = {
+      ...userOpts,
+      resolved: false,
+    } as AllOptions<T, I>;
+
+    this.#resolveOptions(defaultOpts);
+  }
+
+  /** Get basic default options. */
   public getDefaultOptions(): BaseUserOptions {
     return BaseOptionsResolver.defaultOptions;
   }
 
-  /**
-   * コンストラクタ
-   * @param opts
-   */
-  constructor(opts: T, defaultOpts?: T) {
-     this.options = {
-      ...opts,
-      resolved: false,
-    } as AllOptions<T>;
-
-    this.resolveOptions(defaultOpts);
-  }
-
-  public getOptions(): AllOptions<T> {
+  /** Get current options. */
+  public getOptions(): AllOptions<T, I> {
     return this.options;
   }
 
+  /** Get the Key-Type map for type checking. */
+  protected getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
+    return {
+      timeoutSec:   `number`,
+      timeoutMs:    `number`,
+      ttlSec:       `number`,
+      ttlMs:        `number`,
+      allowReentry: `boolean`,
+   };
+  }
+
   /**
-   * ユーザーオプションを検証後、内部用に一部変更・補完した結果を取得する。
-   * @param {ojbect} defaultOpts  デフォルトオプション
+   * Check each option's property type.
    */
-  resolveOptions(defaultOpts?: T) {
-    this.validateOptions();
-    this.normalizeOptions(defaultOpts);
+  protected _checkTypes() {
+    const pairs = this.getCheckTypePairs();
+
+    typedKeys(pairs).forEach(key => {
+      const t = pairs[key];
+      const v = this.options[key];
+      REQUIRE(!v || typeof t === 'function' && t(v) || typeof v === t, 
+        `The type of option ${key} is incorrect.`, InvalidOptions, { name: key });
+      });
+  }
+
+  /**
+   * Get the array of time-related keys that require unit conversion (seconds to milliseconds). 
+   * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
+   * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
+   */
+  protected _getTimeKeys(): TimeBasedKey<T>[] {
+    return ['timeout', 'ttl'] as TimeBasedKey<T>[];
+  }
+
+  /**
+   * Validate, transform, and complete the user options passed to the constructor.
+   * @param defaultOpts  Defalt options
+   */
+  #resolveOptions(defaultOpts?: T) {
+    this.#validateOptions();
+    this.#normalizeOptions(defaultOpts);
     this.options.resolved = true;
   }
 
-  /*
-  type KeyTypePair = {
-
-  }
-*/
   /**
-   * オプションの妥当性をチェックする。
+   * Validate options
    */
-  validateOptions() {
+  #validateOptions() {
     // 型チェック
-    this.checkTypes();
+    this._checkTypes();
     // 併用チェック
-    this.checkCompeting();
+    this.#checkCompeting();
   }
 
   /**
-   * オプションを内部用に一部変更・補完（デフォルト埋め、別名サポート、値の変換など）
-   * @param defaultOpts  デフォルトオプション
+   * Transform, and complete options.
+   * @param defaultOpts  Defalt options
    */
-  normalizeOptions(defaultOpts?: T): void {
-    this.convSecToMs();
+  #normalizeOptions(defaultOpts?: T): void {
+    this._convSecToMs();
 
     Object.assign(this.options, { ...defaultOpts,  ...this.options});
     typedKeys(this.options).forEach(key => {
@@ -99,91 +135,41 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
     Object.assign(this.options, { ...this.getDefaultOptions(), ...this.options });
   }
 
-  protected getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
-    return {
-      timeoutSec:   `number`,
-      timeoutMs:    `number`,
-      ttlSec:       `number`,
-      ttlMs:        `number`,
-      allowReentry: `boolean`,
-      /*
-      logger:       (value: any) =>  {
-        return typeof value === 'object' &&
-          typeof (value as any).log   === 'function' &&
-          typeof (value as any).trace === 'function' &&
-          typeof (value as any).debug === 'function' &&
-          typeof (value as any).info  === 'function' &&
-          typeof (value as any).warn  === 'function' &&
-          typeof (value as any).error === 'function';
-      },
-      */
-    };
-    
-  }
-
-  /**
-   * ユーザーオプションの値の型をチェックする
-   */
-  checkTypes() {
-    const pairs = this.getCheckTypePairs();
-
-    typedKeys(pairs).forEach(key => {
-      const t = pairs[key];
-      const v = this.options[key];
-      REQUIRE(!v || typeof t === 'function' && t(v) || typeof v === t, 
-        `オプション${key}の型が正しくありません`, LockError, {code: 'EINVAL', key});
-      });
-  }
-
-  /*
-  protected getCompetingKeys(): CompetingKeysType<T, TimeBasedKey<T>>[] {
-    return ['timeout', 'ttl'] as CompetingKeysType<T, TimeBasedKey<T>>[];
-  }
-  */
- 
-  /**
-   * Get the array of time-related keys that require unit conversion (seconds to milliseconds). 
-   * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
-   * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
-   */
-  protected getTimeKeys(): TimeBasedKey<T>[] {
-    return ['timeout', 'ttl'] as TimeBasedKey<T>[];
-  }
-
-  private getSecKeyMap(keys: TimeBasedKey<T>[]) {
+  /** get TimeBaseKey-> SecBaseKey map */
+  #getSecKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Sec}`])
+      keys.map(key => [key, `${key}Sec` as AllOptionsKey<T>])
     );
   }
 
-  private getMsKeyMap(keys: TimeBasedKey<T>[]) {
+  /** get TimeBaseKey-> MsBaseKey map */
+  #getMsKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
     return Object.fromEntries(
-      keys.map(key => [key as TimeBasedKey<T>, `${key}Ms}`])
+      keys.map(key => [key, `${key}Ms` as AllOptionsKey<T>])
     );
   }
 
   /**
-   * ユーザーオプションの値の競合をチェックする
-   * @param keys  チェック対象のキー配列の配列
+   * Check for conflicts in option values.
    */
-  private checkCompeting() {
-    const keys = this.getTimeKeys();
-    const secKeyMap = this.getSecKeyMap(keys);
-    const msKeyMap = this.getMsKeyMap(keys);
+  #checkCompeting() {
+    const keys = this._getTimeKeys();
+    const secKeyMap = this.#getSecKeyMap(keys);
+    const msKeyMap = this.#getMsKeyMap(keys);
     keys.forEach(key => {
-      const sec = secKeyMap[key] as AllOptionsKey<T>;
-      const ms  = msKeyMap[key]  as AllOptionsKey<T>;
+      const sec = secKeyMap[key];
+      const ms  = msKeyMap[key];
       const k1  = this.options[sec], k2 = this.options[ms];
-      REQUIRE(!k1 || !k2, `オプション${String(sec)}と${String(ms)}は同時に指定できません`, 
-        LockError, {code: 'EINVAL', props: {keys: [sec, ms]} });
+      REQUIRE(!k1 || !k2, `Options ${String(sec)} and ${String(ms)} cannot be specified at the same time.`, 
+        InvalidOptions, { props: {keys: [sec, ms]} });
     });
   }
 
   /**
    * Optionsで指定された秒単位値をミリ秒単位に変換する
    */
-  convSecToMs() {
-    const keys = this.getTimeKeys();
+  protected _convSecToMs() {
+    const keys = this._getTimeKeys();
     // this.options を、時間キーのみを含む型として扱う（型アサーション）
     // ここでは 'as unknown as ...' を使って、一度 unknown を経由させて安全にキャストする
     const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<T> | MsKey<T>, number>>
@@ -200,20 +186,9 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions> {
       }
     });
   }
-  
-/*
-    const setToMsMap = Object.fromEntries(
-      keys.map(key => [`${key}Sec`, `${key}Ms}`])
-    );
-
-    for (const from of Object.keys(setToMsMap)) {
-      const value = this.options[from as AllOptionsKey<T>] as number;
-      if (value != null) {
-        const to = setToMsMap[from];
-        this.options[to as AllOptionsKey<T>] = Math.floor(value * 1000);
-        delete this.options[from as AllOptionsKey<T>];
-      }
-    }
   }
-*/
+
+/** Enumerate typed object keys. */
+export function typedKeys<T extends object>(obj: T): Array<keyof T> {
+  return Object.keys(obj) as Array<keyof T>;
 }

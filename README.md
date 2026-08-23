@@ -3,13 +3,10 @@ A file-based lock for coordinating exclusive access between processes.
 Inspired by existing Node.js file-locking implementations and developed to explore a different API and locking model.
 
 
-# Interface
-  ```js
-  const ret = await FileLock.withLock('lock key', () => { 'process to run while locked'; return result; }, options);
-  // Of course, you can retrieve return values ​​from the callback function.
-  ```
-
 # Installation
+```bash
+npm install @ayapapa-npm/file-locking-js
+```
 
 
 # Features
@@ -50,3 +47,28 @@ Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`
 # Configuration
 
 # Options
+
+# Usage
+  ```js
+  const defaultOptions = FileLock.getDefaultOptions();
+  defaultOptions.timeoutMs  = 2000;
+  defaultOptions.ttlMs      = 2000;
+  heartbeatIntervalMs       = 500;
+  heartbeatTimeoutMs        = 5000;
+  
+  FileLock.setConfig({ 
+    lockDirectory: "Specify the directory path where the file containing lock information is stored.",
+    defaultOptions
+  }};
+
+  const ret = await FileLock.withLock(
+    "Specify the lock key.", 
+    () => { // Callback function to execute while locked
+      "Describes the operations to be performed while the lock is held.";
+      return "Specify the results if any.";
+    },
+    { ttlMs: 5000 } // Overrides the default options set via FileLock.SetConfig().
+  );
+  console.log(ret); // "Specify the results if any.";
+  ```
+
