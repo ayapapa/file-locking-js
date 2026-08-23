@@ -40,13 +40,15 @@ Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`
     }, 
     options
   );
-  console.log(ret);
+  console.log(ret); // "The operation is completed.";
   ```
 
 
 # Configuration
 
+
 # Options
+
 
 # Usage
   ```js

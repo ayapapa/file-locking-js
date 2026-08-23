@@ -1,17 +1,33 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { AllOptions, AllOptionsKey } from './AllOptions.ts';
-import { 
-  type BaseUserOptions, 
-  type KeyTypeMap, 
-  type TimeBasedKey, 
-  type MsKey, 
-  type SecKey 
-} from './BaseUserOptions.ts';
+import { type BaseUserOptions } from './BaseUserOptions.ts';
 import { InvalidOptions } from './LockErrors.ts';
 import { BaseInternalState } from './BaseInternalState.ts';
 
 const {REQUIRE} = Contracts;
+
+/** Types of time-based key. */
+export type TimeBasedKey<T> = {
+  [K in keyof T]:
+    K extends `${infer Base}Sec`
+      ? `${Base}Ms` extends keyof T
+        ? Base
+        : never
+      : never
+}[keyof T];
+
+
+/** Type of Key-Type map. */
+export type KeyTypeMap<T> = Record<keyof T, any>;
+
+/** Types of seconds-time-based key. */
+type SecKey<T> = `${TimeBasedKey<T>}Sec`;
+
+/** Types of millisecond-time-based key. */
+type MsKey<T> = `${TimeBasedKey<T>}Ms`;
+
+//export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
 /**
  * A class that resolves options.
@@ -24,10 +40,10 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   
   /** Basic default options. */
   private static defaultOptions: BaseUserOptions = {
-      timeoutMs:      5000,   // ロック解除待ち最大時間のデフォルトは5秒
-      ttlMs:          10000,  // ロック有効期間(time to live)のデフォルトは10秒
-      allowReentry:   false,  // 再入ロック禁止をデフォルトとする
-  }
+    timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
+    ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
+    allowReentry:   false,  // Default to disallowing re-entrant locks
+  };
 
   /** Static methods. */
 
@@ -68,7 +84,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   }
 
   /** Get the Key-Type map for type checking. */
-  protected getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
+  protected _getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
     return {
       timeoutSec:   `number`,
       timeoutMs:    `number`,
@@ -79,10 +95,19 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   }
 
   /**
+   * Get the array of time-related keys that require unit conversion (seconds to milliseconds). 
+   * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
+   * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
+   */
+  protected _getTimeKeys(): TimeBasedKey<T>[] {
+    return ['timeout', 'ttl'] as TimeBasedKey<T>[];
+  }
+
+  /**
    * Check each option's property type.
    */
-  protected _checkTypes() {
-    const pairs = this.getCheckTypePairs();
+  #checkTypes() {
+    const pairs = this._getCheckTypePairs();
 
     typedKeys(pairs).forEach(key => {
       const t = pairs[key];
@@ -90,15 +115,6 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
       REQUIRE(!v || typeof t === 'function' && t(v) || typeof v === t, 
         `The type of option ${key} is incorrect.`, InvalidOptions, { name: key });
       });
-  }
-
-  /**
-   * Get the array of time-related keys that require unit conversion (seconds to milliseconds). 
-   * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
-   * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
-   */
-  protected _getTimeKeys(): TimeBasedKey<T>[] {
-    return ['timeout', 'ttl'] as TimeBasedKey<T>[];
   }
 
   /**
@@ -116,7 +132,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
    */
   #validateOptions() {
     // 型チェック
-    this._checkTypes();
+    this.#checkTypes();
     // 併用チェック
     this.#checkCompeting();
   }
@@ -126,7 +142,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
    * @param defaultOpts  Defalt options
    */
   #normalizeOptions(defaultOpts?: T): void {
-    this._convSecToMs();
+    this.#convSecToMs();
 
     Object.assign(this.options, { ...defaultOpts,  ...this.options});
     typedKeys(this.options).forEach(key => {
@@ -166,9 +182,9 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   }
 
   /**
-   * Optionsで指定された秒単位値をミリ秒単位に変換する
+   * Convert a value in seconds to milliseconds.
    */
-  protected _convSecToMs() {
+  #convSecToMs() {
     const keys = this._getTimeKeys();
     // this.options を、時間キーのみを含む型として扱う（型アサーション）
     // ここでは 'as unknown as ...' を使って、一度 unknown を経由させて安全にキャストする
@@ -186,7 +202,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
       }
     });
   }
-  }
+}
 
 /** Enumerate typed object keys. */
 export function typedKeys<T extends object>(obj: T): Array<keyof T> {

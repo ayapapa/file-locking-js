@@ -1,9 +1,4 @@
-//import { Contracts } from '@ayapapa-npm/contracts-js';
-//import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-
-//const {REQUIRE, VERIFY, REQUIRE_DEBUG} = Contracts;
-//const logger = new PrettyConsole();
-
+/** Basic user options. */
 export interface BaseUserOptions {
   /** 
    * Maximum wait time (in seconds) to acquire the lock. 
@@ -65,54 +60,7 @@ export interface BaseUserOptions {
 }
 
 /** Type of `Options` key */
-export type OptionsKey<T> = keyof T;// extends BaseUserOptions;
+//export type OptionsKey<T> = keyof T;// extends BaseUserOptions;
 
-/** Types of time-based keys. */
-/*
-export type TimeBasedKey = "timeout" | "ttl";
-export type SecKey = `${TimeBasedKey}Sec`;
-export type MsKey = `${TimeBasedKey}Ms`;
-*/
-export type TimeBasedKey<T> = {
-  [K in keyof T]:
-    K extends `${infer Base}Sec`
-      ? `${Base}Ms` extends keyof T
-        ? Base
-        : never
-      : never
-}[keyof T];
-export type SecKey<T> = `${TimeBasedKey<T>}Sec`;
-export type MsKey<T> = `${TimeBasedKey<T>}Ms`;
-
-export type KeyTypeMap<T> = Record<OptionsKey<T>, any>;
-
-export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
-
-/** Monitoring object passed to the callback function executed after acquiring the lock. */
-export interface Monitor {
-  /** Whether the operation was cancelled. */
-  cancelled: boolean;
-
-  reason?: string;
-
-  operation?: string;
-
-  id?: string;
-}
-
-/** Definition of the callback function to be executed after acquiring the lock. */
-//export type CallbackOnLock = (monitor: Monitor) => any;
-
-export interface InternalState {
-  /** Whether the BaseUserOptions was resolved. */
-  resolved: boolean;
-
-  /** Lock owner id. */
-  ownerId?: string | null;
-
-  monitor?: Monitor;
-
-  release?: () => void;
-}
 
 

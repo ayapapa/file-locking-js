@@ -22,7 +22,7 @@ const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock, type Config as BaseConfig, type LogProvider } from "./LockBase.ts";
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
-import { FileLockInternalState } from './FileLockInternalState.ts';
+import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockUserOptionsResolver, typedKeys } from "./FileLockUserOptionsResolver.ts";
 import {  AlreadyLocked, CallStack, FileLockError, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
@@ -271,23 +271,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const ret = { ...config };
     if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
     return ret;
-    //return structuredClone(config);
-    /**
-     * structuredClone() は「構造化されたデータ」（JSON で表現できるようなデータ）のみをコピーできます。以下のタイプはコピー対象外です：
-     * 関数
-     * Date, Map, Set, RegExp などのビルトインオブジェクト（※一部サポートされていますが、関数は不可）
-     * DOM ノード
-     * バイナリデータ（ArrayBuffer は可、Blob は不可など）
-     */
   }
 
   /** Instance fields. */
-
-  /** File path for storing lock information (without extension) */
-  //private baseFilePath: string = '';
-
-  /** File path for storing lock information (with extension) */
-  //private filePath: string = '';
 
   /** Heartbeat timer id */
   #heartbeatTimer?: NodeJS.Timeout | null;
@@ -302,21 +288,6 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   private constructor(key: string) {
     super(key, FileLock.config);
-    // ★★★★★　dirPathは、ここで、きめるのは、ダメ。withLockのたびに、ディレクトリを確認しないと、途中の設定の変更を確認できない！！！！★★★★★
-    // だとすると、パスは、インスタンスプロパティではダメなのかな？？？　だって、インスタンスで覚えちゃうからね。
-    // ★★なので、都度、決めるしかなくなるね！！！って、本当？？？　ちゃんと、設計の見直しを考えよう！！！★★
-    // となると、以下の、パス関連は、インスタンスではなく、都度、作る感じだな！！！
-    // ★★★大注意「インスタンスの浸食発生！！」★★★
-    // あまり想定出来ないけれど、keyのロック処理中に、コンフィグを書き換えパスがかわったとすると、そのkeyのロックのあいだに、同じkeyでロックしようとした瞬間にパスが変更されてしまう。
-    //  ※いちおう、内部仕様上、コンフィグ設定時にキャッシュがクリアされるので、インスタンスが変わる。なので、上記の浸食は仕様上無い。。。が、問題はハックされないとは限らない。。
-    //  ↓↓↓
-    // オプションに持たせよう！
-    //this.key = key;
-    /*
-    this.dirPath      = FileLock.getLockDirPath();
-    this.baseFilePath = path.join(this.dirPath, this.key);
-    this.filePath     = this.baseFilePath + '.json';
-    */
   }
 
   /**
@@ -419,17 +390,16 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   async #lock(options: AllOptions): Promise<void> {
     return this.#waitPreviousAndLock(options, () => {
-      let release;// = { releaseMeta: () => void };
+      //let release;// = { releaseMeta: () => void };
       // メタファイル作成
       try {
-        release = this.#execLock(options);
-        if (!release) return false; // 前段ロックが有効なので、ロックできなかった
+        if (!this.#execLock(options)) return false; // 前段ロックが有効なので、ロックできなかった
       }
       catch (err) {
         throw err;
       }
       // ロック解放関数を返す
-      options.release = release;
+      //options.release = release;
       this.#released = false;
       return true;
     });
@@ -440,12 +410,12 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param options オプション。
    * @returns ロック取得の場合は解放用関数を、さもなくば、nullを返す
    */
-  #execLock(options: AllOptions): (() => void) | null {
+  #execLock(options: AllOptions): boolean {
     // 本インスタンスの解放フラグが経っていないなら、前段ロック中なのでnull
-    if (this.#released === false) return null;
+    if (this.#released === false) return false;
     // ファイルを確認し、有効ならnull
     if (fs.existsSync(options.filePath)) {
-      if (!this.#isLockExpired(options)) return null;//有効な前段ロックあり
+      if (!this.#isLockExpired(options)) return false;//有効な前段ロックあり
     }
     // ロック獲得可能なためロック情報格納ファイル作成
     const ttlMs: number = options.ttlMs ?? FileLock.getDefaultOptions().ttlMs as any;
@@ -467,7 +437,8 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     // ハートビートタイマー開始
     this.#startHeartbeat(options);
     // 解放関数を返す
-    return () => this.#unlockMeta(options)
+    //return () => this.#unlockMeta(options)
+    return true;
   }
 
   /**
@@ -583,12 +554,13 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param options オプション。
    */
   #release(options: AllOptions) {
-    if (options.release) options.release();
+    //if (options.release) options.release();
+    this.#unlockMeta(options);
 
     this.#stopHeartbeat()
 
-    delete options.release;
-    delete options.ownerId;
+    //delete options.release;
+    options.ownerId = null;
     this.ownerId = null;
     this.#released = true;
   }

@@ -1,5 +1,4 @@
-import { type KeyTypeMap, type TimeBasedKey } from './BaseUserOptions.ts';
-import { BaseOptionsResolver, typedKeys } from './BaseOptionsResolver.ts';
+import { BaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './BaseOptionsResolver.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { FileLockInternalState } from './FileLockInternalState.ts';
 
@@ -26,12 +25,13 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
       retryIntervalMs: 100,
     }
   }
-  override getDefaultOptions(): FileLockUserOptions {
+
+  public override getDefaultOptions(): FileLockUserOptions {
     return FileLockUserOptionsResolver.getDefaultOptions();
   }
 
-  override getCheckTypePairs(): KeyTypeMap<FileLockUserOptions> {
-    const basics = super.getCheckTypePairs();
+  protected override _getCheckTypePairs(): KeyTypeMap<FileLockUserOptions> {
+    const basics = super._getCheckTypePairs();
     return {
       ...basics,
       pollIntervalSec:       "number",
