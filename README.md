@@ -1,17 +1,19 @@
 # file-locking-js
-A file-based lock for coordinating exclusive access between processes.
-Inspired by existing Node.js file-locking implementations and developed to explore a different API and locking model.
+A file-based locking utility designed to coordinate exclusive access across processes, threads, and asynchronous tasks within a thread. <br>
 
+Inspired by existing Node.js file-locking implementations and developed to explore a different API and locking model.<br>
+
+It enables the exclusive execution of operations—such as "resource access"—that require serialization across multiple processes.<br>
+Examples include limiting access to a specific service to a single process or thread at a time, or updating a document without interference from other processes.
 
 # Installation
 ```bash
 npm install @ayapapa-npm/file-locking-js
 ```
 
-
 # Features
-* Enables exclusive execution of "resource access operations" that require serialization across multiple processes.<br>
-Examples include "limiting access to a specific service to one instance at a time" or "updating a document without interference from other processes."
+* From a user interface perspective, this is a `Key`-based locking system. <br>
+Internally, it creates a `File` associated with the specified `Key` within a directory defined in the `Config`; once the `Callback` associated with that `Key` completes execution, the file is deleted. If a request is made for a lock using the same `Key` while that file still exists—indicating the lock is active—the system waits for the lock to be released (i.e., for the file to be deleted) before proceeding with the operation.
 * Features a simple and safe user interface. <br>
 Users simply call it like this:
   ```js
@@ -25,7 +27,7 @@ Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`
 * Leverages the robust and well-known `proper-filelock` library to handle the underlying file access synchronization, ensuring reliable inter-process mutual exclusion.
 * By storing the lock's `TTL` (time-to-live) and `heartbeat timeout` (the timeout period following operation completion) within the lock file itself, it is possible to verify the lock's validity based on the parameters defined when the lock was acquired.
 * Supports caching of created lock instances to reduce performance overhead. Additionally, users can specify a maximum number of cache entries, allowing for a balanced trade-off regarding memory usage.
-* Callback function's is able to have a parameter to monitor the lockking statusm like this:
+* Callback functions is able to have a parameter to monitor the locking status, like this:
   ```js
   const ret = await FileLock.withLock(
     'lock key',
@@ -42,6 +44,7 @@ Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`
   );
   console.log(ret); // "The operation is completed.";
   ```
+  **Note: It is not mandatory to interrupt the process when monitor.cancelled is true.**
 
 
 # Configuration

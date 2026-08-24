@@ -3,7 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { LockError, DeadlockDetected } from './LockErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
-import { type BaseUserOptions, type InternalState, type Monitor } from './BaseUserOptions.ts';
+import { type BaseUserOptions } from './BaseUserOptions.ts';
+import { type BaseInternalState, type Monitor } from './BaseInternalState.ts'
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -43,7 +44,7 @@ export interface Config {
  * コンテキスト内にける別プロセス起動先でのロックの再入制御までは行えない。
  * @class LockBase
  */
-export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends InternalState = InternalState>  {
+export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends BaseInternalState = BaseInternalState>  {
 
   /** Static fieilds. */
 
@@ -66,7 +67,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
   protected key: string;
 
   /** Lock owner id. */
-  protected ownerId: string | null = null;
+  //protected ownerId: string | null = null;
 
   /** コンテキストID（リエントラントロック検出用） */
   private contextId: string;
@@ -147,7 +148,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
       if (this.isReentry()) {
         if (!options.allowReentry) throw new DeadlockDetected(null, { key: this.key });
         this.logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
-        options.ownerId = this.ownerId;
+        //options.ownerId = this.ownerId;
         // ロックカウンターをインクリメント
         this.incReantryCount(options);
         try {
@@ -179,6 +180,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
   /**
    * 再入ロックカウンターをインクリメント
    * @param {BaseUserOptions} options 
+   * @abstract
    */
   protected incReantryCount(options: AllOptions<T, I>) {
     throw new LockError(`継承クラスで実装せよ${options}`)
@@ -187,6 +189,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
   /**
    * 再入ロックカウンターをデクリメント
    * @param {BaseUserOptions} options 
+   * @abstract
    */
   protected decReantryCount(options: AllOptions<T, I>) {
     throw new LockError(`継承クラスで実装せよ${options}`)
@@ -255,7 +258,7 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
    */
   #newMonitor(options: AllOptions<T, I>): Monitor {
     this.#deleteMonitor(options);
-    return this.#setMonitor({cancelled:false, reason:'', id: Math.random().toString(36).slice(2)}, options);
+    return this.#setMonitor({cancelled:false, id: Math.random().toString(36).slice(2)}, options);
   }
 
   /**
@@ -274,5 +277,17 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends In
   #setMonitor(mon: Monitor, options: AllOptions<T, I>) {
     return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
   }
+}
+
+/** Asynchronous sleep. */
+export async function sleepAsync(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Synchronous sleep. */
+export function sleepSync(ms: number) {
+  const sab = new SharedArrayBuffer(4);
+  const int32 = new Int32Array(sab);
+  Atomics.wait(int32, 0, 0, ms);
 }
 

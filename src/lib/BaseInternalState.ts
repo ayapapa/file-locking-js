@@ -10,7 +10,7 @@ export interface Monitor {
   operation?: string;
 
   /** Monitor ID. */
-  id: string;
+  id?: string;
 }
 
 /** Basic status information. */
@@ -22,6 +22,6 @@ export interface BaseInternalState {
   ownerId: string | null;
 
   /** Monitoring information to be passed to the callback function. */
-  monitor: Monitor;
+  monitor?: Monitor;
 }
 

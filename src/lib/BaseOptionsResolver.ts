@@ -186,8 +186,8 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
    */
   #convSecToMs() {
     const keys = this._getTimeKeys();
-    // this.options を、時間キーのみを含む型として扱う（型アサーション）
-    // ここでは 'as unknown as ...' を使って、一度 unknown を経由させて安全にキャストする
+    // Treat this.options as a type containing only the time key (type assertion)
+    // Here, use 'as unknown as ...' to safely cast via unknown
     const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<T> | MsKey<T>, number>>
     
     keys.forEach(key => {

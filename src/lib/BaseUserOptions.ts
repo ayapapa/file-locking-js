@@ -59,8 +59,4 @@ export interface BaseUserOptions {
    allowReentry?: boolean;
 }
 
-/** Type of `Options` key */
-//export type OptionsKey<T> = keyof T;// extends BaseUserOptions;
-
-
 

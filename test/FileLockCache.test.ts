@@ -1,13 +1,6 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-
-import { Config, FileLock } from '../src/index';
-
-async function sleepAsync(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const logger = new PrettyConsole({ level: 'trace' });
+import { describe, expect, it } from 'vitest';
+import { Config, FileLock } from '../src/index.ts';
+import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
 FileLock.setConfig({ logger });
 
