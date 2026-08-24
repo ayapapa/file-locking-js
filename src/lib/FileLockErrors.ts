@@ -1,4 +1,4 @@
-import { LockError, AlreadyLocked, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockErrors.ts';
+import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockErrorsBase.ts';
 
 /**
  * Basic lock handling error. 
@@ -82,19 +82,4 @@ export class LockCompromised extends FileLockError {
     }
 }
 
-/** 
- * Callstack. 
- */
-export class CallStack extends FileLockError {
-  /**
-   * Constructor.
-   * @param params  Parameters.
-   */
-  constructor(params?: { props?: { [key: string]: any } }) {
-    const props = { ...params?.props };
-    super('', { code: `CALLSTACK`, props });
-    if (this.stack) this.stack = this.stack.replace('Error', 'CallStack');
-  }
-}
-
-export { AlreadyLocked, DeadlockDetected, InvalidOptions, TTLExceeded };
+export { AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded };

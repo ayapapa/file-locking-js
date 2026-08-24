@@ -1,18 +1,15 @@
-import { BaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './BaseOptionsResolver.ts';
+import { UserOptionsResolverBase, typedKeys, type KeyTypeMap, type TimeBasedKey } from './UserOptionsResolverBase.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { FileLockInternalState } from './FileLockInternalState.ts';
 
-export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUserOptions, FileLockInternalState> {
+/**
+ * A class that resolves UserOptions for FileLock.
+ */
+export class FileLockUserOptionsResolver extends UserOptionsResolverBase<FileLockUserOptions, FileLockInternalState> {
   
   /**
-   * Constructor.
-   * @param options User options.
+   * Static methods.
    */
-  constructor(options: FileLockUserOptions, defaultOptions?: FileLockUserOptions ) {
-    super(options, defaultOptions);
-
-    (options as any)._resolvedOpts = this.options;
-  };
 
   /** Get default options. */
   public static override getDefaultOptions(): FileLockUserOptions {
@@ -26,10 +23,26 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
     }
   }
 
+  /**
+   * Instance methods.
+   */
+
+  /**
+   * Constructor.
+   * @param options User options.
+   */
+  constructor(options: FileLockUserOptions, defaultOptions?: FileLockUserOptions ) {
+    super(options, defaultOptions);
+
+    (options as any)._resolvedOpts = this.options;
+  };
+
+  /** Get default options. */
   public override getDefaultOptions(): FileLockUserOptions {
     return FileLockUserOptionsResolver.getDefaultOptions();
   }
 
+  /** Get the type-checking pairs `{'property name': 'value type'}` for the optional properties. */
   protected override _getCheckTypePairs(): KeyTypeMap<FileLockUserOptions> {
     const basics = super._getCheckTypePairs();
     return {
@@ -46,6 +59,7 @@ export class FileLockUserOptionsResolver extends BaseOptionsResolver<FileLockUse
     };
   }
   
+  /** Get an array of time-related base names (keys) from the option properties. */
   protected override _getTimeKeys(): TimeBasedKey<FileLockUserOptions>[] {
     const bases = super._getTimeKeys();
     bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTimeout', 'retryInterval');

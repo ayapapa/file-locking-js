@@ -1,25 +1,26 @@
-// 利用モジュールの読み込み
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { LockError, DeadlockDetected } from './LockErrors.ts';
+import { LockError, DeadlockDetected } from './LockErrorsBase.ts';
 import { type AllOptions } from './AllOptions.ts';
-import { type BaseUserOptions } from './BaseUserOptions.ts';
-import { type BaseInternalState, type Monitor } from './BaseInternalState.ts'
+import { type UserOptionsBase } from './UserOptionsBase.ts';
+import { type InternalStateBase, type Monitor } from './InternalStateBase.ts'
 
 const {REQUIRE_DEBUG} = Contracts;
 
 /** Definition of the callback function to be executed after acquiring the lock. */
 export type CallbackOnLock = (monitor: Monitor) => any;
 
-/** 再入ロック検出用のコンテキストオブジェクト */
+/** Context object for reentrancy lock detection. */
 export interface ReentrantContext  {
   /** Set of reentrant context ids */
   heldLocks: Map<string, { monitor: Monitor }>;
 }
 
+/** Type of the log output object. */
 export type LogProvider = Pick<Console, 'log' | 'trace' | 'debug' | 'info' | 'warn' | 'error' > & {fatal?: (...args: any[]) => void};
 
-export interface Config {
+/** Basic config */
+export interface BaseConfig {
    /**
     * External logger. 
     * Default is `console`.
@@ -36,17 +37,20 @@ export interface Config {
  }
 
 /**
- * 排他制御（ロック）実装の基本クラス。
- * AsyncLocalStorage を利用して、リエントラントロック（再入ロック）の回避を行う。
+ * Base class for implementing mutual exclusion (locking). 
+ * Uses AsyncLocalStorage to prevent re-entrant locking issues. 
  *
- * 注意: AsyncLocalStorage によるリエントラントロック（再入ロック）の回避は、
- * 同一 Node プロセス内の同じ非同期コンテキストにのみ有効。
- * コンテキスト内にける別プロセス起動先でのロックの再入制御までは行えない。
- * @class LockBase
+ * Note: Preventing re-entrant locking via AsyncLocalStorage is effective
+ * only within the same asynchronous context in the same Node process. 
+ * It does not extend to controlling re-entrancy across processes launched
+ * from within that context.
+ * @abstract
  */
-export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends BaseInternalState = BaseInternalState>  {
+export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends InternalStateBase = InternalStateBase>  {
 
-  /** Static fieilds. */
+  /** 
+   * Static fieilds. 
+   */
 
   /**
    * AsyncLocalStorage. 
@@ -54,207 +58,178 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends Ba
    * Since the goal is to share reentrancy context information (via `getStore()`) regardless of the specific instance, 
    * it is implemented as a static property to enable sharing across instances.  
    */
-  private static als: AsyncLocalStorage<ReentrantContext> = new AsyncLocalStorage<ReentrantContext>();
+  private static _als: AsyncLocalStorage<ReentrantContext> = new AsyncLocalStorage<ReentrantContext>();
 
-  /** Static methods */
+  /** 
+   * Instance fieilds. 
+   */
 
-
-  /** Instance fieilds. */
-
-  protected logger: LogProvider;
+  /** Logger. */
+  protected _logger: LogProvider;
 
   /** Lock key */
-  protected key: string;
+  protected _key: string;
 
-  /** Lock owner id. */
-  //protected ownerId: string | null = null;
-
-  /** コンテキストID（リエントラントロック検出用） */
-  private contextId: string;
-
+  /** Context ID (for reentrant lock detection). */
+  #contextId: string;
 
   /** Instance methods. */
 
   /**
-   * コンストラクタ。
+   * Constructor.
+   * @param key     Lock key.
+   * @param config  Configuration.
    */
-  protected constructor(key: string, config?: Config) {
-    this.key = key;
-    this.contextId  = key;// crypto.randomUUID();
-    this.logger = config?.logger ?? console;
-    if (this.logger === console) {
-      this.logger = {...console as LogProvider};
-      this.logger.trace = this.logger.debug;
+  protected constructor(key: string, config?: BaseConfig) {
+    this._key = key;
+    this.#contextId  = key;// crypto.randomUUID();
+    this._logger = config?.logger ?? console;
+    if (this._logger === console) {
+      this._logger = {...console as LogProvider};
+      this._logger.trace = this._logger.debug;
     }
-    // 'fatal'が無いケースもあるので、その場合は、'error'を利用する。
-    if (!this.logger.fatal) this.logger.fatal = this.logger.error;
+    // There are cases where 'fatal' is not present; in such instances, use 'error'.
+    if (!this._logger.fatal) this._logger.fatal = this._logger.error;
   }
 
   /**
-   * デフォルトオプションを取得する
-   * @returns {object}
-   */
-//  public defaultOptions(): BaseUserOptions {
-//    return BaseOptionsResolver.getDefaultOptions();
-    /*
-    return {
-      timeoutMs:      5000,   // ロック解除待ち最大時間のデフォルトは5秒
-      ttlMs:          10000,  // ロック有効期間(time to live)のデフォルトは10秒
-      allowReentry:   false,  // 再入ロック禁止をデフォルトとする
-      resolved:       false,
-      logger:         console
-    };
-    */
-//  }
-
-  /**
-   * ユーザーオプションを検証後、内部用に一部変更・補完した結果を取得する。
-   * @param {BaseUserOptions}    opts デフォルトオプション
-   * @param {function}      [optsCls]     オプションクラス
-   * @returns {BaseUserOptions}
-   */
-//  private resolveOptions(opts: T, optsCls = BaseOptionsResolver): AllOptions<T, I> {
-//    if (opts.resolved) return opts; // すでに解決済
-//    const resolved = new optsCls(opts)
-//    REQUIRE_DEBUG(resolved instanceof BaseOptionsResolver, "オプションクラス不正", LockError, {code: 'EINVAL'});
-//    resolved.resolveOptions();
-//    return resolved.getOptions();
-//  }
-
-  /**
-   * 指定したキーに対するロックを取得し、
-   * 関数 onLockFn を排他制御下で実行し、ロック解除後にonLockFn の戻り値で解決される Promise を返す。
+   * Acquires a lock for the specified key,
+   * executes the function `onLockFn` under exclusive control, and returns a Promise that resolves with the return value of `onLockFn` after the lock is released.
    *
-   * @param {CallbackOnLock}  onLockFn      ロック取得後に実行するコールバック関数
-   * @param {CallbackOnLock}  execWithLock  
-   *  ロック取得、onLockFn呼び出し、ロック解除の一連の処理するコールバック関数
-   * @param {BaseUserOptions} [options] タイムアウトなどのオプション（単位: 秒）
-   *  - timeoutSec: ロック取得のタイムアウト時間。省略時はコンストラクタで指定された値を使用。
-   * @return {Promise<*>} onLockFn の戻り値で解決される Promise
+   * @param onLockFn      A user-specified callback function to be executed after acquiring the lock.
+   * @param execWithLock  The callback function that actually executes `withLock`.  
+   * @param options       Options.
+   * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
    */
   protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: AllOptions<T, I>) => any, options: AllOptions<T, I>) {
-    REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'onLockFn不正', LockError, {code: 'EINVAL'});
-    REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'execWithLock不正', LockError, {code: 'EINVAL'});
+    REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
+    REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'Invalid execWithLock.', LockError, {code: 'EINVAL'});
 
     const execDependingOnReentry = () => {
-      // 再帰ロックチェック準備
-      const rc = this.getReentrantContext();
+      // Preparing for recursive lock checks.
+      const rc = this._getReentrantContext();
       if (!rc) {
-        // まだ再入ロック検知のためのコンテキストがないので「新コンテキストを作って、その中でwithLockし直す」
-        return this.runInNewContext(() => execDependingOnReentry());
+        // Since there is no context for reentrancy lock detection yet, I will create a new context and call `withLock` again within it.
+        return this.#runInNewContext(() => execDependingOnReentry());
       }
-      // 再入ロックチェック
-      if (this.isReentry()) {
-        if (!options.allowReentry) throw new DeadlockDetected(null, { key: this.key });
-        this.logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
-        //options.ownerId = this.ownerId;
-        // ロックカウンターをインクリメント
-        this.incReantryCount(options);
+
+      // Re-entry lock check.
+      if (this.#isReentry()) {
+        // Error if reentrant locks are not permitted.
+        if (!options.allowReentry) throw new DeadlockDetected(null, { key: this._key });
+
+        // Since re-entry is permitted, increment the lock count and then execute the callback.
+        this._logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
+        this._incReantryCount(options);
         try {
-          return this.execCallback(onLockFn, options);
+          return this.#execCallback(onLockFn, options);
         }
         catch (err) {
-          this.onError(err, 'Callback in LockBase._withLock()', options);
+          this._onError(err, 'Callback in LockBase._withLock()', options);
           throw err;
         }
         finally {
-//          try {
-            this.decReantryCount(options);
-  //        }
-    /*
-          catch (err: any) {
-            this.onError(err, 'decReantryCount', options):
-            throw err;
-          }
-            */
+          this._decReantryCount(options);
         }
-     }
-      // withLockを実行する
-      return execWithLock(() => this.execCallback(onLockFn, options), options);
+      }
+
+      // Exeute locking operations.
+      return execWithLock(() => this.#execCallback(onLockFn, options), options);
     }
     
     return execDependingOnReentry();
   }
 
   /**
-   * 再入ロックカウンターをインクリメント
-   * @param {BaseUserOptions} options 
+   * Increment the re-entry lock counter.
+   * @param options 
    * @abstract
    */
-  protected incReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`継承クラスで実装せよ${options}`)
+  protected _incReantryCount(options: AllOptions<T, I>) {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: options })
   }
 
   /**
-   * 再入ロックカウンターをデクリメント
-   * @param {BaseUserOptions} options 
+   * Decrement the re-entry lock counter.
+   * @param options 
    * @abstract
    */
-  protected decReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`継承クラスで実装せよ${options}`)
+  protected _decReantryCount(options: AllOptions<T, I>) {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: options })
   }
 
-  protected prepare(options: AllOptions<T, I>): void {
+  /** 
+   * Make preparations for the lock.
+   * @param options 
+   * @abstract
+   */
+  protected _prepare(options: AllOptions<T, I>): void {
     this.#newMonitor(options);
   }
   
-  protected onError(err: any, operation: string, options: AllOptions<T, I>) {
+  /**
+   * Handle errors that occur while locked.
+   * @param err 
+   * @param operation 
+   * @param options 
+   * @abstract
+   */
+  protected _onError(err: any, operation: string, options: AllOptions<T, I>) {
     this.#setMonitor({ cancelled: true, reason: err.code ?? 'ELOCK', operation}, options)
   }
 
   /**
-   * 子コンテキスト上でコールバック関数実行(for 再入ロック検出)
-   * @param {function}  onLockFn  ロック中にコールバックする関数
-   * @returns {Promise<*>}  onLockFnの戻り値を取得するPromise。
+   * Execute callback function in child context (for reentrant lock detection).
+   * @param onLockFn  A user-specified function called during the lock.
+   * @returns A `Promise` that resolves to the return value of onLockFn.
    */
-  private execCallback(onLockFn: CallbackOnLock, options: AllOptions<T, I>) {
-    // この呼び出し専用のコンテキストを決定する
-    const parent = this.getReentrantContext() as any;
+  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<T, I>) {
+    const parent = this._getReentrantContext() as any;
     let child: ReentrantContext;
     let monitor: Monitor;
-    if (parent.heldLocks.has(this.key)) {
-      // 再入ロック時は、monitorを親と共有
-      monitor = parent.heldLocks.get(this.key)?.monitor as any;
+    if (parent.heldLocks.has(this._key)) {
+      monitor = parent.heldLocks.get(this._key)?.monitor as any;
       options.monitor = monitor;
       child = parent;
     }
     else {
       child = { heldLocks: new Map(parent?.heldLocks) };
       monitor = options.monitor as any;
-      child.heldLocks.set(this.key, { monitor });
+      child.heldLocks.set(this._key, { monitor });
     }
-    // 専用コンテキストでonLockFn()を実行
-    return LockBase.als.run(child, async () => onLockFn(monitor));
+
+    return LockBase._als.run(child, async () => onLockFn(monitor));
   }
 
   /**
-   * 再入ロックか否かをチェックする
+   * Check whether re-entrant locking is used.
    */
-  private isReentry(): boolean {
-    return Boolean(this.getReentrantContext()?.heldLocks.has(this.contextId));
+  #isReentry(): boolean {
+    return Boolean(this._getReentrantContext()?.heldLocks.has(this.#contextId));
   }
 
   /**
-   * 新しいコンテキストを作成し、そのコンテキスト上で関数fnを実行する
+   * Create a new context and execute the function `fn` within that context.
    * @param {function} fn 
    * @returns 
    */
-  private runInNewContext(fn: () => any) {
+  #runInNewContext(fn: () => any) {
     const initialContext: ReentrantContext = { heldLocks: new Map() };
-    return LockBase.als.run(initialContext, () => {
+    return LockBase._als.run(initialContext, () => {
       return fn();
     });
   }
 
-  private getReentrantContext() : ReentrantContext | null {
-    return LockBase.als.getStore() ?? null;
+  /** Retrieve the current context. */
+  _getReentrantContext() : ReentrantContext | null {
+    return LockBase._als.getStore() ?? null;
   }
 
   /**
-   * 新たにモニターを作成する
+   * Create a new monitor.
    * @param options
-   * @returns
+   * @returns A new monitor.
    */
   #newMonitor(options: AllOptions<T, I>): Monitor {
     this.#deleteMonitor(options);
@@ -262,19 +237,19 @@ export class LockBase <T extends BaseUserOptions = BaseUserOptions, I extends Ba
   }
 
   /**
-   * モニターを削除する
-   * @param {UserOptions} options
+   * Delete the monitor.
+   * @param options
    */
-  #deleteMonitor(options: AllOptions) {
+  #deleteMonitor(options: AllOptions): void {
     delete options.monitor;
   }
 
   /**
-   * モニターに値をセットする
-   * @param {UserOptions} options
-   * @returns {Monitor} 値が反映されたモニター
+   * Set the value on the monitor.
+   * @param options
+   * @returns Monitor reflecting the values.
    */
-  #setMonitor(mon: Monitor, options: AllOptions<T, I>) {
+  #setMonitor(mon: Monitor, options: AllOptions<T, I>): Monitor {
     return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
   }
 }
@@ -291,3 +266,4 @@ export function sleepSync(ms: number) {
   Atomics.wait(int32, 0, 0, ms);
 }
 
+export { Monitor };

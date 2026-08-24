@@ -14,7 +14,7 @@ export interface Monitor {
 }
 
 /** Basic status information. */
-export interface BaseInternalState {
+export interface InternalStateBase {
   /** Whether the BaseUserOptions was resolved. */
   resolved: boolean;
 

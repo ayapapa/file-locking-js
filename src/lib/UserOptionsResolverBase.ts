@@ -1,9 +1,9 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { AllOptions, AllOptionsKey } from './AllOptions.ts';
-import { type BaseUserOptions } from './BaseUserOptions.ts';
-import { InvalidOptions } from './LockErrors.ts';
-import { BaseInternalState } from './BaseInternalState.ts';
+import { type UserOptionsBase } from './UserOptionsBase.ts';
+import { InvalidOptions } from './LockErrorsBase.ts';
+import { InternalStateBase } from './InternalStateBase.ts';
 
 const {REQUIRE} = Contracts;
 
@@ -32,14 +32,14 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
 /**
  * A class that resolves options.
  * Base class: Accepts a generic type T
- * T must inherit from BaseUserOptions (constraint) 
+ * T must inherit from UserOptionsBase (constraint) 
  */
-export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I extends BaseInternalState = BaseInternalState> {
+export class UserOptionsResolverBase <T extends UserOptionsBase = UserOptionsBase, I extends InternalStateBase = InternalStateBase> {
 
   /** Static Fields. */
   
   /** Basic default options. */
-  private static defaultOptions: BaseUserOptions = {
+  private static defaultOptions: UserOptionsBase = {
     timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
     ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
     allowReentry:   false,  // Default to disallowing re-entrant locks
@@ -48,8 +48,8 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   /** Static methods. */
 
   /** Get basic default options. */
-  public static getDefaultOptions(): BaseUserOptions {
-    return BaseOptionsResolver.defaultOptions;
+  public static getDefaultOptions(): UserOptionsBase {
+    return UserOptionsResolverBase.defaultOptions;
   }
 
   /** Instance fields. */
@@ -74,8 +74,8 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   }
 
   /** Get basic default options. */
-  public getDefaultOptions(): BaseUserOptions {
-    return BaseOptionsResolver.defaultOptions;
+  public getDefaultOptions(): UserOptionsBase {
+    return UserOptionsResolverBase.defaultOptions;
   }
 
   /** Get current options. */
@@ -84,7 +84,7 @@ export class BaseOptionsResolver <T extends BaseUserOptions = BaseUserOptions, I
   }
 
   /** Get the Key-Type map for type checking. */
-  protected _getCheckTypePairs(): KeyTypeMap<BaseUserOptions> {
+  protected _getCheckTypePairs(): KeyTypeMap<UserOptionsBase> {
     return {
       timeoutSec:   `number`,
       timeoutMs:    `number`,

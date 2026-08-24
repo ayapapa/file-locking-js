@@ -1,8 +1,7 @@
-import { BaseUserOptions, type InternalState as BaseInternalState, type Monitor } from './BaseUserOptions.ts';
-//import { type AllOptions as AllOptionsT } from './AllOptions.ts';
+import { UserOptionsBase } from './UserOptionsBase.ts';
 
-// User options for FileLock (inherits from BaseUserOptions)
-export interface FileLockUserOptions extends BaseUserOptions {
+// User options for FileLock (inherits from UserOptionsBase)
+export interface FileLockUserOptions extends UserOptionsBase {
   /**
    * Polling interval (checking if locked) in seconds until timeout. 
    * Internally converted to pollIntervalMs. Cannot be used with pollIntervalMs. 
@@ -63,9 +62,3 @@ export interface FileLockUserOptions extends BaseUserOptions {
   retryIntervalMs?: number;
 
 }
-
-export interface InternalState extends BaseInternalState {
-
-}
-
-export { Monitor };

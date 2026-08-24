@@ -85,3 +85,19 @@ export class InvalidOptions extends LockError {
     super(msg, { code:'EINVAL' , props });
   }
 };
+
+/** 
+ * Callstack. 
+ */
+export class CallStack extends LockError {
+  /**
+   * Constructor.
+   * @param params  Parameters.
+   */
+  constructor(params?: { props?: { [key: string]: any } }) {
+    const props = { ...params?.props };
+    super('', { code: `CALLSTACK`, props });
+    if (this.stack) this.stack = this.stack.replace('Error', 'CallStack');
+  }
+}
+

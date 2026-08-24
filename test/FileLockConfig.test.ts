@@ -51,8 +51,8 @@ describe('FileLock', () => {
         {}
       )).toBe(retVal);
       const lock = (FileLock as any).getLock(key) as any;
-      expect(lock.logger.trace === lock.logger.debug).toBe(true);
-      expect(lock.logger.fatal === lock.logger.error).toBe(true);
+      expect(lock._logger.trace === lock._logger.debug).toBe(true);
+      expect(lock._logger.fatal === lock._logger.error).toBe(true);
     }
     finally {
       FileLock.setConfig(orgConf);

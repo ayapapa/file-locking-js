@@ -20,7 +20,7 @@ import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
-import { LockBase, sleepAsync, sleepSync, type CallbackOnLock, type Config as BaseConfig, type LogProvider } from "./LockBase.ts";
+import { LockBase, sleepAsync, sleepSync, type CallbackOnLock, type BaseConfig, type LogProvider, type Monitor } from "./LockBase.ts";
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockUserOptionsResolver, typedKeys } from "./FileLockUserOptionsResolver.ts";
@@ -310,7 +310,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * Increment lock counter.
    * @param options 
    */
-  protected override incReantryCount(options: AllOptions) {
+  protected override _incReantryCount(options: AllOptions) {
     const meta = this.#getMeta(options);
     options.ownerId =  options.ownerId || meta.ownerId;
     meta.counter = meta.counter || 0;
@@ -323,7 +323,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * And, when the counter becomes '0', release lock.
    * @param options 
    */
-  protected override decReantryCount(options: AllOptions) {
+  protected override _decReantryCount(options: AllOptions) {
     let meta;
     try {
       meta = this.#getMeta(options);
@@ -333,7 +333,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
       }
     }
     catch (err) {
-      this.onError(err, 'getMeta', options);
+      this._onError(err, 'getMeta', options);
       this.#actuallyRelease(options);
       throw err;
     }
@@ -346,11 +346,11 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * Make advance preparations.
    * @param options Options
    */
-  protected override prepare(options: AllOptions): void {
-    super.prepare(options);
+  protected override _prepare(options: AllOptions): void {
+    super._prepare(options);
     if (FileLock.initialized !== true) FileLock.initialize(); // Just in case
     const  dirPath    = FileLock.getLockDirPath();
-    const baseFilePath = path.join(dirPath, this.key);
+    const baseFilePath = path.join(dirPath, this._key);
     options.filePath     = baseFilePath + '.json';
   }
 
@@ -365,7 +365,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   private async withLock(onLockFn: CallbackOnLock, options: AllOptions): Promise<any> {
     REQUIRE_DEBUG(options.resolved, "The option remains unresolved.", InvalidOptions, { props: options });
 
-    this.prepare(options);
+    this._prepare(options);
 
     return super._withLock(
       onLockFn,
@@ -392,7 +392,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
           );
         }
         catch (err) {
-          this.onError(err, 'Callback or Timer in withLock()', opts);
+          this._onError(err, 'Callback or Timer in withLock()', opts);
           throw err;
         }
         finally {
@@ -415,7 +415,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const timeoutTime = start + (options.timeoutMs as any);
     while (!this.#tryLock(options)) {
       if (Date.now() >= timeoutTime) {
-        throw new AlreadyLocked('', {key: this.key, props: { file: options.filePath } });
+        throw new AlreadyLocked('', {key: this._key, props: { file: options.filePath } });
       }
       await sleepAsync(options.pollIntervalMs as any);
     }
@@ -458,8 +458,8 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     // Create lock information file.
     this.#createFile(options);
 
-    this.logger.trace('tryLock: Created lock information file.', 
-      new CallStack({ props:{ key: this.key, ownerId: options.ownerId }
+    this._logger.trace('tryLock: Created lock information file.', 
+      new CallStack({ props:{ key: this._key, ownerId: options.ownerId }
     }));
 
     this.#startHeartbeat(options);
@@ -475,7 +475,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param options Options.
    */
   #release(options: AllOptions): void {
-    this.decReantryCount(options);
+    this._decReantryCount(options);
   }
 
   /**
@@ -495,7 +495,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   #startHeartbeat(options: AllOptions): void {
     if (this.#heartbeatTimer) return; // Preventing Multiple Instances.
-    this.logger.trace(`start heartbeat at ${DateFormatter.format(new Date())}`);
+    this._logger.trace(`start heartbeat at ${DateFormatter.format(new Date())}`);
     this.#heartbeatTimer = setInterval(
       async () => {
         if (this.#released) return this.#stopHeartbeat();
@@ -503,8 +503,8 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
           this.#updateHeartbeat(options);
         }
         catch (err) {
-          this.logger.trace(`heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
-          this.onError(err, 'updateHeartbeat', options);
+          this._logger.trace(`heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
+          this._onError(err, 'updateHeartbeat', options);
           // To maintain the lock, the heartbeat is not stopped here.
         }
         // Therefore, the lock-released flag is checked even after the update.
@@ -519,7 +519,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   #stopHeartbeat(): void {
     if (this.#heartbeatTimer) {
-      this.logger.trace(`stop heartbeat at ${DateFormatter.format(new Date())}`);
+      this._logger.trace(`stop heartbeat at ${DateFormatter.format(new Date())}`);
       clearInterval(this.#heartbeatTimer);
       this.#heartbeatTimer = null;
     }
@@ -532,7 +532,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const meta = this.#getMeta(options);
     meta.lastHeartbeatAt = Date.now();
     this.#setMeta(options, meta);
-    this.logger.trace(`update heartbeat at ${DateFormatter.format(new Date(meta.lastHeartbeatAt))}`);
+    this._logger.trace(`update heartbeat at ${DateFormatter.format(new Date(meta.lastHeartbeatAt))}`);
   }
 
   /**
@@ -599,7 +599,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
           continue;
         }
         if (err.code === 'ELOCKED') {
-          throw new AlreadyLocked('', { key: this.key, props: { file: name } });
+          throw new AlreadyLocked('', { key: this._key, props: { file: name } });
         }
         errMsg = errMsg || `An access error occurred for the lock information storage file.`;
         throw new FileLockError(`${errMsg}(${err.message})`, {code: err.code, props: { file: name } });
@@ -626,7 +626,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   #getMeta(options: AllOptions): LockMetaData {
     if (!fs.existsSync(options.filePath)) {
-      throw new LockCompromised('The lock information storage file does not exist.', {key: this.key, props: { file: options.filePath } });
+      throw new LockCompromised('The lock information storage file does not exist.', {key: this._key, props: { file: options.filePath } });
     }
 
     const contents = this.#accessMetaWithLock(
@@ -641,15 +641,15 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     if(options.ownerId && options.ownerId !== meta.ownerId) {
       const err = new LockCompromised(
         'The lock information storage file was overwritten by another lock.',
-        {key: this.key, props: { file: options.filePath, key: this.key, optionsOwnerId: options.ownerId, /*instanceId: this.ownerId, */lockFileOwnerId: meta.ownerId } });
-      this.logger.error(err);
+        {key: this._key, props: { file: options.filePath, key: this._key, optionsOwnerId: options.ownerId, /*instanceId: this.ownerId, */lockFileOwnerId: meta.ownerId } });
+      this._logger.error(err);
       throw err;
     }
 
     // Check contents.
     const check = (key: keyof LockMetaData, type: string) => {
       if (!(key in meta && typeof meta[key] === type)) {
-        throw new LockCompromised(`The lock information format is invalid.`, {key: this.key, props: { file: options.filePath } });
+        throw new LockCompromised(`The lock information format is invalid.`, {key: this._key, props: { file: options.filePath } });
       }
     };
 
@@ -694,4 +694,4 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 // Initialize
 FileLock.initialize();
 
-export { LogProvider };
+export { LogProvider, Monitor };
