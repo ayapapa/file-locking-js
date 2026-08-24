@@ -334,11 +334,11 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     }
     catch (err) {
       this.onError(err, 'getMeta', options);
-      this.#release(options);
+      this.#actuallyRelease(options);
       throw err;
     }
     if (meta && meta.counter === 0) {
-      this.#release(options);
+      this.#actuallyRelease(options);
     }
   }
 
@@ -372,7 +372,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
       async (cb, opts) => { // `cb` is a callback in the parent class that wraps `onLockFn`.
 
-        await this.#lock(opts);
+        await this.#acquire(opts);
 
         // Create TTL timer
         let ttlTimeoutId: NodeJS.Timeout;
@@ -396,7 +396,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
           throw err;
         }
         finally {
-          this.#unlock(opts);
+          this.#release(opts);
         }
       },
       options
@@ -410,7 +410,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * Throw an error (exception) if the specified timeout is exceeded.
    * @param options  Options
    */
-  async #lock(options: AllOptions): Promise<void> {
+  async #acquire(options: AllOptions): Promise<void> {
     const start = Date.now();
     const timeoutTime = start + (options.timeoutMs as any);
     while (!this.#tryLock(options)) {
@@ -458,7 +458,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     // Create lock information file.
     this.#createFile(options);
 
-    this.logger.trace('lockMeta: CreatedLockFile', 
+    this.logger.trace('tryLock: Created lock information file.', 
       new CallStack({ props:{ key: this.key, ownerId: options.ownerId }
     }));
 
@@ -474,7 +474,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * In practice, the counter is decremented, and the lock is released when it reaches zero.
    * @param options Options.
    */
-  #unlock(options: AllOptions): void {
+  #release(options: AllOptions): void {
     this.decReantryCount(options);
   }
 
@@ -562,9 +562,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   /**
    * Final unlock processing.
-   * @param options オプション。
+   * @param options Options.
    */
-  #release(options: AllOptions) {
+  #actuallyRelease(options: AllOptions) {
     //if (options.release) options.release();
     this.#removeFile(options);
 
@@ -609,7 +609,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   /**
    * Get the lock information storage file's contents as object.
-   * @param options Options
+   * @param options Options.
    * @returns null if not exist, or the contents as object.
    */
   #getMetaOrNull(options: AllOptions): LockMetaData | null {

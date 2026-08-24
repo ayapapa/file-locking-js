@@ -14,6 +14,9 @@ export class FileLockError extends LockError {
   }
 };
 
+/** 
+ * Lock directory access error.
+ */
 class LockDirectoryAccessFailed extends FileLockError {
   /**
    * Constructor.
@@ -31,6 +34,9 @@ class LockDirectoryAccessFailed extends FileLockError {
   }
 }
 
+/**
+ * Lock directory 'Stat' error.
+ */
 export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
@@ -42,6 +48,9 @@ export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
   }
 }
 
+/**
+ * Lock directory 'Creaate' error.
+ */
 export class LockDirectoryCreationFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
@@ -53,12 +62,14 @@ export class LockDirectoryCreationFailed extends LockDirectoryAccessFailed {
   }
 }
 
-/** Lock is compromised. */
+/** 
+ * Lock compromised error. 
+ */
 export class LockCompromised extends FileLockError {
   /**
-   * コンストラクタ
-   * @param reason エラー内容
-   * @param params  エラーインスタンスに付与するプロパティ群
+   * Constructor.
+   * @param reason Reason for the error.
+   * @param params  Parameters.
    */
   constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any } }) {
     const key: string | null = params?.key ?? null;
@@ -71,14 +82,18 @@ export class LockCompromised extends FileLockError {
     }
 }
 
+/** 
+ * Callstack. 
+ */
 export class CallStack extends FileLockError {
   /**
-   * コンストラクタ
-   * @param params  エラーインスタンスに付与するプロパティ群
+   * Constructor.
+   * @param params  Parameters.
    */
   constructor(params?: { props?: { [key: string]: any } }) {
     const props = { ...params?.props };
     super('', { code: `CALLSTACK`, props });
+    if (this.stack) this.stack = this.stack.replace('Error', 'CallStack');
   }
 }
 
