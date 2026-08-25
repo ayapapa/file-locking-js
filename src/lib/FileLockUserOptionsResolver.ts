@@ -1,11 +1,11 @@
-import { UserOptionsResolverBase, typedKeys, type KeyTypeMap, type TimeBasedKey } from './UserOptionsResolverBase.ts';
+import { LockBaseUserOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseUserOptionsResolver.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { FileLockInternalState } from './FileLockInternalState.ts';
 
 /**
  * A class that resolves UserOptions for FileLock.
  */
-export class FileLockUserOptionsResolver extends UserOptionsResolverBase<FileLockUserOptions, FileLockInternalState> {
+export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<FileLockUserOptions, FileLockInternalState> {
   
   /**
    * Static methods.

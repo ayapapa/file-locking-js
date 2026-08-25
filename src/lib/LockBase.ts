@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { LockError, DeadlockDetected } from './LockErrorsBase.ts';
+import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
-import { type UserOptionsBase } from './UserOptionsBase.ts';
-import { type InternalStateBase, type Monitor } from './InternalStateBase.ts'
+import { type LockBaseUserOptions } from './LockBaseUserOptions.ts';
+import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -46,7 +46,7 @@ export interface BaseConfig {
  * from within that context.
  * @abstract
  */
-export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends InternalStateBase = InternalStateBase>  {
+export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
 
   /** 
    * Static fieilds. 

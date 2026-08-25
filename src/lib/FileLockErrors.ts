@@ -1,4 +1,4 @@
-import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockErrorsBase.ts';
+import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockBaseErrors.ts';
 
 /**
  * Basic lock handling error. 

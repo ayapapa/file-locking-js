@@ -1,7 +1,7 @@
-import { UserOptionsBase } from './UserOptionsBase.ts';
+import { LockBaseUserOptions } from './LockBaseUserOptions.ts';
 
-// User options for FileLock (inherits from UserOptionsBase)
-export interface FileLockUserOptions extends UserOptionsBase {
+// User options for FileLock (inherits from LockBaseUserOptions)
+export interface FileLockUserOptions extends LockBaseUserOptions {
   /**
    * Polling interval (checking if locked) in seconds until timeout. 
    * Internally converted to pollIntervalMs. Cannot be used with pollIntervalMs. 
