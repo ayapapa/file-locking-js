@@ -1,14 +1,37 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
+import * as pinos from 'pino'
+import { pino } from 'pino'
 
-import { FileLock } from '../src/index';
+import { FileLock, LogProvider } from '../src/index';
 
 export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export const logger = new PrettyConsole({ level: 'trace' });
+const transport = pinos.transport({
+  target: 'pino/file',
+  options: {
+    destination: './logs/file-lock.log',
+    frequency: 'daily',
+    //size: '10m',
+    mkdir: true,
+  },
+});
+
+export const logger = pino(
+  {
+    level: 'trace',
+    timestamp: pino.stdTimeFunctions.isoTime,
+    formatters: {
+      level: label => ({ level: label.toUpperCase() }),
+    },
+  },
+  transport,
+) as LogProvider;
+
+//export const logger = new PrettyConsole({ level: 'trace' });
 
 export function getLockMetaPath(key: string): string {
   return path.join((FileLock as any).getLockDirPath(), key + '.json');

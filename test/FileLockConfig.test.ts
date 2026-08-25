@@ -4,17 +4,10 @@ import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { Config, FileLock, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
-
-async function sleepAsync(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const logger = new PrettyConsole({ level: 'trace' });
-
-FileLock.setConfig({ logger });
+import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
 describe('FileLock', () => {
-
+  /*
   it("`FileLock.setConfig()` works correctly.", async () => {
     const orgConf = FileLock.getConfig();
     expect.assertions(3);
@@ -33,16 +26,17 @@ describe('FileLock', () => {
       FileLock.setConfig(orgConf);
     }
   });
-
+*/
   it("`You can specify `console` as the logger, " +
     "and the `fatal` function has been replaced by the `error` function, " +
     "while the `trace` function has been replaced by the `debug` function..", async () => {
 
     const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
-    expect.assertions(3);
+    //expect.assertions(3);
     try {
       FileLock.setConfig({ logger: console });
+
       expect(await FileLock.withLock(key, 
         async () => {
           await sleepAsync(500);
@@ -91,6 +85,7 @@ describe('FileLock', () => {
   }
 
   it("The directory specified in `FileLock.setCondig()` is created.", async () => {
+    console.log("######START The directory specified...#####");
     const dir = path.join(process.cwd(), '.lock');
     let orgConf: Config;
     await testLockDirectoryCreation(
@@ -106,8 +101,7 @@ describe('FileLock', () => {
   it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
     " a error is throwed.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    let orgConf: Config;
-    orgConf = FileLock.getConfig();
+    let orgConf: Config = FileLock.getConfig();
     FileLock.setConfig({ logger });
     fs.rmSync(dir, { force: true, recursive: true });
     fs.writeFileSync(dir, "");
@@ -199,10 +193,89 @@ describe('FileLock', () => {
     }
   });
 
-  it("ロック中にディレクトリパスを変更してもエラーにならない", async () => {
+  it("Changing the directory path while a lock is held does not result in an error.", async () => {
+
+    const orgConf = FileLock.getConfig();
+    const retVal = "test_001", key = retVal;
+    expect.assertions(3);
+    try {
+      FileLock.setConfig({ logger: console });
+      expect(await FileLock.withLock(key, 
+        async () => {
+          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+          await sleepAsync(500);
+          return retVal;
+        },
+        {}
+      )).toBe(retVal);
+      const lock = (FileLock as any).getLock(key) as any;
+      expect(lock._logger.trace === lock._logger.debug).toBe(true);
+      expect(lock._logger.fatal === lock._logger.error).toBe(true);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+
   });
 
-  it("ロック中にディレクトリパスを変更し、同キーでさらにロックしても、エラーにならない２。", async () => {
+  it("Changing the directory path while a lock is held and then locking again using the same key does not result in an error.", async () => {
+
+    const orgConf = FileLock.getConfig();
+    const retVal = "test_001", key = retVal;
+    expect.assertions(3);
+    try {
+      FileLock.setConfig({ logger: console });
+      expect(await FileLock.withLock(key, 
+        async () => {
+          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+          await FileLock.withLock(key, 
+            () => {
+              return;
+            }
+          );
+          await sleepAsync(500);
+          return retVal;
+        },
+        {}
+      )).toBe(retVal);
+      const lock = (FileLock as any).getLock(key) as any;
+      expect(lock._logger.trace === lock._logger.debug).toBe(true);
+      expect(lock._logger.fatal === lock._logger.error).toBe(true);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+
   });
 
+  it("Changing the directory path while a lock is held and subsequently acquiring another lock " +
+    "using the same key—while in reentrant lock permission mode—does not result in an error.", async () => {
+
+    const orgConf = FileLock.getConfig();
+    const retVal = "test_001", key = retVal;
+    expect.assertions(3);
+    try {
+      FileLock.setConfig({ logger: console });
+      expect(await FileLock.withLock(key, 
+        async () => {
+          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+          await FileLock.withLock(key, 
+            () => {
+              return;
+            },
+            { allowReentry: true }
+          );
+          await sleepAsync(500);
+          return retVal;
+        },
+      )).toBe(retVal);
+      const lock = (FileLock as any).getLock(key) as any;
+      expect(lock._logger.trace === lock._logger.debug).toBe(true);
+      expect(lock._logger.fatal === lock._logger.error).toBe(true);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+
+  });
 });

@@ -75,7 +75,4 @@ describe('FileLock', () => {
       removeLockFiles(key);
     }
   });
-
-  it("hogehoge", async () => {
-  });
 });

@@ -245,7 +245,5 @@ describe('FileLock', () => {
     await testTypeErrorOption('retriesOnIOErr', 'string');
   });
 
-  it("hogehoge", async () => {
-  });
-
+  
 });

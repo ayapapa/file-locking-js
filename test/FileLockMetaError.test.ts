@@ -77,7 +77,4 @@ describe('FileLock', () => {
       {ttlMs: 2000}
     )).toBe(retVal);
   });
-
-  it("hogehoge", async () => {
-  });
 });

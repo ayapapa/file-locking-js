@@ -23,7 +23,7 @@ describe('FileLock', () => {
         await sleepAsync(3000);
         return retVal1;
       },
-      {timeoutSec : 1 }
+      { timeoutSec : 1 }
     );
     
     const key2 = 'testKey2', retVal2 = key2;
@@ -32,7 +32,7 @@ describe('FileLock', () => {
         await sleepAsync(3000);
         return retVal2;
       },
-      {timeoutSec : 1 }
+      { timeoutSec : 1 }
     );
     let res;
     expect(res = await Promise.all([a, b])).toHaveLength(2);
@@ -49,7 +49,7 @@ describe('FileLock', () => {
         return await FileLock.withLock(
           key, 
           async (monitor2) => {
-            // モニターは、同キー再入ロック時には共有される
+            // The monitor should be shared when the key is re-entered (re-entrant lock).
             expect(monitor2).toBe(monitor);
             await sleepAsync(500)
             return retVal;
@@ -111,6 +111,4 @@ describe('FileLock', () => {
     )})).toBe(retVal);
   });
 
-  it("hogehoge", async () => {
-  });
 });

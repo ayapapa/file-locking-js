@@ -352,6 +352,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const  dirPath    = FileLock.getLockDirPath();
     const baseFilePath = path.join(dirPath, this._key);
     options.filePath     = baseFilePath + '.json';
+    options.contextId    = options.filePath;  // Use the file path as the context ID 
+                                              // to avoid issues caused by changes 
+                                              // to the lock directory configuration.
   }
 
   /**
@@ -430,10 +433,12 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   #createFile(options: AllOptions) {
     const ttlMs: number = options.ttlMs ?? FileLock.getDefaultOptions().ttlMs as any;
     const heartbeatTimeoutMs: number = options.heartbeatTimeoutMs as any
+    const ownerId = crypto.randomUUID();
+
     this.#setMeta(
       options,
       {
-        ownerId: options.ownerId = crypto.randomUUID(),
+        ownerId: options.ownerId = ownerId,
         expirationTime: Date.now() + ttlMs,
         heartbeatTimeoutMs: heartbeatTimeoutMs,
         lastHeartbeatAt: Date.now(),
@@ -452,7 +457,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     if (this.#released === false) return false;
 
     if (fs.existsSync(options.filePath)) {
-      if (!this.#isLockExpired(options)) return false; // This lock is alive.
+      if (!this.#isLockExpired(options)) {
+        return false; // This lock is alive.
+      }
     }
 
     // Create lock information file.
@@ -484,6 +491,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   #isLockExpired(options: AllOptions): boolean {
     const meta = this.#getMetaOrNull(options);
+    this._logger.debug(meta, ':Lock file contents');
     const expired = !meta || meta.expirationTime < Date.now();
     const dead = !meta || meta.lastHeartbeatAt + meta.heartbeatTimeoutMs < Date.now();
     return expired && dead;
@@ -668,6 +676,11 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param withLock  ロックするか否か。。。たぶん、今後不要！
    */
   #setMeta(options: AllOptions, meta: LockMetaData, withLock: boolean = true) {
+    // ★デバッグ用
+    withLock = false;
+    const callStack = new CallStack().stack;
+    Object.assign((meta as any), { pid: process.pid, ppid: process.ppid, execPath: process.execPath, callStack })
+    // ★デバッグ用
     try {
       if (!withLock) {
         fs.writeFileSync(options.filePath, JSON.stringify(meta));
@@ -686,6 +699,33 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
         err = new FileLockError("Couldn't remove the lock information storage file", {code: err.code, props: { file: options.filePath } });
       } 
       throw err;
+    }
+    this.#addHistory(meta, options);
+  }
+
+
+  #addHistory(meta: any, options: any): void {
+    meta.options = options;
+    const historyFile = path.join(path.dirname(options.filePath), 'history.json');
+    const contents = fs.existsSync(historyFile) ? fs.readFileSync(historyFile) as any : null;
+    let history = {} as any; 
+    try {
+      history = contents ? JSON.parse(contents) : {};
+    }
+    catch (err) {
+    }
+    const maxEntries = 100;
+    history[String(Date.now())] = meta;
+    const keys = Object.keys(history);
+    while (keys.length > maxEntries) {
+      keys.length--;
+      delete history[keys[keys.length]];
+    } 
+    try {
+      fs.writeFileSync(historyFile, JSON.stringify(history));
+    }
+    catch (err) {
+      // Ignore.
     }
   }
 

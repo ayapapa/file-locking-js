@@ -71,7 +71,7 @@ export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends In
   protected _key: string;
 
   /** Context ID (for reentrant lock detection). */
-  #contextId: string;
+  //#contextId: string;
 
   /** Instance methods. */
 
@@ -82,7 +82,7 @@ export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends In
    */
   protected constructor(key: string, config?: BaseConfig) {
     this._key = key;
-    this.#contextId  = key;// crypto.randomUUID();
+    //this.#contextId  = key;// crypto.randomUUID();
     this._logger = config?.logger ?? console;
     if (this._logger === console) {
       this._logger = {...console as LogProvider};
@@ -115,7 +115,7 @@ export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends In
       }
 
       // Re-entry lock check.
-      if (this.#isReentry()) {
+      if (this.#isReentry(options)) {
         // Error if reentrant locks are not permitted.
         if (!options.allowReentry) throw new DeadlockDetected(null, { key: this._key });
 
@@ -188,15 +188,16 @@ export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends In
     const parent = this._getReentrantContext() as any;
     let child: ReentrantContext;
     let monitor: Monitor;
-    if (parent.heldLocks.has(this._key)) {
-      monitor = parent.heldLocks.get(this._key)?.monitor as any;
+    const contextId: string = options.contextId;
+    if (parent.heldLocks.has(contextId)) {
+      monitor = parent.heldLocks.get(contextId).monitor;
       options.monitor = monitor;
       child = parent;
     }
     else {
       child = { heldLocks: new Map(parent?.heldLocks) };
       monitor = options.monitor as any;
-      child.heldLocks.set(this._key, { monitor });
+      child.heldLocks.set(contextId, { monitor });
     }
 
     return LockBase._als.run(child, async () => onLockFn(monitor));
@@ -205,8 +206,8 @@ export class LockBase <T extends UserOptionsBase = UserOptionsBase, I extends In
   /**
    * Check whether re-entrant locking is used.
    */
-  #isReentry(): boolean {
-    return Boolean(this._getReentrantContext()?.heldLocks.has(this.#contextId));
+  #isReentry(options: AllOptions): boolean {
+    return Boolean(this._getReentrantContext()?.heldLocks.has(options.contextId));
   }
 
   /**

@@ -272,6 +272,4 @@ describe('FileLock', () => {
     );
   });
 
-  it("hogehoge", async () => {
-  });
 });
