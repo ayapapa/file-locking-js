@@ -142,7 +142,8 @@ describe('FileLock', () => {
     lockFn: (cb: (monitor: Monitor)=>Promise<void>) => Promise<void>,
     lockCallback: (monitor: Monitor, callbackCompleted: (v: unknown) => void) => Promise<void>,
     errorFn: (err: any) => void,
-    finnalyFn: () => void = () => {}): Promise<void> {
+    finnalyFn: () => void = () => {}
+  ): Promise<void> {
 
     let callbackCompleted: (v: unknown) => void;
     const callbackPromise = new Promise(resolve => {

@@ -1,4 +1,4 @@
-import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded } from './LockBaseErrors.ts';
+import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded, type LockErrorProps } from './LockBaseErrors.ts';
 
 /**
  * Basic lock handling error. 
@@ -9,7 +9,7 @@ export class FileLockError extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: {code?: string, props?: { [key: string]: any } }) {
+  constructor(msg?: string, params?: {code?: string, props?: LockErrorProps }) {
     super(msg, params);
   }
 };
@@ -25,7 +25,7 @@ class LockDirectoryAccessFailed extends FileLockError {
    * @param code  Error code string.
    * @param params  Parameters.
    */
-  constructor(fsErrorMsg: string | null, operation: string, code: string, params?: {path?: string, props?: { [key: string]: any } }) {
+  constructor(fsErrorMsg: string | null, operation: string, code: string, params?: {path?: string, props?: LockErrorProps }) {
     const path = params?.path;
     const props = { ...params?.props };
     if (path != null) props.path = path;
@@ -43,7 +43,7 @@ export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
    * @param fsErrorMsg   fs's error message.
    * @param params  Parameters.
    */
-  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
+  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: LockErrorProps }) {
     super(fsErrorMsg, 'check the status of', 'ELOCKDIRSTAT', params);
   }
 }
@@ -57,7 +57,7 @@ export class LockDirectoryCreationFailed extends LockDirectoryAccessFailed {
    * @param fsErrorMsg   fs's error message.
    * @param params  Parameters.
    */
-  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: { [key: string]: any } }) {
+  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: LockErrorProps }) {
     super(fsErrorMsg, 'create', 'ELOCKDIRCREATE', params);
   }
 }
@@ -71,7 +71,7 @@ export class LockCompromised extends FileLockError {
    * @param reason Reason for the error.
    * @param params  Parameters.
    */
-  constructor(reason: string | null, params?: { key: string, props?: { [key: string]: any } }) {
+  constructor(reason: string | null, params?: { key: string, props?: LockErrorProps }) {
     const key: string | null = params?.key ?? null;
     const props = { ...params?.props };
     if (key) props.key = key;

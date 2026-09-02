@@ -1,6 +1,6 @@
-	import { FileLock, type Config, type LogProvider } from './lib/FileLock.ts';
+	import { FileLock, type Config, type LogProvider, type Monitor } from './lib/FileLock.ts';
 	import { AlreadyLocked, DeadlockDetected, FileLockError, InvalidOptions, LockDirectoryCreationFailed, LockCompromised, LockDirectoryStatFailed, TTLExceeded } from './lib/FileLockErrors.ts';
-	import { type FileLockUserOptions, type Monitor } from './lib/FileLockUserOptions.ts';
+	import { type FileLockUserOptions } from './lib/FileLockUserOptions.ts';
 	export { 
 		AlreadyLocked, 
 		DeadlockDetected, 
@@ -14,5 +14,6 @@
 		type Config, 
 		type FileLockUserOptions, 
 		type LogProvider, 
-		type Monitor };
+		type Monitor
+	};
 	export default FileLock;

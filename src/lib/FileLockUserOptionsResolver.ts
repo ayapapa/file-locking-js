@@ -1,6 +1,7 @@
 import { LockBaseUserOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseUserOptionsResolver.ts';
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { FileLockInternalState } from './FileLockInternalState.ts';
+//import { NumberArray } from 'lru-cache/raw';
 
 /**
  * A class that resolves UserOptions for FileLock.
@@ -8,20 +9,10 @@ import { FileLockInternalState } from './FileLockInternalState.ts';
 export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<FileLockUserOptions, FileLockInternalState> {
   
   /**
-   * Static methods.
+   * Static fields.
    */
 
-  /** Get default options. */
-  public static override getDefaultOptions(): FileLockUserOptions {
-    return {
-      ...super.getDefaultOptions(),
-      pollIntervalMs: 100,
-      heartbeatIntervalMs: 1000,
-      heartbeatTimeoutMs: 10000,
-      retriesOnIOErr: 1,
-      retryIntervalMs: 100,
-    }
-  }
+  static readonly minHeartBeatTImeoutMs: number = 2000;
 
   /**
    * Instance methods.
@@ -33,14 +24,7 @@ export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<Fil
    */
   constructor(options: FileLockUserOptions, defaultOptions?: FileLockUserOptions ) {
     super(options, defaultOptions);
-
-    (options as any)._resolvedOpts = this.options;
   };
-
-  /** Get default options. */
-  public override getDefaultOptions(): FileLockUserOptions {
-    return FileLockUserOptionsResolver.getDefaultOptions();
-  }
 
   /** Get the type-checking pairs `{'property name': 'value type'}` for the optional properties. */
   protected override _getCheckTypePairs(): KeyTypeMap<FileLockUserOptions> {
@@ -64,6 +48,20 @@ export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<Fil
     const bases = super._getTimeKeys();
     bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTimeout', 'retryInterval');
     return bases;
+  }
+
+  /**
+   * @internal
+   * Transform, and complete options.
+   * @param defaultOpts  Defalt options
+   * @protected
+   */
+  protected override _normalizeOptions(defaultOpts?: FileLockUserOptions): void {
+    super._normalizeOptions(defaultOpts);
+    this.options.heartbeatTimeoutMs = Math.max(
+      this.options.heartbeatTimeoutMs ?? 0, 
+      FileLockUserOptionsResolver.minHeartBeatTImeoutMs
+    );
   }
 
 }

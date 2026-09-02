@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-import * as pinos from 'pino'
+import { PrettyConsole, LogEntry } from '@ayapapa-npm/pretty-console-js';
+import * as Pino from 'pino'
 import { pino } from 'pino'
 
 import { FileLock, LogProvider } from '../src/index';
@@ -10,17 +10,17 @@ export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const transport = pinos.transport({
+const transport = Pino.transport({
   target: 'pino/file',
   options: {
     destination: './logs/file-lock.log',
     frequency: 'daily',
-    //size: '10m',
+    size: '5m',
     mkdir: true,
   },
 });
 
-export const logger = pino(
+const pinoLogger = pino(
   {
     level: 'trace',
     timestamp: pino.stdTimeFunctions.isoTime,
@@ -29,12 +29,24 @@ export const logger = pino(
     },
   },
   transport,
-) as LogProvider;
+);
 
-//export const logger = new PrettyConsole({ level: 'trace' });
+const onPrettyLog = ( logEntry: LogEntry ) => {
+  const method = logEntry.method === 'log' ? 'info' : logEntry.method;
+  const err = logEntry.args.find(arg => arg instanceof Error);
+  if (err) {
+    // Pino's type definition expects the second argument to be a string.
+    // Use Reflect.apply to pass the arguments as-is.
+    Reflect.apply(pinoLogger[method], pinoLogger, [err, logEntry.args]);    }
+  else {
+    pinoLogger[method](logEntry.args);
+  }
+}
+
+export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace' });
 
 export function getLockMetaPath(key: string): string {
-  return path.join((FileLock as any).getLockDirPath(), key + '.json');
+  return path.join((FileLock as any).getLockDirPath(), key, 'meta.json');
 }
 
 export const getLockMeta = (key: string) => {
@@ -54,4 +66,4 @@ export function removeLockFiles(key: string) {
   if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath);
 }
 
-FileLock.setConfig({ logger, ErrorStackTraceLimit: 20 });
+FileLock.setConfig({ logger, history: true });

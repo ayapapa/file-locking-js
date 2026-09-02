@@ -38,8 +38,9 @@ export interface FileLockUserOptions extends LockBaseUserOptions {
 
   /**
    * Validity period in milliseconds for the last heartbeat update. 
-   * If this amount of time has not elapsed since the last update, the process is considered to be still running. Cannot be used with heartbeatTimeoutSec. 
-   * Default is 10000.
+   * If this amount of time has not elapsed since the last update, the process is considered to be still running. This cannot be used in conjunction with `heartbeatTimeoutSec`.
+   * The minimum value is 2000; if a value lower than this is specified, this minimum value is used.
+   * The default value is 10000.
    */
   heartbeatTimeoutMs?: number;
 

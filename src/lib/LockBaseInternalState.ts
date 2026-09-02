@@ -16,7 +16,7 @@ export interface Monitor {
 /** Basic status information. */
 export interface LockBaseInternalState {
   /** Whether the BaseUserOptions was resolved. */
-  resolved: boolean;
+  //resolved: boolean;
 
   /** Lock owner id. */
   ownerId: string | null;

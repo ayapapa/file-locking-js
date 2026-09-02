@@ -7,18 +7,20 @@ import { Config, FileLock, LockDirectoryCreationFailed, LockDirectoryStatFailed 
 import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
 describe('FileLock', () => {
-  /*
+
   it("`FileLock.setConfig()` works correctly.", async () => {
     const orgConf = FileLock.getConfig();
     expect.assertions(3);
     try {
-      FileLock.setConfig({});
+      FileLock.setConfig(FileLock.getDefaultConfig());
+      const def = FileLock.getDefaultConfig();
+      const cur = FileLock.getConfig();
       expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
       const lockDirectory = 'hogehoge';
       let config: Config = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
-      config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
+      config = {...FileLock.getDefaultConfig(), userDefaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
     }
@@ -26,7 +28,41 @@ describe('FileLock', () => {
       FileLock.setConfig(orgConf);
     }
   });
-*/
+
+  it("heartbeatTimeoutMsに0を設定すると、最小値2000がセットされる.", async () => {
+    const orgConf = FileLock.getConfig();
+    try {
+      // コンフィグ設定におけるデフォルトオプションの値は解決されることを確認
+      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 0 } });
+      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
+
+      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 1000 } });
+      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
+
+      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 1999 } });
+      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
+
+      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 2001 } });
+      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2001);
+
+      // withLockにおけるオプションの値はケースによって変更されることを確認する
+      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 0 });
+      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
+   
+      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 1999 });
+      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
+
+      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 2000});
+      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
+
+      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 2001});
+      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2001);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
   it("`You can specify `console` as the logger, " +
     "and the `fatal` function has been replaced by the `error` function, " +
     "while the `trace` function has been replaced by the `debug` function..", async () => {
@@ -276,6 +312,56 @@ describe('FileLock', () => {
     finally {
       FileLock.setConfig(orgConf);
     }
+  });
 
+  it("When debug mode is enabled, the history is updated.", async () => {
+    const orgConf = FileLock.getConfig();
+    const dir = path.join(process.cwd(), '.lock');
+    const hist = path.join(dir, 'history.json');
+    if (fs.existsSync(hist) === false) fs.writeFileSync(hist, '');
+    const stat_before = fs.statSync(hist);
+    expect.assertions(1);
+    try {
+      FileLock.setConfig({ _debug: true });
+      await FileLock.withLock('debug_mode_key', 
+        async () => {
+          await sleepAsync(500);
+        },
+      );
+      const stat_after = fs.statSync(hist);
+      expect(stat_before.mtimeMs).lessThan(stat_after.mtimeMs);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
+  function isStringArray(value: unknown[]): boolean {
+  return value.every(v => typeof v === "string");
+}
+
+
+  it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
+    const orgConf = FileLock.getConfig();
+    const key = 'debug_mode_key_009'
+    const dir = path.join(process.cwd(), '.lock');
+    const metaFile = path.join(dir, key, 'meta.json');
+    expect.assertions(4);
+    try {
+      FileLock.setConfig({ _debug: true });
+      await FileLock.withLock(key, 
+        async () => {
+          const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
+          expect(meta.processId).toBeTypeOf('number');
+          expect(meta.parentProcessId).toBeTypeOf('number');
+          expect(Array.isArray(meta.processArgv) && (meta.processArgv as unknown[]).every(v => typeof v === "string")).toBeTruthy();
+          expect(meta.callStack).toBeTypeOf('string');
+          await sleepAsync(500);
+        },
+      );
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
   });
 });

@@ -21,11 +21,20 @@ export type TimeBasedKey<T> = {
 /** Type of Key-Type map. */
 export type KeyTypeMap<T> = Record<keyof T, any>;
 
+/**
+ * @internal
+ */
+/*
+export interface OptionsForTesting<T> {
+  _resolvedOpts?: T
+}
+*/
 /** Types of seconds-time-based key. */
 type SecKey<T> = `${TimeBasedKey<T>}Sec`;
 
 /** Types of millisecond-time-based key. */
 type MsKey<T> = `${TimeBasedKey<T>}Ms`;
+
 
 //export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
@@ -36,21 +45,7 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
  */
 export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState> {
 
-  /** Static Fields. */
-  
-  /** Basic default options. */
-  private static defaultOptions: LockBaseUserOptions = {
-    timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
-    ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
-    allowReentry:   false,  // Default to disallowing re-entrant locks
-  };
-
   /** Static methods. */
-
-  /** Get basic default options. */
-  public static getDefaultOptions(): LockBaseUserOptions {
-    return LockBaseUserOptionsResolver.defaultOptions;
-  }
 
   /** Instance fields. */
 
@@ -62,20 +57,17 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
   /**
    * Constructor
    * @param opts        User options.
-   * @param defaultOpts Default options. If undefined or null, use getDefaultOptions()'s return values。
+   * @param defaultOptions Default options.
    */
-  constructor(userOpts: T, defaultOpts?: T) {
-     this.options = {
-      ...userOpts,
-      resolved: false,
-    } as AllOptions<T, I>;
+  constructor(userOpts: T, defaultOptions?: T) {
+    if ('_resolvedOpts' in userOpts) delete userOpts._resolvedOpts;
 
-    this.#resolveOptions(defaultOpts);
-  }
+    this.options = { ...userOpts } as AllOptions<T, I>;
 
-  /** Get basic default options. */
-  public getDefaultOptions(): LockBaseUserOptions {
-    return LockBaseUserOptionsResolver.defaultOptions;
+    this.#resolveOptions(defaultOptions);
+
+    Object.assign(userOpts, { _resolvedOpts: this.options })
+
   }
 
   /** Get current options. */
@@ -83,7 +75,10 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
     return this.options;
   }
 
-  /** Get the Key-Type map for type checking. */
+  /**
+   * @internal
+   *  Get the Key-Type map for type checking. 
+   */
   protected _getCheckTypePairs(): KeyTypeMap<LockBaseUserOptions> {
     return {
       timeoutSec:   `number`,
@@ -95,12 +90,28 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
   }
 
   /**
+   * @internal
    * Get the array of time-related keys that require unit conversion (seconds to milliseconds). 
    * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
    * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
    */
   protected _getTimeKeys(): TimeBasedKey<T>[] {
     return ['timeout', 'ttl'] as TimeBasedKey<T>[];
+  }
+
+  /**
+   * @internal
+   * Transform, and complete options.
+   * @param defaultOptions  User default options
+   * @protected
+   */
+  protected _normalizeOptions(defaultOptions?: T): void {
+    this.#convSecToMs();
+
+    Object.assign(this.options, { ...defaultOptions,  ...this.options});
+    typedKeys(this.options).forEach(key => {
+      if (this.options[key] == null) delete this.options[key];
+    });
   }
 
   /**
@@ -123,12 +134,12 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    */
   #resolveOptions(defaultOpts?: T) {
     this.#validateOptions();
-    this.#normalizeOptions(defaultOpts);
-    this.options.resolved = true;
+    this._normalizeOptions(defaultOpts);
   }
 
   /**
-   * Validate options
+   * @internal
+   * Validate options.
    */
   #validateOptions() {
     // 型チェック
@@ -137,28 +148,20 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
     this.#checkCompeting();
   }
 
-  /**
-   * Transform, and complete options.
-   * @param defaultOpts  Defalt options
+  /** 
+   * @internal
+   * get TimeBaseKey-> SecBaseKey map.
    */
-  #normalizeOptions(defaultOpts?: T): void {
-    this.#convSecToMs();
-
-    Object.assign(this.options, { ...defaultOpts,  ...this.options});
-    typedKeys(this.options).forEach(key => {
-      if (this.options[key] == null) delete this.options[key];
-    });
-    Object.assign(this.options, { ...this.getDefaultOptions(), ...this.options });
-  }
-
-  /** get TimeBaseKey-> SecBaseKey map */
   #getSecKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
     return Object.fromEntries(
       keys.map(key => [key, `${key}Sec` as AllOptionsKey<T>])
     );
   }
 
-  /** get TimeBaseKey-> MsBaseKey map */
+  /**
+   * @internal
+   * get TimeBaseKey-> MsBaseKey map.
+   */
   #getMsKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
     return Object.fromEntries(
       keys.map(key => [key, `${key}Ms` as AllOptionsKey<T>])
@@ -166,6 +169,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
   }
 
   /**
+   * @internal
    * Check for conflicts in option values.
    */
   #checkCompeting() {
@@ -182,6 +186,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
   }
 
   /**
+   * @internal
    * Convert a value in seconds to milliseconds.
    */
   #convSecToMs() {

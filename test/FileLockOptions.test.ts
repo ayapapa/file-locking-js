@@ -13,6 +13,10 @@ const logger = new PrettyConsole({ level: 'trace' });
 
 FileLock.setConfig({ logger });
 
+interface TestOpts {
+  _resolvedOpts?: FileLockUserOptions
+};
+
 describe('FileLock', () => {
 
   function testToBeSameAsTheDefaultOptions(opts: FileLockUserOptions): void {
@@ -55,7 +59,7 @@ describe('FileLock', () => {
 
   it("When the lock with xxxSec options only,  internally resolved options have valid calculated xxxMs properties.", async () => {
     const retVal = "test_001", key = retVal;
-    const opts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213} as any;
+    const opts: FileLockUserOptions & TestOpts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213};
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -67,22 +71,21 @@ describe('FileLock', () => {
     expect(opts._resolvedOpts).toBeDefined();
     const defaultOpts = FileLock.getDefaultOptions();
     // Check basic options
-    expect(opts._resolvedOpts.timeoutSec).toBeUndefined();
-    expect(opts._resolvedOpts.timeoutMs).toBe(Math.floor(opts.timeoutSec * 1000)); 
-    expect(opts._resolvedOpts.ttlSec).toBeUndefined();
-    expect(opts._resolvedOpts.ttlMs).toBe(Math.floor(opts.ttlSec * 1000));
-    expect(opts._resolvedOpts.allowReentry).toBe(defaultOpts.allowReentry);
+    expect(opts._resolvedOpts?.timeoutSec).toBeUndefined();
+    expect(opts._resolvedOpts?.timeoutMs).toBe(Math.floor((opts.timeoutSec ?? 0) * 1000)); 
+    expect(opts._resolvedOpts?.ttlSec).toBeUndefined();
+    expect(opts._resolvedOpts?.ttlMs).toBe(Math.floor((opts.ttlSec ?? 0) * 1000));
+    expect(opts._resolvedOpts?.allowReentry).toBe(defaultOpts.allowReentry);
     // Check basic options
-    expect(opts._resolvedOpts.pollIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.pollIntervalMs).toBe(Math.floor(opts.pollIntervalSec * 1000));
-    expect(opts._resolvedOpts.heartbeatIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.heartbeatIntervalMs).toBe(Math.floor(opts.heartbeatIntervalSec * 1000));
-    expect(opts._resolvedOpts.heartbeatTimeoutSec).toBeUndefined();
-    expect(opts._resolvedOpts.heartbeatTimeoutMs).toBe(Math.floor(opts.heartbeatTimeoutSec * 1000));
-    expect(opts._resolvedOpts.retriesOnIOErr).toBe(defaultOpts.retriesOnIOErr);
-    expect(opts._resolvedOpts.retryIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.retryIntervalMs).toBe(Math.floor(opts.retryIntervalSec * 1000));
-    expect(opts._resolvedOpts.resolved).toBe(true);
+    expect(opts._resolvedOpts?.pollIntervalSec).toBeUndefined();
+    expect(opts._resolvedOpts?.pollIntervalMs).toBe(Math.floor((opts.pollIntervalSec ?? 0) * 1000));
+    expect(opts._resolvedOpts?.heartbeatIntervalSec).toBeUndefined();
+    expect(opts._resolvedOpts?.heartbeatIntervalMs).toBe(Math.floor((opts.heartbeatIntervalSec ?? 0) * 1000));
+    expect(opts._resolvedOpts?.heartbeatTimeoutSec).toBeUndefined();
+    expect(opts._resolvedOpts?.heartbeatTimeoutMs).toBe(Math.floor((opts.heartbeatTimeoutSec ?? 0) * 1000));
+    expect(opts._resolvedOpts?.retriesOnIOErr).toBe(defaultOpts.retriesOnIOErr);
+    expect(opts._resolvedOpts?.retryIntervalSec).toBeUndefined();
+    expect(opts._resolvedOpts?.retryIntervalMs).toBe(Math.floor((opts.retryIntervalSec ?? 0) * 1000));
   });
 
   it("When the lock with options other than time-related ones,  internally resolved options are valid.", async () => {
@@ -114,7 +117,6 @@ describe('FileLock', () => {
     expect(opts._resolvedOpts.retriesOnIOErr).toBe(opts.retriesOnIOErr);
     expect(opts._resolvedOpts.retryIntervalSec).toBeUndefined();
     expect(opts._resolvedOpts.retryIntervalMs).toBe(defaultOpts.retryIntervalMs);
-    expect(opts._resolvedOpts.resolved).toBe(true);
   });
 
   async function testOptionConflicting(name: string, eMsg: string) {

@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
+import { LockError, CallStack, DeadlockDetected } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseUserOptions } from './LockBaseUserOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
@@ -33,10 +33,11 @@ export interface BaseConfig {
     * The default value is 10 but may be set to any valid JavaScript number. 
     * If set to a non-number value, or set to a negative number, stack traces will not capture any frames.
     */
-   ErrorStackTraceLimit?: number;
+   //ErrorStackTraceLimit?: number;
  }
 
 /**
+ * @internal
  * Base class for implementing mutual exclusion (locking). 
  * Uses AsyncLocalStorage to prevent re-entrant locking issues. 
  *
@@ -51,7 +52,13 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
   /** 
    * Static fieilds. 
    */
+  
+  protected static readonly _defaultAllowReentry = false;
 
+  protected static readonly _defaultTimeoutMs = 5000;
+
+  protected static readonly _defaultTtlMs = 10000;
+  
   /**
    * AsyncLocalStorage. 
    * Used for reentrant lock detection.
@@ -59,6 +66,22 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * it is implemented as a static property to enable sharing across instances.  
    */
   private static _als: AsyncLocalStorage<ReentrantContext> = new AsyncLocalStorage<ReentrantContext>();
+
+  /**
+   * Static methods.
+   */
+
+  /** 
+   * @internal
+   * Get basic default options. 
+   */
+  public static getDefaultOptions(): LockBaseUserOptions {
+    return {
+      timeoutMs:      LockBase._defaultTimeoutMs,    // Default maximum wait time for lock release is 5 seconds
+      ttlMs:          LockBase._defaultTtlMs,        // Default lock validity period (time to live) is 10 seconds
+      allowReentry:   LockBase._defaultAllowReentry, // Default to disallowing re-entrant locks
+    };
+  }
 
   /** 
    * Instance fieilds. 
@@ -82,7 +105,6 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    */
   protected constructor(key: string, config?: BaseConfig) {
     this._key = key;
-    //this.#contextId  = key;// crypto.randomUUID();
     this._logger = config?.logger ?? console;
     if (this._logger === console) {
       this._logger = {...console as LogProvider};
@@ -91,6 +113,10 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
     // There are cases where 'fatal' is not present; in such instances, use 'error'.
     if (!this._logger.fatal) this._logger.fatal = this._logger.error;
   }
+
+  /**
+   * 
+   */
 
   /**
    * Acquires a lock for the specified key,
@@ -147,7 +173,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @abstract
    */
   protected _incReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: options })
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: { options } });
   }
 
   /**
@@ -156,7 +182,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @abstract
    */
   protected _decReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: options })
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: { options } });
   }
 
   /** 
@@ -266,5 +292,10 @@ export function sleepSync(ms: number) {
   const int32 = new Int32Array(sab);
   Atomics.wait(int32, 0, 0, ms);
 }
+
+/** Get callstack. */
+export function getCallStack(params?: {  props?: any } ): string {
+  return new CallStack(params).stack ?? '';
+} 
 
 export { Monitor };

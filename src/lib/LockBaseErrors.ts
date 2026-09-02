@@ -1,3 +1,6 @@
+/** Type of LockeError proerties. */
+export type LockErrorProps = Record<string, unknown>;
+
 /**
  * Basic lock handling error. 
  */
@@ -8,14 +11,14 @@ export class LockError extends Error {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { code?: string, props?: { [key: string]: any } }) {
-    const org_stackTraceLimit = Error.stackTraceLimit;
-    Error.stackTraceLimit = 20;
+  constructor(msg?: string, params?: { code?: string, props?: LockErrorProps/*{ [key: string]: any }*/ }) {
+    //const org_stackTraceLimit = Error.stackTraceLimit;
+    //Error.stackTraceLimit = 20;
     super(msg);
     const props = {...params?.props};
     this.code = (params?.code) ?? 'ELOCK';
     Object.assign(this, props);
-    Error.stackTraceLimit = org_stackTraceLimit;
+    //Error.stackTraceLimit = org_stackTraceLimit;
   }
 };
 
@@ -28,7 +31,7 @@ export class DeadlockDetected extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { key: string, props?: { [key: string]: any } }) {
+  constructor(msg?: string | null, params?: { key: string, props?: LockErrorProps }) {
     msg = msg || 'A deadlock was detected.';
     const props = { ...params?.props }
     if (params?.key) props.key = params?.key;
@@ -45,7 +48,7 @@ export class TTLExceeded extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { ttlMs: number, props?: { [key: string]: any } }) {
+  constructor(msg?: string | null, params?: { ttlMs: number, props?: LockErrorProps }) {
     const ttlMs = params?.ttlMs;
     msg = msg || `The maximum processing time(${ttlMs ?? "options.ttlMs"} milliseconds) while locked has been exceeded.`;
     const props = {...params?.props };
@@ -94,7 +97,7 @@ export class CallStack extends LockError {
    * Constructor.
    * @param params  Parameters.
    */
-  constructor(params?: { props?: { [key: string]: any } }) {
+  constructor(params?: { props?: LockErrorProps }) {
     const props = { ...params?.props };
     super('', { code: `CALLSTACK`, props });
     if (this.stack) this.stack = this.stack.replace('Error', 'CallStack');
