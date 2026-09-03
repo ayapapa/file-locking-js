@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { LockError, CallStack, DeadlockDetected } from './LockBaseErrors.ts';
+import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseUserOptions } from './LockBaseUserOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
@@ -132,7 +132,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
     REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'Invalid execWithLock.', LockError, {code: 'EINVAL'});
 
-    const execDependingOnReentry = () => {
+    const execDependingOnReentry = async () => {
       // Preparing for recursive lock checks.
       const rc = this._getReentrantContext();
       if (!rc) {
@@ -149,10 +149,11 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
         this._logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
         this._incReantryCount(options);
         try {
-          return this.#execCallback(onLockFn, options);
+          return await this.#execCallback(onLockFn, options);
         }
         catch (err) {
-          this._onError(err, 'Callback in LockBase._withLock()', options);
+          if (err instanceof Error) Object.assign(err, { code: 'EREENTLOCK' });
+          this._onError(err, 'Error occured in re-entrant locking callback.', options);
           throw err;
         }
         finally {
@@ -173,7 +174,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @abstract
    */
   protected _incReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: { options } });
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
   /**
@@ -182,7 +183,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @abstract
    */
   protected _decReantryCount(options: AllOptions<T, I>) {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOTIMPL', props: { options } });
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
   /** 
@@ -205,24 +206,29 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
     this.#setMonitor({ cancelled: true, reason: err.code ?? 'ELOCK', operation}, options)
   }
 
+  /** Retrieve the current context. */
+  private _getReentrantContext() : ReentrantContext | null {
+    return LockBase._als.getStore() ?? null;
+  }
+
   /**
    * Execute callback function in child context (for reentrant lock detection).
    * @param onLockFn  A user-specified function called during the lock.
    * @returns A `Promise` that resolves to the return value of onLockFn.
    */
   #execCallback(onLockFn: CallbackOnLock, options: AllOptions<T, I>) {
+    REQUIRE_DEBUG(options.monitor !== undefined, 'options.monitor is undefined!', LockError, { code: 'EINVAL' });
     const parent = this._getReentrantContext() as any;
     let child: ReentrantContext;
-    let monitor: Monitor;
+    let monitor: Monitor = options.monitor as Monitor; // 事前条件でチェック済
     const contextId: string = options.contextId;
     if (parent.heldLocks.has(contextId)) {
-      monitor = parent.heldLocks.get(contextId).monitor;
-      options.monitor = monitor;
+      // 互いの処理中断情報を共有するため親のmonitorを共有
+      options.monitor = monitor = parent.heldLocks.get(contextId).monitor;;
       child = parent;
     }
     else {
       child = { heldLocks: new Map(parent?.heldLocks) };
-      monitor = options.monitor as any;
       child.heldLocks.set(contextId, { monitor });
     }
 
@@ -248,11 +254,6 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
     });
   }
 
-  /** Retrieve the current context. */
-  _getReentrantContext() : ReentrantContext | null {
-    return LockBase._als.getStore() ?? null;
-  }
-
   /**
    * Create a new monitor.
    * @param options
@@ -260,7 +261,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    */
   #newMonitor(options: AllOptions<T, I>): Monitor {
     this.#deleteMonitor(options);
-    return this.#setMonitor({cancelled:false, id: Math.random().toString(36).slice(2)}, options);
+    return options.monitor = {cancelled:false, id: Math.random().toString(36).slice(2)};
   }
 
   /**
@@ -277,7 +278,8 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @returns Monitor reflecting the values.
    */
   #setMonitor(mon: Monitor, options: AllOptions<T, I>): Monitor {
-    return options.monitor ? Object.assign(options.monitor, mon) : options.monitor = mon;
+    const curMon: Monitor = 'monitor' in options ? options.monitor : this.#newMonitor(options);
+    return options.monitor = Object.assign(curMon, mon);
   }
 }
 
@@ -294,8 +296,12 @@ export function sleepSync(ms: number) {
 }
 
 /** Get callstack. */
-export function getCallStack(params?: {  props?: any } ): string {
-  return new CallStack(params).stack ?? '';
+export function getCallStack(): string {
+//  return new CallStack(params).stack ?? '';
+  const obj: { stack?: string } = {};
+  Error.captureStackTrace(obj, getCallStack);
+  obj.stack = obj.stack ? obj.stack.replace(/^Error\b/, "Call stack") : `Call stack: couldn't get.`;
+  return obj.stack;
 } 
 
 export { Monitor };

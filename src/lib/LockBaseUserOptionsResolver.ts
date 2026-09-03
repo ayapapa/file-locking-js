@@ -109,9 +109,6 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
     this.#convSecToMs();
 
     Object.assign(this.options, { ...defaultOptions,  ...this.options});
-    typedKeys(this.options).forEach(key => {
-      if (this.options[key] == null) delete this.options[key];
-    });
   }
 
   /**
@@ -123,7 +120,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
     typedKeys(pairs).forEach(key => {
       const t = pairs[key];
       const v = this.options[key];
-      REQUIRE(!v || typeof t === 'function' && t(v) || typeof v === t, 
+      REQUIRE(key in this.options === false || /*typeof t === 'function' && t(v) ||*/ typeof v === t, 
         `The type of option ${key} is incorrect.`, InvalidOptions, { name: key });
       });
   }

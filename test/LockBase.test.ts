@@ -1,22 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock } from '../src/index';
-import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
-
-async function sleepAsync(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+import { FileLock, LockError } from '../src/index';
+import { getCallStack, LockBase, type ReentrantContext, sleepAsync, sleepSync } from '../src/lib/LockBase.ts';
+import { Monitor } from '../src/lib/LockBaseInternalState.ts'
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const logger = new PrettyConsole({ level: 'trace' });
 
 FileLock.setConfig({ logger });
 
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('FileLock', () => {
 
   it("The reentrancy context is shared even when the lock instances are different.", async () => {
-    const als = (LockBase as any)._als;
-    const rc: ReentrantContext = als.getStore();
+    const als = (LockBase as any)._als as AsyncLocalStorage<ReentrantContext>;
+    const rc: ReentrantContext | undefined = als.getStore();
     const childContext: ReentrantContext = { heldLocks: new Map(rc?.heldLocks) };
     const contextId = 'text-context';
     childContext.heldLocks.set(contextId, { monitor: { cancelled: false } });
@@ -30,4 +33,80 @@ describe('FileLock', () => {
     });
   });
 
+  it("`sleepAsync()`が指定通りの時間眠る.", async () => {
+    const time = Date.now();
+    await sleepAsync(100);
+    expect(time + 100).lessThanOrEqual(Date.now());
+  });
+
+  it("`sleepSync()`が指定通りの時間眠る.", async () => {
+    const time = Date.now();
+    sleepSync(100);
+    expect(time + 100).lessThanOrEqual(Date.now());
+  });
+
+  class TestLock extends LockBase {
+    constructor() {
+      super("Key");
+    }
+
+    test_incReantryCount() {
+        this._incReantryCount({ ownerId: "", contextId: "" });
+    }
+
+    test_decReantryCount() {
+        this._decReantryCount({ ownerId: "", contextId: "" });
+    }
+
+    test_onError(err: Error, op: string) : Monitor {
+      const opts = { ownerId: "", contextId: "" };
+      this._onError(err, op, opts);
+      return 'monitor' in opts ? opts.monitor as Monitor : { cancelled: false };
+    }
+  }
+
+  function testNotImpleMethod(cb: () => void) {
+    expect.assertions(3)
+    try {
+      cb();
+    }
+    catch (err) {
+      if (err instanceof Error) {
+        expect(err instanceof LockError).toBeTruthy();
+        expect(err.message).toBe('Implement this in the subclass.');
+        expect('code' in err && err.code === 'ENOIMPL').toBeTruthy();
+      }
+    }
+  }
+
+  it("`LockBase._incReantryCount()`を実装しないと未実装エラー.", async () => {
+    testNotImpleMethod(() => {
+      new TestLock().test_incReantryCount();
+    });
+  });
+
+  it("`LockBase._decReantryCount()`を実装しないと未実装エラー.", async () => {
+    testNotImpleMethod(() => {
+      new TestLock().test_decReantryCount();
+    });
+  });
+
+  it("`LockBase._onError()`で、codeを持たないエラーを指定すると、、、.", async () => {
+    const tl = new TestLock();
+    const operation = 'OP';
+    const mon = tl.test_onError(new Error("test `LockBase._onError()`"), operation);
+    expect(mon.cancelled).toBeTruthy();
+    expect(typeof mon.id === 'string' && mon.id.length > 0).toBeTruthy()
+    expect(mon.operation).toBe(operation)
+    expect(mon.reason).toBe('ELOCK'); // 未指定時のデフォルトの理由
+  });
+
+  it("stack が undefined なら`Call stack: couldn't get.`を返す", () => {
+    vi.spyOn(Error, 'captureStackTrace').mockImplementation((targetObject: object) => {});
+
+    expect(getCallStack()).toBe(`Call stack: couldn't get.`);
+  });
+
 });
+
+

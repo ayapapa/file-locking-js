@@ -2,13 +2,13 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, DeadlockDetected, FileLock, FileLockError, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+import { AlreadyLocked, DeadlockDetected, FileLock, FileLockError, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
 
 describe('FileLock', () => {
 
   it("An error occurs if `key` is not specified.", async () => {
     let key;
-    expect.assertions(4);
+    expect.assertions(3);
     try {
       await FileLock.withLock(key as any, async () => {
           await sleepAsync(500);
@@ -16,11 +16,12 @@ describe('FileLock', () => {
         {timeoutSec : 1 }
       );
     }
-    catch (err: any) {
-      expect(err instanceof FileLockError).toBe(true);
-      expect(err.code).toBe('EINVAL');
-      expect(err.key).toBe(key);
-      expect(err.message.includes("Must specify `key`")).toBe(true);
+    catch (err) {
+      if (err instanceof Error) {
+        expect(err).instanceOf(InvalidOptions);
+        expect('code' in err && err.code === 'EINVAL').toBeTruthy();
+        expect(err.message).contains("`key` must be specified as a non-empty string.");
+      }
     }
   });
 
@@ -271,6 +272,78 @@ describe('FileLock', () => {
       },
       (err) => expect(err instanceof TTLExceeded).toBeTruthy()
     );
+  });
+
+  function testNoParamsError(ErrorClass: new(...args: any[]) => Error, msg?: string, param?: {}) {
+    const err = new ErrorClass(null, param);
+    msg ? expect(err.message).toBe(msg) : expect(err.message).toBe('null');
+  }
+
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(TTLExceeded).", async () => {
+    testNoParamsError(LockError);
+  });
+
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(TTLExceeded).", async () => {
+    testNoParamsError(TTLExceeded, 'The maximum processing time(options.ttlMs milliseconds) while locked has been exceeded.');
+  });
+
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(AlreadyLocked).", async () => {
+    testNoParamsError(AlreadyLocked , "Could not lock because the 'key' is already locked.");
+  });
+
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(InvalidOptions).", async () => {
+    testNoParamsError(InvalidOptions  , "The value of the specified options is invalid.");
+  });
+
+  it("InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる.", async () => {
+    testNoParamsError(InvalidOptions  , "The value of the specified options(PARAM) is invalid.", { name: "PARAM"});
+    logger.log(`InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる. => OK`)
+  });
+
+  it("ロックコールバックでエラーになったとき", async () => {
+    let mon: Monitor = { cancelled: false };
+    try {
+      await FileLock.withLock(
+        'testKey_8131',
+        (monitor: Monitor) => {
+          mon = monitor;
+          throw new Error("Callback error!");
+        }
+      );
+    }
+    catch (err) {
+      expect(mon?.cancelled).toBeTruthy();
+    }
+
+  });
+
+  it("リエントラントロックコールバックでエラーになったとき", async () => {
+    let mon1: Monitor = { cancelled: false };
+    let mon2: Monitor = { cancelled: false };
+    expect.assertions(4);
+    try {
+      await FileLock.withLock(
+        'testKey_18465',
+        async (monitor1: Monitor) => {
+          mon1 = monitor1;
+          await FileLock.withLock(
+            'testKey_18465',
+            (monitor2: Monitor) => {
+              mon2 = monitor2;
+              throw new Error("Reentrant callback error!");
+            },
+            { allowReentry: true }
+          );
+        }
+      );
+    }
+    catch (err) { // EREENTLOCK
+      expect(mon1?.cancelled).toBeTruthy();
+      expect(mon1?.reason).toBe('EREENTLOCK');
+      expect(mon2?.cancelled).toBeTruthy();
+      expect(mon2?.reason).toBe('EREENTLOCK');
+    }
+
   });
 
 });

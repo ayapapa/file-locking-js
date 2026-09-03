@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockUserOptions, InvalidOptions } from '../src/index';
+import { FileLock, FileLockUserOptions, FileLockUserOptionsResolver, InvalidOptions } from '../src/index';
 import { AnyCnameRecord } from 'node:dns';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { LockError } from '../src/lib/LockBaseErrors';
 
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -17,7 +18,7 @@ interface TestOpts {
   _resolvedOpts?: FileLockUserOptions
 };
 
-describe('FileLock', () => {
+describe('FileLockUserOptions test.', () => {
 
   function testToBeSameAsTheDefaultOptions(opts: FileLockUserOptions): void {
     // Check basic options
@@ -247,5 +248,97 @@ describe('FileLock', () => {
     await testTypeErrorOption('retriesOnIOErr', 'string');
   });
 
+  function testNullKindValueOption(key: keyof FileLockUserOptions, value: undefined | null) {
+    const options: FileLockUserOptions = {};
+    // テストのため強制型キャスト
+    options[key] = value as any;
+    expect(() => new FileLockUserOptionsResolver(options)).toThrow(InvalidOptions);
+  }
+
+  it("undefinedやnullを指定すると、エラーになる(timeoutSec).", async () => {
+    testNullKindValueOption('timeoutSec', null);
+    testNullKindValueOption('timeoutSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(timeoutMs).", async () => {
+    testNullKindValueOption('timeoutMs', null);
+    testNullKindValueOption('timeoutMs', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(ttlSec).", async () => {
+    testNullKindValueOption('ttlSec', null);
+    testNullKindValueOption('ttlSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(ttlMs).", async () => {
+    testNullKindValueOption('ttlMs', null);
+    testNullKindValueOption('ttlMs', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(allowReentry).", async () => {
+    testNullKindValueOption('allowReentry', null);
+    testNullKindValueOption('allowReentry', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(pollIntervalSec).", async () => {
+    testNullKindValueOption('pollIntervalSec', null);
+    testNullKindValueOption('pollIntervalSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(pollIntervalMs).", async () => {
+    testNullKindValueOption('pollIntervalMs', null);
+    testNullKindValueOption('pollIntervalMs', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(heartbeatIntervalSec).", async () => {
+    testNullKindValueOption('heartbeatIntervalSec', null);
+    testNullKindValueOption('heartbeatIntervalSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(heartbeatIntervalMs).", async () => {
+    testNullKindValueOption('heartbeatIntervalMs', null);
+    testNullKindValueOption('heartbeatIntervalMs', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(heartbeatTimeoutSec).", async () => {
+    testNullKindValueOption('heartbeatTimeoutSec', null);
+    testNullKindValueOption('heartbeatTimeoutSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(heartbeatTimeoutMs).", async () => {
+    testNullKindValueOption('heartbeatTimeoutMs', null);
+    testNullKindValueOption('heartbeatTimeoutMs', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(retriesOnIOErr).", async () => {
+    testNullKindValueOption('retriesOnIOErr', null);
+    testNullKindValueOption('retriesOnIOErr', undefined);
+  });
   
+  it("undefinedやnullを指定すると、エラーになる(retryIntervalSec).", async () => {
+    testNullKindValueOption('retryIntervalSec', null);
+    testNullKindValueOption('retryIntervalSec', undefined);
+  });
+
+  it("undefinedやnullを指定すると、エラーになる(retryIntervalMs).", async () => {
+    testNullKindValueOption('retryIntervalMs', null);
+    testNullKindValueOption('retryIntervalMs', undefined);
+  });
+
+  it("解決済のoptionを変更して、再度解決すると、その結果が正しく反映されている.", async () => {
+    const options: FileLockUserOptions & {[_resolvedOpts: string]: FileLockUserOptions} = {};
+    const rOpts = new FileLockUserOptionsResolver(options).getOptions();
+    options.allowReentry = true;
+    const rOpts2 = new FileLockUserOptionsResolver(options).getOptions()
+    expect(rOpts2.allowReentry).toBe(options.allowReentry);
+    expect('_resolvedOpts' in options ? options._resolvedOpts?.allowReentry : 'error').toBe(options.allowReentry);
+  });
+
+  //FileLockUserOptionsResolver
+/*
+  it("An `InvalidOptions` error occurs when an option value of a different type is specified(retriesOnIOErr).", async () => {
+    await testTypeErrorOption('retriesOnIOErr', 'string');
+  });
+*/
+
 });

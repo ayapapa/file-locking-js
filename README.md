@@ -12,11 +12,8 @@ npm install @ayapapa-npm/file-locking-js
 ```
 
 # Features
-* **From a user interface perspective, this is a `Key`-based locking system.** <br>
+* **`Key`-based locking system.** <br>
 Internally, it creates a `File` associated with the specified `Key` within a directory defined in the `Config`; once the `Callback` associated with that `Key` completes execution, the file is deleted. If a request is made for a lock using the same `Key` while that file still exists—indicating the lock is active—the system waits for the lock to be released (i.e., for the file to be deleted) before proceeding with the operation.
-* **A highly reliable and user-friendly mechanism for inter-process mutual exclusion.**<br>
-This implementation leverages the robust and widely used `proper-filelock` library as the foundation for its locking mechanism. <br>
-Specifically, it uses the library to lock a file that stores lock information, releasing the lock once the callback function—intended to run while the lock is held—has completed. The introduction of this lock-information file enables several key features, resulting in a highly reliable and user-friendly mechanism for inter-process mutual exclusion.
 * **Features a simple and safe user interface.** <br>
 Users simply call it like this:
   ```js
@@ -48,7 +45,8 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   );
   console.log(ret); // "The operation is completed.";
   ```
-  **Note: It is not mandatory to interrupt the process when monitor.cancelled is true.**
+  Note1: It is not mandatory to interrupt the process when monitor.cancelled is true.<br>
+  Note2: If `options.allowReentry` is true and a reentrant lock is acquired, the `monitor` passed to the initial lock operation (callback) is shared with the subsequent one.
 
 
 # Configuration

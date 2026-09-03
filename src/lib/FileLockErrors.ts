@@ -1,4 +1,4 @@
-import { LockError, AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded, type LockErrorProps } from './LockBaseErrors.ts';
+import { LockError, AlreadyLocked, DeadlockDetected, InvalidOptions, TTLExceeded, type LockErrorProps } from './LockBaseErrors.ts';
 
 /**
  * Basic lock handling error. 
@@ -82,4 +82,4 @@ export class LockCompromised extends FileLockError {
     }
 }
 
-export { AlreadyLocked, CallStack, DeadlockDetected, InvalidOptions, TTLExceeded };
+export { AlreadyLocked, DeadlockDetected, InvalidOptions, LockError , TTLExceeded };

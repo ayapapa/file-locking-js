@@ -332,7 +332,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @return A Promise that resolves with the return value of onLockFn.
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}): Promise<any> {
-    REQUIRE(Boolean(key), 'Must specify `key`.', FileLockError, { code: 'EINVAL' });
+    REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { code: 'EINVAL' });
     // Resolve options.  If userDefaultOptions is specified in the config, it will be used as the default options.
     const defaultOpts = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
     const rOpt = new FileLockUserOptionsResolver(options, defaultOpts).getOptions();
@@ -550,7 +550,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @return A Promise that resolves with the return value of onLockFn.
    */
   private async withLock(onLockFn: CallbackOnLock, options: AllOptions): Promise<any> {
-    REQUIRE_DEBUG(Boolean(options._resolvedOpts), "The option remains unresolved.", InvalidOptions, { props: options });
+    REQUIRE_DEBUG(Boolean(options._resolvedOpts), "The option remains unresolved.", InvalidOptions, { name: 'options', props: options });
 
     this._prepare(options);
 
