@@ -43,7 +43,7 @@ describe('FileLock', () => {
         {timeoutMs: 1000}
       );
     }
-    catch (err: any) {
+    catch (err) {
       expect(err instanceof AlreadyLocked).toBe(true);
     }
     finally {

@@ -25,11 +25,11 @@ class LockDirectoryAccessFailed extends FileLockError {
    * @param code  Error code string.
    * @param params  Parameters.
    */
-  constructor(fsErrorMsg: string | null, operation: string, code: string, params?: {path?: string, props?: LockErrorProps }) {
+  constructor(fsErrMsg: string | null, operation: string, code: string, params?: {path?: string, props?: LockErrorProps }) {
     const path = params?.path;
     const props = { ...params?.props };
     if (path != null) props.path = path;
-    if (fsErrorMsg != null) props.fsErrorMsg = fsErrorMsg;
+    if (fsErrMsg != null) props.fsErrMsg = fsErrMsg;
     super(`Failed to ${operation} the lock information storage directory${path ? '('+path+')' : ""}.`, { code , props });
   }
 }
@@ -40,11 +40,11 @@ class LockDirectoryAccessFailed extends FileLockError {
 export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
-   * @param fsErrorMsg   fs's error message.
+   * @param fsErrMsg   fs's error message.
    * @param params  Parameters.
    */
-  constructor(fsErrorMsg: string | null, params?: {path?: string, props?: LockErrorProps }) {
-    super(fsErrorMsg, 'check the status of', 'ELOCKDIRSTAT', params);
+  constructor(fsErrMsg: string | null, params?: {path?: string, props?: LockErrorProps }) {
+    super(fsErrMsg, 'check the status of', 'ELOCKDIRSTAT', params);
   }
 }
 
@@ -76,7 +76,7 @@ export class LockCompromised extends FileLockError {
     const props = { ...params?.props };
     if (key) props.key = key;
     super(
-      `The lock${key ? '(key: ' + key + ')' : ""} has been compromised. ${reason ?? ''}`,
+      `The lock${key ? '(key: ' + key + ')' : ""} has been compromised${reason ? '(' + reason +')' : ''}.`,
       {code: `ECOMPROMISED`, props }
     );
     }

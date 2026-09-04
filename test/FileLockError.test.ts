@@ -1,8 +1,13 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, DeadlockDetected, FileLock, FileLockError, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles, TestLock  } from './FileLockTestCommon.ts';
+import { AlreadyLocked, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('FileLock', () => {
 
@@ -190,9 +195,9 @@ describe('FileLock', () => {
         callbackCompleted('Completed');
       },
       (err) => {
-        expect(err instanceof LockCompromised).toBeTruthy();
+        expect(err).instanceOf(LockCompromised);
         expect(err.code).toBe('ECOMPROMISED');
-        expect(err.message.includes("has been compromised.")).toBeTruthy();
+        expect(err.message).contains("has been compromised");
       },
       () => removeLockFiles(key)
     );
@@ -244,9 +249,9 @@ describe('FileLock', () => {
         }
       },
       (err) => {
-        expect(err instanceof LockCompromised).toBeTruthy();
+        expect(err).instanceOf(LockCompromised);
         expect(err.code).toBe('ECOMPROMISED');
-        expect(err.message.includes("has been compromised.")).toBeTruthy();
+        expect(err.message).contains("has been compromised");
       },
       () => removeLockFiles(key)
     );
@@ -270,7 +275,7 @@ describe('FileLock', () => {
         expect(monitor.reason).toBe('ETTLEXCEEDED');
         callbackCompleted('Completed.')
       },
-      (err) => expect(err instanceof TTLExceeded).toBeTruthy()
+      (err) => expect(err).instanceOf(TTLExceeded)
     );
   });
 
@@ -294,11 +299,31 @@ describe('FileLock', () => {
   it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(InvalidOptions).", async () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options is invalid.");
   });
+  
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(DeadlockDetected).", async () => {
+    testNoParamsError(DeadlockDetected  , "A deadlock was detected.");
+  });
+
+  //LockDirectoryAccessFailed 
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockDirectoryStatFailed).", async () => {
+    testNoParamsError(LockDirectoryStatFailed  , "Failed to check the status of the lock information storage directory.");
+  });
+
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockDirectoryCreationFailed).", async () => {
+    testNoParamsError(LockDirectoryCreationFailed  , "Failed to create the lock information storage directory.");
+  });
+
+  //LockCompromised 
+  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockCompromised).", async () => {
+    testNoParamsError(LockCompromised  , "The lock has been compromised.");
+  });
+
 
   it("InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる.", async () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options(PARAM) is invalid.", { name: "PARAM"});
     logger.log(`InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる. => OK`)
   });
+  
 
   it("ロックコールバックでエラーになったとき", async () => {
     let mon: Monitor = { cancelled: false };
@@ -320,7 +345,7 @@ describe('FileLock', () => {
   it("リエントラントロックコールバックでエラーになったとき", async () => {
     let mon1: Monitor = { cancelled: false };
     let mon2: Monitor = { cancelled: false };
-    expect.assertions(4);
+    expect.assertions(6);
     try {
       await FileLock.withLock(
         'testKey_18465',
@@ -338,12 +363,72 @@ describe('FileLock', () => {
       );
     }
     catch (err) { // EREENTLOCK
+      expect(err).instanceOf(Error);;
+      expect(mon1).toBe(mon2);
       expect(mon1?.cancelled).toBeTruthy();
-      expect(mon1?.reason).toBe('EREENTLOCK');
-      expect(mon2?.cancelled).toBeTruthy();
-      expect(mon2?.reason).toBe('EREENTLOCK');
+      expect(mon1?.reason).toBe('ECALLBACK');
+      expect(mon1?.operation).contains("Re-entrant locking callback.");
+      expect(mon1?.cause).toBe(err);
     }
+  });
 
+  it("リエントラントロックコールバックでエラーになったとき2(エラー以外を投げる)", async () => {
+    let mon1: Monitor = { cancelled: false };
+    let mon2: Monitor = { cancelled: false };
+    expect.assertions(6);
+    try {
+      await FileLock.withLock(
+        'testKey_18465',
+        async (monitor1: Monitor) => {
+          mon1 = monitor1;
+          await FileLock.withLock(
+            'testKey_18465',
+            (monitor2: Monitor) => {
+              mon2 = monitor2;
+              throw "Reentrant callback error!";
+            },
+            { allowReentry: true }
+          );
+        }
+      );
+    }
+    catch (err) {
+      expect(err).contains("Reentrant callback error!");
+      expect(mon1).toBe(mon2);
+      expect(mon1?.cancelled).toBeTruthy();
+      expect(mon1?.reason).toBe('ECALLBACK');
+      expect(mon1?.operation).contains("Re-entrant locking callback.");
+      expect(mon1?.cause).toBe(err);
+    }
+  });
+
+  it("リエントラントロック処理中にファイル読み込みエラー発生", async () => {
+    const key = 'testKey_18465x'
+    expect.assertions(4);
+    try {
+      await FileLock.withLock(
+        key,
+        async (monitor1: Monitor) => {
+          //vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
+          vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error("readFileSync error!"), { code: 'ERMOON' }); });
+
+          await FileLock.withLock(
+            key,
+            (monitor2: Monitor) => { },
+            { allowReentry: true }
+          );
+        }
+      );
+    }
+    catch (err) { // EREENTLOCK
+      if (err instanceof Error) {
+        expect(err).instanceOf(FileLockError);
+        expect(err.message).contains(`Couldn't read the lock information storage file.(readFileSync error!)`);
+        expect('code' in err && err.code).toBe('ERMOON');
+        const metaPath = TestLock.getLockMetaFilePath(key);
+        expect('file' in err && err.file).contains(metaPath);
+      }
+    }
   });
 
 });

@@ -1,21 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-
-//import pLockfile from 'proper-lockfile';
-// Define proper-lockfile's withLock
-/*
-const PLockFile = {
-  withLock(file: string, cb: () => void, opts: plockfile.LockOptions) {
-    plockfile.lockSync(file, opts);
-    try {
-      return cb();
-    }
-    finally {
-      plockfile.unlockSync(file, opts);
-    }
-  }
-}
-*/
 import { LRUCache } from 'lru-cache';
 import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
 import { Contracts } from '@ayapapa-npm/contracts-js';
@@ -27,80 +11,20 @@ const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 // const REQUIRE_DEBUG = (isOk: boolean | (() => boolean), msg: string, ErrorClass: new(...args: unknown[]) => Error,  eParams?: Record<string, unknown>, eProps?: Record<string, unknown>) => 
   
 
-import { LockBase, getCallStack, sleepAsync, sleepSync, type CallbackOnLock, type BaseConfig, type LogProvider, type Monitor } from "./LockBase.ts";
+import { LockBase, getCallStack, sleepAsync, sleepSync, type CallbackOnLock } from "./LockBase.ts";
 import { FileLockUserOptions } from './FileLockUserOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockUserOptionsResolver, typedKeys } from "./FileLockUserOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
-//import { Cipheriv } from 'node:crypto';
+import { type FileLockConfig as Config } from './FileLockConfig.ts';
+import { type LogProvider } from './LockBaseConfig.ts';
 
-type AllOptions = AllOptionsT<FileLockUserOptions, FileLockInternalState>;
-
-/**
- * FileLock cofiguration. 
+/** 
+ * @ internal
+ * All options type.
  */
-export interface Config extends BaseConfig {
-  /**
-   * Specifies the directory path to stored locking imformations.
-   * If it has been specified, use this as the top priority.
-   * The directory is determined based on the following order of priority:<br>
-   *  1. Specified via an `Config` (user's explicit intent)
-   *  2. `process.cwd()` (current working directory at runtime)
-   * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.
-   */
-  lockDirectory?: string | null;
-
-  /** 
-   * Whether to enable caching for FileLock instances associated with a key.
-   * Default is `true`.
-   */
-  cache?: boolean;
-
-  /**
-   * Maximum number that can be cached. 
-   * `0` means `cache` is disabled, even if `cache` is true.
-   * Default is `100`.
-   */
-  cacheMaxNum?: number;
-
-  /**
-   * Cache expiration time (milliseconds). 
-   * Default is `50000`.
-   */
-  cacheTtlMs?: number;
-
-  /**
-   * User default options used with `withLock()`.
-   * Default is the return value of `FileLock.getDefaultOptions()`.. 
-   */
-  userDefaultOptions?: FileLockUserOptions;
-
-  /**
-   * Whether to keep a history of lock information.
-   * If set to `true`, a history of lock information will be saved in a file named `history.json` in the lock directory.
-   * Default is `false`.
-   */
-  history?: boolean;
-
-  /**
-   * Maximum number of history entries to keep.
-   * If the number of entries exceeds this value, the oldest entries will be deleted in order.
-   * Default is `100`.
-   */
-  maxHistoryEntries?: number;
-
-  /**
-   * @internal
-   * Indicates whether to execute in debug mode.
-   * If `true`, process-related information is added to the lock information file, 
-   * and history tracking is enabled.
-   * This is a debug flag for this class and is intended for use only during development.
-   * However, if an external logger is injected, it cannot be controlled; 
-   * please adjust the log level yourself as necessary.
-   */
-  _debug?: boolean;
-}
+type AllOptions = AllOptionsT<FileLockUserOptions, FileLockInternalState>;
 
 /**
  * @internal 
@@ -108,22 +32,29 @@ export interface Config extends BaseConfig {
  */
 interface LockMetaData {
   /** Lock execution owner ID. */
-  ownerId: string
+  ownerId: string,
+
   /** ID of the process executing the lock. */
-  processId: number,
+  processId?: number,
+
   /** ID of the parent process of the lock-executing process. */
   parentProcessId?: number,
+
   /** An array containing the command-line arguments passed when the Node.js process was launched.  */
   processArgv?: string[],
+
   /** Lock expiration time. */
   expirationTime: number,
+
   /** 
    * The valid duration since the last heartbeat.
    * Exceeding this limit is one of the factors used to determine that the lock is invalid.
    */
   heartbeatTimeoutMs: number,
+
   /** The last heartbeat time. */
   lastHeartbeatAt: number,
+
   /** Lock counter.
    * A value that increments or decrements when re-entrant locking is permitted. 
    */
@@ -239,15 +170,12 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   static #config: Config = FileLock.getDefaultConfig();
 
-  
-  /** Whether or not initialization has been performed. */
-  static #initialized: boolean = false;
-
   /**
+   * @internal
    * FileLock instance cache associated with a key. 
    * Uses `LRUCache`, providing features to set a maximum cache size and prune (remove) infrequently accessed elements.
    */
-  private static cache: LRUCache<string, FileLock> | null;
+  static #cache: LRUCache<string, FileLock> | null;
 
 
   /** 
@@ -257,7 +185,6 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   /** Initialize. */
   public static initialize() {
     FileLock.resetConfig();
-    FileLock.#initialized = true;
   }
 
   /**
@@ -280,20 +207,22 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     // Clear chache
     FileLock.clearCache();
 
-    const cacheMaxNum = FileLock.#config.cacheMaxNum ?? FileLock.#defaultCacheMaxNum;
-    if (cacheMaxNum === 0) FileLock.#config.cache = false;
+    FileLock.#config.cacheMaxNum = FileLock.#config.cacheMaxNum ?? FileLock.#defaultCacheMaxNum;
+    if (FileLock.#config.cacheMaxNum === 0) FileLock.#config.cache = false;
 
-    // If cache is enabled, (Re)create cache.
+    FileLock.#config.cacheTtlMs = FileLock.#config.cacheTtlMs ?? FileLock.#defaultCacheTtlMs;
+
+        // If cache is enabled, (Re)create cache.
     if (FileLock.#config.cache) {
       const opts: LRUCache.Options<string, FileLock, unknown> = {
-        max: cacheMaxNum,
-        ttl: FileLock.#config.cacheTtlMs ?? FileLock.#defaultCacheTtlMs,
+        max: FileLock.#config.cacheMaxNum,
+        ttl: FileLock.#config.cacheTtlMs,
       };
-      FileLock.cache = new LRUCache<string, FileLock>(opts);
+      FileLock.#cache = new LRUCache<string, FileLock>(opts);
     }
     // or set null to chache.
     else {
-      FileLock.cache = null;
+      FileLock.#cache = null;
     }
 
   }
@@ -305,7 +234,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   /** GEt current `Config`. */
   public static getConfig(): Config {
-    return FileLock.#copyConfig(FileLock.#config || FileLock.getDefaultConfig());
+    return FileLock.#copyConfig(FileLock.#config);// || FileLock.getDefaultConfig());
   }
 
   /** Get default `Config`. */
@@ -337,7 +266,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const defaultOpts = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
     const rOpt = new FileLockUserOptionsResolver(options, defaultOpts).getOptions();
     FileLock._lastOptions = rOpt;
-    return FileLock.getLock(key).withLock(onLockFn, rOpt);
+    return FileLock._getLock(key).withLock(onLockFn, rOpt);
   }
 
   /**
@@ -358,45 +287,64 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   /** Clear `lock` instance cache. */
   public static clearCache() {
-    if (FileLock.cache) FileLock.cache.clear();
+    const cache = FileLock._getCache();
+    if (cache) cache.clear();
   }
 
   /**
-   * Get `lock` instance.
+   * @internal
+   * Get `lock` instance. <br>
+   * It is set to `private` for testing purposes.
    * @param key Lock key. 
    */
-  private static getLock(key: string): FileLock {
+  private static _getLock(key: string): FileLock {
     if (FileLock.#hasCache(key)) {
-      return FileLock.cache?.get(key) as FileLock;
+      // Since its existence has been confirmed, I will type-cast it.
+      return FileLock._getCache()?.get(key) as FileLock;
     }
     const lock = new FileLock(key);
     FileLock.#setCache(key, lock);
     return lock;
   }
+  
+  /**
+   * @internal
+   * It is set to `private` for testing purposes.
+   */
+  private static _getCache(): LRUCache<string, FileLock> | null {
+    return FileLock.#cache;
+  }
 
   /**
-   * Get a directory path for storing files containing lock information.
-   * If it has been specified, use this as the top priority.
+   * @internal
+   * Get a directory path for storing files containing lock information.<br>
+   * If it has been specified, use this as the top priority.<br>
    * The directory is determined based on the following order of priority:<br>
    *  1. Specified via an `Config` (user's explicit intent)
    *  2. `process.cwd()` (current working directory at runtime)
-   * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.
+   * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.<br>
+   * It is set to `private` for testing purposes.
    * @returns A directory path for storing files containing lock information.
    */
-  private static getLockDirPath() {
+  private static _getLockDirPath() {
     const existsDir = (name: string): boolean => {
+      let stat;
       try {
-        const stat = fs.statSync(name);
-        if (stat.isDirectory()) return true;
-        throw Object.assign(new Error(`'${name}' is not a directory.`), { code: 'ENOTDIR' });
+        stat = fs.statSync(name);
       }
       catch (err) {
-        if (err instanceof Error) {
-          const code =  'code' in err ? err.code : null;
-          if (code === 'ENOENT') return false;
-          throw new LockDirectoryStatFailed(err.message, { path: name, props: { fsErrorCode: code } } );
-        };
-        return false;
+        // fs.statSync()は、例外のみ投げるので、Errorに型キャストする
+        const e = err as Error;
+        const code = 'code' in e && String(e.code);
+        if (code === 'ENOENT') return false;
+        throw new LockDirectoryStatFailed(e.message, { path: name, props: { fsErrCode: code } } );
+      }
+      
+      if (stat.isDirectory()) {
+        return true
+      }
+      else {
+        throw Object.assign(new FileLockError(`'${name}' is not a directory.`), { code: 'ENOTDIR' });
       }
     }
 
@@ -405,7 +353,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
         fs.mkdirSync(name,  { recursive: true });
       }
       catch (err: any) {
-        throw new LockDirectoryCreationFailed(err.message, { path: name, props: { path: name, fsErrorCode: err.code } });
+        throw new LockDirectoryCreationFailed(err.message, { path: name, props: { path: name, fsErrCode: err.code } });
       }
     }
 
@@ -441,23 +389,30 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   }
 
   /**
+   * @internal
    * Whether the instance corresponding to `key` is cached. 
    * @param key Lock key. 
    */
   static #hasCache(key: string): boolean {
-    return FileLock.cache != null && FileLock.cache.has(key);
+    const cache = FileLock._getCache();
+    return Boolean(cache && cache.has(key));
   }
 
   /**
+   * @internal
    * Whether the instance corresponding to `key` is cached. 
    * @param key   Lock key. 
    * @param lock  Lock instance. 
    */
   static #setCache(key: string, lock: FileLock): void  {
-    if (FileLock.cache) FileLock.cache.set(key, lock);
+    const cache = FileLock._getCache();
+    if (cache) cache.set(key, lock);
   }
 
-  /** Copy config. */
+  /**
+   * @internal
+   * Copy config. 
+   */
   static #copyConfig(config: Config): Config {
     const ret = { ...config };
     if (config.userDefaultOptions) ret.userDefaultOptions = { ...config.userDefaultOptions };
@@ -469,10 +424,16 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * Instance fields.
    */
 
-  /** Heartbeat timer id */
+  /**
+   * @internal
+   * Heartbeat timer id 
+   */
   #heartbeatTimer?: NodeJS.Timeout | null;
 
-  /** Whether or not it is released */
+  /**
+   * @internal
+   * Whether or not it is released
+   */
   #released: boolean = true;
 
 
@@ -481,7 +442,8 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
 
   /**
-   * Creates a FileLock instance.
+   * @internal
+   * Creates a FileLock instance. <br>
    * @param {string}  key Locking key.
    * @internal
    */
@@ -490,18 +452,20 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   }
 
   /**
+   * @internal
    * Increment lock counter.
    * @param options 
    */
   protected override _incReantryCount(options: AllOptions) {
     const meta = this.#getInfo(options);
-    options.ownerId =  options.ownerId || meta.ownerId;
-    meta.counter = meta.counter || 0;
+    options._ownerId =  options._ownerId || meta.ownerId;
+    meta.counter = meta.counter;
     meta.counter++;
     this.#updateInfo(options, meta);
   }
 
   /**
+   * @internal
    * Decrement lock counter.
    * And, when the counter becomes '0', release lock.
    * @param options 
@@ -510,13 +474,13 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     let meta;
     try {
       meta = this.#getInfo(options);
-      if (options.ownerId === meta.ownerId) {
-        if (meta.counter > 0) meta.counter--;
+      if (options._ownerId === meta.ownerId && meta.counter > 0) {
+        meta.counter--;
         this.#updateInfo(options, meta);
       }
     }
     catch (err) {
-      this._onError(err, 'getInfo', options);
+      this._onError(err, 'FileLock.#getInfo()', options);
       this.#actuallyRelease(options);
       throw err;
     }
@@ -531,13 +495,13 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
   protected override _prepare(options: AllOptions): void {
     super._prepare(options);
-    if (FileLock.#initialized !== true) FileLock.initialize(); // Just in case
-    const dirPath     = FileLock.getLockDirPath();
+    const dirPath     = FileLock._getLockDirPath();
     const fileDir     = path.join(dirPath, this._key);
-    options.filePath     = path.join(fileDir, 'meta.json');
-    options.contextId    = options.filePath;  // Use the file path as the context ID 
+    options._filePath     = path.join(fileDir, 'meta.json');
+    options._contextId    = options._filePath;  // Use the file path as the context ID 
                                               // to avoid issues caused by changes 
                                               // to the lock directory configuration.
+    options._historyFile = path.join(dirPath, 'history.json');
   }
 
   /**
@@ -563,23 +527,25 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
         // Create TTL timer
         let ttlTimeoutId: NodeJS.Timeout;
+        const ttlMs = opts.ttlMs || LockBase._defaultTtlMs;
         const timeoutPr = new Promise((_, reject) => {
           ttlTimeoutId = setTimeout(() => {
-            reject(new TTLExceeded(null, { ttlMs: opts.ttlMs || LockBase._defaultTtlMs, props: { key: this._key, file: opts.filePath } }));
+            reject(new TTLExceeded(null, { ttlMs, props: { key: this._key, file: opts._filePath } }));
           },
-          opts.ttlMs);
+          ttlMs);
         });
 
         // A race between callback processing and the TTL timer.
         try {
           return await Promise.race([cb(), timeoutPr])
             .finally(() => { // In any case, turn off the timer.
-              if (ttlTimeoutId !== undefined) clearTimeout(ttlTimeoutId);
+              // Avoid if statements as a measure against coverage issue
+              ttlTimeoutId && clearTimeout(ttlTimeoutId);
             }
           );
         }
         catch (err) {
-          this._onError(err, 'Callback or Timer in withLock()', opts);
+          this._onError(err, 'Callback or Timer in withLock()', opts, 'ECALLBACK');
           throw err;
         }
         finally {
@@ -600,11 +566,12 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
   async #acquire(options: AllOptions): Promise<void> {
     const start = Date.now();
     const timeoutTime = start + (options.timeoutMs || LockBase._defaultTimeoutMs);
+    const pollIntervalMs = options.pollIntervalMs || FileLock.#defaultPollIntervalMs;
     while (!this.#tryLock(options)) {
       if (Date.now() >= timeoutTime) {
-        throw new AlreadyLocked('', {key: this._key, props: { file: options.filePath } });
+        throw new AlreadyLocked('', {key: this._key, props: { file: options._filePath } });
       }
-      await sleepAsync(options.pollIntervalMs || FileLock.#defaultPollIntervalMs);
+      await sleepAsync(pollIntervalMs);
     }
   }
 
@@ -622,16 +589,17 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     this.#updateInfo(
       options,
       {
-        ownerId: options.ownerId = ownerId,
+        ownerId: options._ownerId = ownerId,
+        /*
         processId: process.pid,
         parentProcessId: process.ppid,
         processArgv: process.argv,
+        */
         expirationTime: Date.now() + ttlMs,
         heartbeatTimeoutMs: heartbeatTimeoutMs,
         lastHeartbeatAt: Date.now(),
         counter: 1
       },
-      true
     );
   }
 
@@ -661,7 +629,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     if (this.#released === false) return false;
 
     try {
-      const dir = path.dirname(options.filePath);
+      const dir = path.dirname(options._filePath);
       if (fs.existsSync(dir)) {
         const meta = this.#getInfoIfExists(options); // ロック情報ファイルがあるかどうかを確認する。なければ、ロック可能。
         if (meta === null) { // Found a directory that does not contain lock information.
@@ -682,9 +650,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     }
     catch (err) {
       // 予期せぬファイル破壊等（LockCompromisedエラー）については、エラーとする。
-      if (err instanceof LockCompromised) {
-        throw err;
-      }
+      if (err instanceof LockCompromised) throw err;
       // それ以外のエラーならロック中とみなし、呼び出し側のretryを誘う。
       return false;
     }
@@ -781,10 +747,10 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     catch (err) {
       return;
     }
-    if (meta.ownerId !== options.ownerId) return; // It's compromised, so do not release it.
+    if (meta.ownerId !== options._ownerId) return; // It's compromised, so do not release it.
 
     // Remove.
-    const dir = path.dirname(options.filePath)
+    const dir = path.dirname(options._filePath)
     return fs.existsSync(dir) && this.#accessInfo(
       dir,
       () => fs.rmSync(dir, { recursive: true, force: true }),
@@ -804,10 +770,10 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
     this.#stopHeartbeat()
 
-    //pLockfile.unlockSync(options.filePath);
+    //pLockfile.unlockSync(options._filePath);
 
     //delete options.release;
-    options.ownerId = null;
+    options._ownerId = null;
     //this.ownerId = null;
     this.#released = true;
   }
@@ -820,8 +786,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param options   Options.
    * @param errMsg    If error, a message to pass to `Error class`.
    */
-  #accessInfo(name: string, methodCb: () => any, options: AllOptions, errMsg: string | null = null): any {
+  #accessInfo(name: string, methodCb: () => any, options: AllOptions, errMsg: string): any {
     let retries = (options.retriesOnIOErr || FileLock.#defaultRetriesOnIOErr) + 1;
+    const retryIntervalMs = options.retryIntervalMs || FileLock.#defaultRetryIntervalMs;
     while (retries >= 0) {
       try {
         return methodCb();
@@ -835,7 +802,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
       }
       catch (err: any) {
         if (retries--) {
-          sleepSync(options.retryIntervalMs || FileLock.#defaultRetryIntervalMs);
+          sleepSync(retryIntervalMs);
           continue;
         }
         /*
@@ -843,7 +810,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
           throw new AlreadyLocked('', { key: this._key, props: { file: name } });
         }
         */
-        errMsg = errMsg || `An access error occurred for the lock information storage file.`;
+        //errMsg = errMsg || `An access error occurred for the lock information storage file.`;
         throw new FileLockError(`${errMsg}(${err.message})`, {code: err.code, props: { file: name } });
       }
     }
@@ -856,7 +823,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @returns null if not exist, or the contents as object.
    */
   #getInfoIfExists(options: AllOptions): LockMetaData | null {
-    if (!fs.existsSync(options.filePath)) {
+    if (!fs.existsSync(options._filePath)) {
       return null;
     }
      return this.#getInfo(options);
@@ -870,39 +837,64 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @returns Lock information object.
    */
   #getInfo(options: AllOptions): LockMetaData {
-    if (!fs.existsSync(options.filePath)) {
-      throw new LockCompromised('The lock information storage file does not exist.', {key: this._key, props: { file: options.filePath } });
+    if (!fs.existsSync(options._filePath)) {
+      throw new LockCompromised('The lock information storage file does not exist.', {key: this._key, props: { file: options._filePath } });
     }
 
     const contents = this.#accessInfo(
-      options.filePath,
-      () => fs.readFileSync(options.filePath), 
+      options._filePath,
+      () => fs.readFileSync(options._filePath), 
       options, 
-      `Couldn't read the lock information storage file..`
+      `Couldn't read the lock information storage file.`
     );
 
-    const meta: LockMetaData = contents ? JSON.parse(contents) : {};
+    let meta: LockMetaData;
+    try {
+      meta = JSON.parse(contents);
+    }
+    catch (err) {
+      throw new LockCompromised(
+        `Couldn't parse the lock information storage file, it is probably broken.`,
+        {key: this._key, props: { file: options._filePath, key: this._key, optionsOwnerId: options._ownerId } });
+    }
 
-    if(options.ownerId && options.ownerId !== meta.ownerId) {
+    if(options._ownerId && options._ownerId !== meta.ownerId) {
       const err = new LockCompromised(
         'The lock information storage file was overwritten by another lock.',
-        {key: this._key, props: { file: options.filePath, key: this._key, optionsOwnerId: options.ownerId, /*instanceId: this.ownerId, */lockFileOwnerId: meta.ownerId } });
+        {key: this._key, props: { file: options._filePath, key: this._key, optionsOwnerId: options._ownerId, lockFileOwnerId: meta.ownerId } });
       this._logger.error(err);
       throw err;
     }
 
     // Check contents.
-    const check = (key: keyof LockMetaData, type: string) => {
-      if (!(key in meta && typeof meta[key] === type)) {
-        throw new LockCompromised(`The lock information format is invalid.`, {key: this._key, props: { file: options.filePath } });
+    const check = (key: keyof LockMetaData, type: string | ((v: unknown) => boolean), optional: boolean = false) => {
+      // キーが存在するなら型チェック成功なら真
+      if (key in meta) {
+        if (
+          (typeof type === 'string' &&  typeof meta[key] === type) ||
+          (typeof type === 'function' && type(meta[key])         )
+        ) return true;
       }
+      // さもなくば、オプショナルなら真
+      if (optional) return true;
+   
+      // 条件未達のためエラー
+      throw new LockCompromised(`The lock information format is invalid(typeof '${key}' is invalid).`,
+        {key: this._key, props: { metaName: key, metaValue: meta[key], file: options._filePath } });
     };
 
     check("ownerId",             "string"); 
+    check("processId",           "number", true); 
+    check("parentProcessId",     "number", true); 
+    check("processArgv",         
+      (v) => Array.isArray(v) && v.every(val => typeof val === 'string'),
+      true
+    ); 
     check("expirationTime",      "number");
     check("heartbeatTimeoutMs",  "number");
     check("lastHeartbeatAt",     "number");
     check("counter",             "number");
+
     return meta;
   }
 
@@ -913,7 +905,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param meta      Lock information.
    * @param withLock  ロックするか否か。。。たぶん、今後不要！
    */
-  #updateInfo(options: AllOptions, meta: LockMetaData, withLock: boolean = true) {
+  #updateInfo(options: AllOptions, meta: LockMetaData) {
     // For debug
     if (this.#isDebug()) {
       Object.assign(
@@ -927,21 +919,16 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
       );
     }
     try {
-      if (!withLock) {
-        fs.writeFileSync(options.filePath, JSON.stringify(meta));
-      }
-      else {
-        this.#accessInfo(
-          options.filePath,
-          () => fs.writeFileSync(options.filePath, JSON.stringify(meta)),
-          options,
-          `Couldn't write the lock information storage file`
-        );
-      }
+      this.#accessInfo(
+        options._filePath,
+        () => fs.writeFileSync(options._filePath, JSON.stringify(meta)),
+        options,
+        `Couldn't write the lock information storage file`
+      );
     }
     catch (err: any) {
       if (err instanceof FileLockError === false) {
-        err = new FileLockError("Couldn't remove the lock information storage file", {code: err.code, props: { file: options.filePath } });
+        err = new FileLockError("Couldn't remove the lock information storage file", {code: err.code, props: { file: options._filePath } });
       } 
       throw err;
     }
@@ -959,7 +946,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
     const config = FileLock.getConfig();
     if (config.history !== true || this.#isDebug() === false) return;
     const entry = { meta, options };
-    const historyFile = path.join(FileLock.getLockDirPath(), 'history.json');
+    const historyFile = options._historyFile;
     const contents = fs.existsSync(historyFile) ? fs.readFileSync(historyFile, 'utf8') : null;
     let history: Record<string, { meta: LockMetaData, options: AllOptions }> = {};
     try {
@@ -991,4 +978,4 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 // Initialize
 FileLock.initialize();
 
-export { LogProvider, Monitor };
+export { Config };

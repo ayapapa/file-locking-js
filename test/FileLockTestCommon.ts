@@ -4,7 +4,7 @@ import { PrettyConsole, LogEntry } from '@ayapapa-npm/pretty-console-js';
 import * as Pino from 'pino'
 import { pino } from 'pino'
 
-import { FileLock, LogProvider } from '../src/index';
+import { FileLock, FileLockUserOptions, LogProvider } from '../src/index';
 
 export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -46,7 +46,7 @@ const onPrettyLog = ( logEntry: LogEntry ) => {
 export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace' });
 
 export function getLockMetaPath(key: string): string {
-  return path.join((FileLock as any).getLockDirPath(), key, 'meta.json');
+  return path.join(TestLock.getLockDirPath(), key, 'meta.json');
 }
 
 export const getLockMeta = (key: string) => {
@@ -62,8 +62,51 @@ export const setLockMeta = (key: string, meta: any) => {
 };
 
 export function removeLockFiles(key: string) {
-  const lockMetaPath = getLockMetaPath(key);
-  if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath);
+  const lockMetaPath = path.dirname(getLockMetaPath(key));
+  if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath, { recursive: true, force: true });
 }
+
+/**
+ * テスト用ロック。
+ * プライベートも利用するため、as anyを使用。
+ */
+export class TestLock extends (FileLock as any) {
+  constructor(lock?: FileLock) {
+    super("TestLock_Key");
+    Object.assign(this, lock);
+  }
+
+  static getLock(key: string): TestLock {
+    return new TestLock(super._getLock(key));
+  }
+
+  static getLockDirPath() {
+    return super._getLockDirPath();
+  }
+
+  static getLockMetaFilePath(key: string) {
+    return path.join(TestLock.getLockDirPath(), key, 'meta.json');
+  }
+
+  static getCache() {
+    return super._getCache();
+  }
+
+  static getCacheSize() {
+    return this.getCache().size;
+  }
+
+  getReentrantContext() {
+    return super._getReentrantContext();
+  }
+
+  async testWithLockEmptyOptions(cb: () => any): Promise<any> {
+    return super.withLock(cb, {});
+  }
+
+
+}
+
+
 
 FileLock.setConfig({ logger, history: true });

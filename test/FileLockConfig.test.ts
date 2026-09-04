@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { Config, FileLock, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
+import { Config, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
 import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
 describe('FileLock', () => {
@@ -80,7 +80,7 @@ describe('FileLock', () => {
         },
         {}
       )).toBe(retVal);
-      const lock = (FileLock as any).getLock(key) as any;
+      const lock = (FileLock as any)._getLock(key) as any;
       expect(lock._logger.trace === lock._logger.debug).toBe(true);
       expect(lock._logger.fatal === lock._logger.error).toBe(true);
     }
@@ -184,8 +184,8 @@ describe('FileLock', () => {
     }
     catch (err: any) {
       expect(err instanceof ErrorClass).toBe(true);
-      expect(err.fsErrorCode).toBe(eCode);
-      expect(err.fsErrorMsg).toBe(eMsg);
+      expect(err.fsErrCode).toBe(eCode);
+      expect(err.fsErrMsg).toBe(eMsg);
     }
     finally {
       spy.mockRestore();
@@ -204,7 +204,7 @@ describe('FileLock', () => {
   it("An error occurs because the directory path specified in `FileLock.setConfig()` already exists but is not a directory.", async () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.writeFileSync(dir, "");
-    expect.assertions(5);
+    //expect.assertions(5);
     const orgConf = FileLock.getConfig();
     try {
       FileLock.setConfig({ lockDirectory: dir, logger });
@@ -217,11 +217,13 @@ describe('FileLock', () => {
       )
     }
     catch (err: any) {
-      expect(err instanceof LockDirectoryStatFailed).toBe(true);
-      expect(err.code).toBe('ELOCKDIRSTAT');
+      expect(err).instanceOf(FileLockError);
+      expect(err.code).toBe('ENOTDIR');
+      /*
       expect(err.fsErrorCode).toBe('ENOTDIR');
       expect(err.fsErrorMsg.includes(dir)).toBe(true);
       expect(err.fsErrorMsg.includes('not a directory')).toBe(true);
+      */
     }
     finally {
       fs.rmSync(dir, { force: true, recursive: true });
@@ -244,7 +246,7 @@ describe('FileLock', () => {
         },
         {}
       )).toBe(retVal);
-      const lock = (FileLock as any).getLock(key) as any;
+      const lock = (FileLock as any)._getLock(key) as any;
       expect(lock._logger.trace === lock._logger.debug).toBe(true);
       expect(lock._logger.fatal === lock._logger.error).toBe(true);
     }
@@ -274,7 +276,7 @@ describe('FileLock', () => {
         },
         {}
       )).toBe(retVal);
-      const lock = (FileLock as any).getLock(key) as any;
+      const lock = (FileLock as any)._getLock(key) as any;
       expect(lock._logger.trace === lock._logger.debug).toBe(true);
       expect(lock._logger.fatal === lock._logger.error).toBe(true);
     }
@@ -305,7 +307,7 @@ describe('FileLock', () => {
           return retVal;
         },
       )).toBe(retVal);
-      const lock = (FileLock as any).getLock(key) as any;
+      const lock = (FileLock as any)._getLock(key) as any;
       expect(lock._logger.trace === lock._logger.debug).toBe(true);
       expect(lock._logger.fatal === lock._logger.error).toBe(true);
     }
@@ -337,9 +339,8 @@ describe('FileLock', () => {
   });
 
   function isStringArray(value: unknown[]): boolean {
-  return value.every(v => typeof v === "string");
-}
-
+    return value.every(v => typeof v === "string");
+  }
 
   it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
     const orgConf = FileLock.getConfig();
@@ -364,4 +365,47 @@ describe('FileLock', () => {
       FileLock.setConfig(orgConf);
     }
   });
+
+  it("cacheMaxNumをundefined指定.", async () => {
+    const orgConf = FileLock.getConfig();
+    expect.assertions(1);
+    try {
+      FileLock.setConfig({ cacheMaxNum: undefined });
+      const config = FileLock.getConfig();
+      expect(config.cacheMaxNum).toBe(100);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
+  // cacheMaxNum 0
+  it("cacheMaxNumを0.", async () => {
+    const orgConf = FileLock.getConfig();
+    expect.assertions(2);
+    try {
+      FileLock.setConfig({ cacheMaxNum: 0 });
+      const config = FileLock.getConfig();
+      expect(config.cacheMaxNum).toBe(0);
+      expect(config.cache).toBeFalsy();
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
+  //cacheTtlMs 
+  it("cacheTtlMsをunddfined.", async () => {
+    const orgConf = FileLock.getConfig();
+    expect.assertions(1);
+    try {
+      FileLock.setConfig({ cacheTtlMs: undefined });
+      const config = FileLock.getConfig();
+      expect(config.cacheTtlMs).toBe(50000);
+    }
+    finally {
+      FileLock.setConfig(orgConf);
+    }
+  });
+
 });

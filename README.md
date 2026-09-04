@@ -6,12 +6,12 @@ Inspired by existing Node.js file-locking implementations and developed to explo
 It enables the exclusive execution of operations—such as "resource access"—that require serialization across multiple processes.<br>
 Examples include limiting access to a specific service to a single process or thread at a time, or updating a document without interference from other processes.
 
-# Installation
+## Installation
 ```bash
 npm install @ayapapa-npm/file-locking-js
 ```
 
-# Features
+## Features
 * **`Key`-based locking system.** <br>
 Internally, it creates a `File` associated with the specified `Key` within a directory defined in the `Config`; once the `Callback` associated with that `Key` completes execution, the file is deleted. If a request is made for a lock using the same `Key` while that file still exists—indicating the lock is active—the system waits for the lock to be released (i.e., for the file to be deleted) before proceeding with the operation.
 * **Features a simple and safe user interface.** <br>
@@ -48,15 +48,18 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   Note1: It is not mandatory to interrupt the process when monitor.cancelled is true.<br>
   Note2: If `options.allowReentry` is true and a reentrant lock is acquired, the `monitor` passed to the initial lock operation (callback) is shared with the subsequent one.
 
+## API Reference
+[API document](docs/api.md)
 
-# Configuration
+## Configuration
 
 
-# Options
+## Options
 
 
-# Usage
+## Usage
   ```js
+  // Global default options (if necessary)
   const defaultOptions = FileLock.getDefaultOptions();
   defaultOptions.timeoutMs  = 2000;
   defaultOptions.ttlMs      = 2000;
@@ -65,7 +68,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   
   FileLock.setConfig({ 
     lockDirectory: "Specify the directory path where the file containing lock information is stored.",
-    defaultOptions
+    defaultOptions // If necessary
   }};
 
   const ret = await FileLock.withLock(
@@ -74,7 +77,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
       "Describes the operations to be performed while the lock is held.";
       return "Specify the results if any.";
     },
-    { ttlMs: 5000 } // Overrides the default options set via FileLock.SetConfig().
+    { ttlMs: 5000 } // Overrides the global default options set via FileLock.SetConfig().
   );
   console.log(ret); // "Specify the results if any.";
   ```

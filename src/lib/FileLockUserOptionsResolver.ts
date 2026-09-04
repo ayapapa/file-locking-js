@@ -4,6 +4,7 @@ import { FileLockInternalState } from './FileLockInternalState.ts';
 //import { NumberArray } from 'lru-cache/raw';
 
 /**
+ * @internal
  * A class that resolves UserOptions for FileLock.
  */
 export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<FileLockUserOptions, FileLockInternalState> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { logger, sleepAsync  } from './FileLockTestCommon.ts';
+import { logger, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
 import { FileLock, FileLockUserOptions } from '../src/index';
 
 describe('FileLock', () => {
@@ -109,6 +109,15 @@ describe('FileLock', () => {
       },
       { allowReentry: false }
     )})).toBe(retVal);
+  });
+
+  it("空のoptionを非スタティックFileLock.withLock()に渡す.", async () => {
+    // 非デバッグモードで、実施せよ（そうでないと、REQUIRE＿DEBUGにひっかかるぜ）
+    try {
+      expect(await new TestLock().testWithLockEmptyOptions(() => "OK")).toBe("OK");
+    }
+    catch (err) {
+    }
   });
 
 });

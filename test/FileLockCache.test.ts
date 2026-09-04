@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Config, FileLock } from '../src/index.ts';
-import { logger, sleepAsync } from './FileLockTestCommon.ts'
+import { logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 FileLock.setConfig({ logger });
 
@@ -20,9 +20,9 @@ describe('FileLock', () => {
     catch (err) {
       logger.error(err);
     }
-    expect((FileLock as any).cache.size > 0).toBe(true);  
+    expect(TestLock.getCacheSize() > 0).toBe(true);  
     FileLock.clearCache();
-    expect((FileLock as any).cache.size).toBe(0);  
+    expect(TestLock.getCacheSize()).toBe(0);  
   });
 
   async function testCacheStatus(config: Config, checkStatus: () => Promise<void>): Promise<void> {
@@ -38,16 +38,16 @@ describe('FileLock', () => {
       }
     )).toBe(retVal);
     await checkStatus();
-    //expect((FileLock as any).cache.size).toBe(1);
+    //expect(TestLock.getCacheSize()).toBe(1);
     FileLock.setConfig(orgConf);
   }
 
   it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
-    await testCacheStatus({ cache: true }, async () => expect((FileLock as any).cache.size).toBe(1));
+    await testCacheStatus({ cache: true }, async () => expect(TestLock.getCacheSize()).toBe(1));
    });
 
   it("If the cache is reset, then disabled, and subsequently locked, the cache does not exist.", async () => {
-    await testCacheStatus({ cache: false }, async () => expect((FileLock as any).cache).toBeNull());
+    await testCacheStatus({ cache: false }, async () => expect(TestLock.getCache()).toBeNull());
   });
 
   it("When the maximum cache size is set to 1, even after locking twice with different keys, " +
@@ -64,7 +64,7 @@ describe('FileLock', () => {
             return retVal;
           }
         )).toBe(retVal);
-        expect((FileLock as any).cache.size).toBe(1);
+        expect(TestLock.getCacheSize()).toBe(1);
       }
     );
   });

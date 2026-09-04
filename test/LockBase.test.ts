@@ -5,6 +5,7 @@ import { FileLock, LockError } from '../src/index';
 import { getCallStack, LockBase, type ReentrantContext, sleepAsync, sleepSync } from '../src/lib/LockBase.ts';
 import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { TestLock } from './FileLockTestCommon.ts'
 
 const logger = new PrettyConsole({ level: 'trace' });
 
@@ -25,11 +26,11 @@ describe('FileLock', () => {
     childContext.heldLocks.set(contextId, { monitor: { cancelled: false } });
     als.run(childContext, async () => {
       const key1 = 'testKey1', key2 = 'testKey2';
-      const ins1 = (FileLock as any).getLock(key1) as LockBase as any;
-      const ins2 = (FileLock as any).getLock(key2) as LockBase as any;
+      const ins1 = TestLock.getLock(key1);
+      const ins2 = TestLock.getLock(key2);
       expect(ins1 !== ins2).toBe(true);
-      expect(ins1._getReentrantContext().heldLocks.has(contextId)).toBe(true);
-      expect(ins2._getReentrantContext().heldLocks.has(contextId)).toBe(true);
+      expect(ins1.getReentrantContext()?.heldLocks.has(contextId)).toBe(true);
+      expect(ins2.getReentrantContext()?.heldLocks.has(contextId)).toBe(true);
     });
   });
 
@@ -45,23 +46,23 @@ describe('FileLock', () => {
     expect(time + 100).lessThanOrEqual(Date.now());
   });
 
-  class TestLock extends LockBase {
+  class TestLockBase extends LockBase {
     constructor() {
       super("Key");
     }
 
     test_incReantryCount() {
-        this._incReantryCount({ ownerId: "", contextId: "" });
+        this._incReantryCount({ _ownerId: "", _contextId: "" });
     }
 
     test_decReantryCount() {
-        this._decReantryCount({ ownerId: "", contextId: "" });
+        this._decReantryCount({ _ownerId: "", _contextId: "" });
     }
 
     test_onError(err: Error, op: string) : Monitor {
-      const opts = { ownerId: "", contextId: "" };
+      const opts = { _ownerId: "", _contextId: "" };
       this._onError(err, op, opts);
-      return 'monitor' in opts ? opts.monitor as Monitor : { cancelled: false };
+      return '_monitor' in opts ? opts._monitor as Monitor : { cancelled: false };
     }
   }
 
@@ -81,18 +82,18 @@ describe('FileLock', () => {
 
   it("`LockBase._incReantryCount()`を実装しないと未実装エラー.", async () => {
     testNotImpleMethod(() => {
-      new TestLock().test_incReantryCount();
+      new TestLockBase().test_incReantryCount();
     });
   });
 
   it("`LockBase._decReantryCount()`を実装しないと未実装エラー.", async () => {
     testNotImpleMethod(() => {
-      new TestLock().test_decReantryCount();
+      new TestLockBase().test_decReantryCount();
     });
   });
 
   it("`LockBase._onError()`で、codeを持たないエラーを指定すると、、、.", async () => {
-    const tl = new TestLock();
+    const tl = new TestLockBase();
     const operation = 'OP';
     const mon = tl.test_onError(new Error("test `LockBase._onError()`"), operation);
     expect(mon.cancelled).toBeTruthy();

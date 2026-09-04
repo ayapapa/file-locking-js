@@ -11,14 +11,11 @@ export class LockError extends Error {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { code?: string, props?: LockErrorProps/*{ [key: string]: any }*/ }) {
-    //const org_stackTraceLimit = Error.stackTraceLimit;
-    //Error.stackTraceLimit = 20;
+  constructor(msg?: string, params?: { code?: string, props?: LockErrorProps }) {
     super(msg);
     const props = {...params?.props};
     this.code = (params?.code) ?? 'ELOCK';
     Object.assign(this, props);
-    //Error.stackTraceLimit = org_stackTraceLimit;
   }
 };
 
@@ -33,9 +30,16 @@ export class DeadlockDetected extends LockError {
    */
   constructor(msg?: string | null, params?: { key: string, props?: LockErrorProps }) {
     msg = msg || 'A deadlock was detected.';
-    const props = { ...params?.props }
-    if (params?.key) props.key = params?.key;
-    super(msg, { code: 'EDEADLK' , props });
+    // key が有効な場合のみ props に key を追加する
+    // if 文にするとカバレッジツールが else パスを誤判定するため、
+    // スプレッド演算子で分岐を回避している
+    //const props = params?.key ? { ...params?.props , key: params.key } : { ...params?.props }
+    //const key = params?.key;
+    //const props = { ...params?.props, ...(key != null && { key }) }
+    super(msg, {
+      code: 'EDEADLK' ,
+      props: params?.key ? { ...params?.props , key: params.key } : { ...params?.props }
+    });
   }
 };
 
@@ -64,7 +68,7 @@ export class AlreadyLocked extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { key: string, props?: { [key: string]: any} } ) {
+  constructor(msg?: string, params?: { key: string, props?: LockErrorProps } ) {
     const key = params?.key;
     msg = msg || `Could not lock because the '${key ?? "key"}' is already locked.`;
     const props = {...params?.props};
@@ -80,7 +84,7 @@ export class InvalidOptions extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { name?: string, props?: { [key: string]: any} } ) {
+  constructor(msg?: string, params?: { name?: string, props?: LockErrorProps } ) {
     const name: string | null = params?.name ?? null;
     msg = msg || `The value of the specified options${name ? '(' + name + ')' : ''} is invalid.`;
     const props = {...params?.props};
