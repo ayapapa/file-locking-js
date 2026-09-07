@@ -1,5 +1,5 @@
 /** Basic user options. */
-export interface LockBaseUserOptions {
+export interface LockBaseOptions {
   /** 
    * Maximum wait time (in seconds) to acquire the lock. <br>
    *  Cannot be used in conjunction with `timeoutMs`; it is internally converted to `timeoutMs`. The default value is the same as the default for `timeoutMs`.

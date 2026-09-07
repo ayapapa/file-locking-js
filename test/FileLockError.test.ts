@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import fs, { rmSync } from 'node:fs';
 import path from 'node:path';
 import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles, TestLock, getLockMetaPath  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, Config, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
 
-let orgConfig: Config;
+let orgConfig: FileLockConfig;
 beforeEach(() => {
   orgConfig = FileLock.getConfig();
 });
@@ -533,7 +533,7 @@ describe('FileLock', () => {
 
     FileLock.setConfig({ history: true });
     
-      //expect.assertions(4);
+    expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
@@ -549,18 +549,6 @@ describe('FileLock', () => {
           code:     "EHISTORY",
           message:  "Failed to parse the history file."
         });
-//        expect(err.message).contains(`Failed to parse the history file.`);
-        /*
-        expect(err).toMatchObject( {
-          code: 'ECOMPROMISED',
-          file: metaPath
-        });
-        */
-        /*
-        expect(err.message).contains(`Couldn't parse the lock information file, it is probably broken.`);
-        expect('code' in err && err.code).toBe('ECOMPROMISED');
-        expect('file' in err && err.file).contains(metaPath);
-        */
       }
     }
     finally {

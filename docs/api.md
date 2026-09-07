@@ -10,7 +10,6 @@
 - [DeadlockDetected](classes/DeadlockDetected.md)
 - [FileLock](classes/FileLock.md)
 - [FileLockError](classes/FileLockError.md)
-- [FileLockUserOptionsResolver](classes/FileLockUserOptionsResolver.md)
 - [InvalidOptions](classes/InvalidOptions.md)
 - [LockCompromised](classes/LockCompromised.md)
 - [LockDirectoryCreationFailed](classes/LockDirectoryCreationFailed.md)
@@ -20,7 +19,7 @@
 
 ## Interfaces
 
-- [Config](interfaces/Config.md)
+- [FileLockConfig](interfaces/FileLockConfig.md)
 - [FileLockUserOptions](interfaces/FileLockUserOptions.md)
 - [Monitor](interfaces/Monitor.md)
 

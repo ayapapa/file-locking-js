@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Config, FileLock } from '../src/index.ts';
+import { FileLockConfig, FileLock } from '../src/index.ts';
 import { logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 FileLock.setConfig({ logger });
@@ -25,7 +25,7 @@ describe('FileLock', () => {
     expect(TestLock.getCacheSize()).toBe(0);  
   });
 
-  async function testCacheStatus(config: Config, checkStatus: () => Promise<void>): Promise<void> {
+  async function testCacheStatus(config: FileLockConfig, checkStatus: () => Promise<void>): Promise<void> {
     FileLock.clearCache();
     const orgConf = FileLock.getConfig();
     FileLock.setConfig({ ...config, logger });

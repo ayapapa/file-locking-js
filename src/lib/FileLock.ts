@@ -7,12 +7,12 @@ const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock } from "./LockBase.ts";
 import { LockError } from "./LockBaseErrors.ts";
-import { FileLockUserOptions } from './FileLockUserOptions.ts';
+import { FileLockOptions } from './FileLockOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
-import { FileLockUserOptionsResolver, typedKeys } from "./FileLockUserOptionsResolver.ts";
+import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
-import { type FileLockConfig as Config } from './FileLockConfig.ts';
+import { type FileLockConfig } from './FileLockConfig.ts';
 import { type LogProvider } from './LockBaseConfig.ts';
 import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
 
@@ -20,7 +20,7 @@ import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
  * @ internal
  * All options type.
  */
-type AllOptions = AllOptionsT<FileLockUserOptions, FileLockInternalState>;
+type AllOptions = AllOptionsT<FileLockOptions, FileLockInternalState>;
 
 /**
  * @internal 
@@ -63,7 +63,7 @@ interface LockMetaData {
 * While the file exists, no other lock can be acquired for the same key. 
 * Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed. 
 */
-export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalState> {
+export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
  
   /** 
    * Static fields 
@@ -164,9 +164,9 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   /** 
    * @internal
-   * Current configuration.
+   * Current configurations.
    */
-  static #config: Required<Config> = FileLock.getDefaultConfig();
+  static #config: Required<FileLockConfig> = FileLock.getDefaultConfig();
 
   /**
    * @internal
@@ -190,15 +190,16 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    */
 
   /**
-   * Set `Config`.  現在設定の一部を書き換えると説明せよ！ see PrettyCOndole.
+   * Set configurations.<br>
+   * 現在設定の一部を書き換えると説明せよ！ see PrettyCOndole.
    * At the same time, the cache is cleared.
    * @param config 
    */
-  public static setConfig(config: Config): void {
+  public static setConfig(config: FileLockConfig): void {
     const dConf = FileLock.#copyConfig(config);
     // ★★★　ここで、userDefaultOptionsが指定されていたら、解決しておかないといけないね！！★★★
     if (dConf.userDefaultOptions) {
-      dConf.userDefaultOptions = new FileLockUserOptionsResolver(dConf.userDefaultOptions).getOptions();
+      dConf.userDefaultOptions = new FileLockOptionsResolver(dConf.userDefaultOptions).getOptions();
     }
     FileLock.#config = { ...FileLock.getConfig(), ...dConf };
 
@@ -225,18 +226,18 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
   }
 
-  /** Reset `Config`. */
+  /** Reset current configurations. */
   public static resetConfig(): void {
     FileLock.setConfig(FileLock.getDefaultConfig());
   }
 
-  /** Get current `Config`. */
-  public static getConfig(): Required<Config> {
+  /** Get current configurations. */
+  public static getConfig(): Required<FileLockConfig> {
     return FileLock.#copyConfig(FileLock.#config);// || FileLock.getDefaultConfig());
   }
 
   /** Get default `Config`. */
-  public static getDefaultConfig(): Required<Config> {
+  public static getDefaultConfig(): Required<FileLockConfig> {
     return {
       _debug:             FileLock.#defaultDebug,
       cache:              FileLock.#defaultCache,
@@ -260,20 +261,20 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @param options   Options
    * @return A Promise that resolves with the return value of onLockFn.
    */
-  public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockUserOptions  = {}): Promise<any> {
+  public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockOptions  = {}): Promise<any> {
     REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { code: 'EINVAL' });
     // Resolve options.  If userDefaultOptions is specified in the config, it will be used as the default options.
     const defaultOpts = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
-    const rOpt = new FileLockUserOptionsResolver(options, defaultOpts).getOptions();
+    const rOpt = new FileLockOptionsResolver(options, defaultOpts).getOptions();
     FileLock._lastOptions = rOpt;
     return FileLock._getLock(key).withLock(onLockFn, rOpt);
   }
 
   /**
-   * Get default options(`FileLockUserOptions`).
+   * Get default options(`FileLockOptions`).
    * @returns Deault options.
    */
-  public static override getDefaultOptions(): FileLockUserOptions {
+  public static override getDefaultOptions(): FileLockOptions {
     return {
       ...super.getDefaultOptions(),
       pollIntervalMs:       FileLock.#defaultPollIntervalMs,
@@ -320,7 +321,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * Get a directory path for storing files containing lock information.<br>
    * If it has been specified, use this as the top priority.<br>
    * The directory is determined based on the following order of priority:<br>
-   *  1. Specified via an `Config` (user's explicit intent)
+   *  1. Specified via an `FileLockConfig` (user's explicit intent)
    *  2. `process.cwd()` (current working directory at runtime)
    * Note: In cases where the directory is explicitly specified (1 or 2 above), an error occurs if the specified directory does not exist and its creation fails.<br>
    * It is set to `private` for testing purposes.
@@ -413,7 +414,7 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
    * @internal
    * Copy config. 
    */
-  static #copyConfig<T extends Config>(config: T): T {
+  static #copyConfig<T extends FileLockConfig>(config: T): T {
     const ret = { ...config };
     if (config.userDefaultOptions) ret.userDefaultOptions = { ...config.userDefaultOptions };
     // If specified undefined, delete it.
@@ -992,5 +993,3 @@ export class FileLock extends LockBase<FileLockUserOptions, FileLockInternalStat
 
 // Initialize
 FileLock.initialize();
-
-export { Config };

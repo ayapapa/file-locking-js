@@ -1,7 +1,7 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { AllOptions, AllOptionsKey } from './AllOptions.ts';
-import { type LockBaseUserOptions } from './LockBaseUserOptions.ts';
+import { type LockBaseOptions } from './LockBaseOptions.ts';
 import { InvalidOptions } from './LockBaseErrors.ts';
 import { LockBaseInternalState } from './LockBaseInternalState.ts';
 
@@ -38,9 +38,9 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
  * @internal
  * A class that resolves options.
  * Base class: Accepts a generic type U
- * U must inherit from LockBaseUserOptions (constraint) 
+ * U must inherit from LockBaseOptions (constraint) 
  */
-export class LockBaseUserOptionsResolver <U extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState> {
+export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOptions, I extends LockBaseInternalState = LockBaseInternalState> {
 
   /** Static methods. */
 
@@ -76,7 +76,7 @@ export class LockBaseUserOptionsResolver <U extends LockBaseUserOptions = LockBa
    * @internal
    *  Get the Key-Type map for type checking. 
    */
-  protected _getCheckTypePairs(): KeyTypeMap<LockBaseUserOptions> {
+  protected _getCheckTypePairs(): KeyTypeMap<LockBaseOptions> {
     return {
       timeoutSec:   `number`,
       timeoutMs:    `number`,

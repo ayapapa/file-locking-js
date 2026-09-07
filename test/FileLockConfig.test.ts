@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { Config, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
+import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
 import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
 describe('FileLock', () => {
@@ -17,7 +17,7 @@ describe('FileLock', () => {
       const cur = FileLock.getConfig();
       expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
       const lockDirectory = 'hogehoge';
-      let config: Config = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
+      let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
       config = {...FileLock.getDefaultConfig(), userDefaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
@@ -123,7 +123,7 @@ describe('FileLock', () => {
   it("The directory specified in `FileLock.setCondig()` is created.", async () => {
     console.log("######START The directory specified...#####");
     const dir = path.join(process.cwd(), '.lock');
-    let orgConf: Config;
+    let orgConf: FileLockConfig;
     await testLockDirectoryCreation(
       dir,
       () => {
@@ -137,7 +137,7 @@ describe('FileLock', () => {
   it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
     " a error is throwed.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    let orgConf: Config = FileLock.getConfig();
+    let orgConf: FileLockConfig = FileLock.getConfig();
     FileLock.setConfig({ logger });
     fs.rmSync(dir, { force: true, recursive: true });
     fs.writeFileSync(dir, "");
@@ -162,7 +162,7 @@ describe('FileLock', () => {
     }
   });
 
-  async function testFsErrorBySpyOn(spyOnFnName: 'statSync' | 'mkdirSync', config: Config, ErrorClass: new (...args:any[]) => Error): Promise<void>
+  async function testFsErrorBySpyOn(spyOnFnName: 'statSync' | 'mkdirSync', config: FileLockConfig, ErrorClass: new (...args:any[]) => Error): Promise<void>
   {
     const eCode = 'EHOGEHOGE';
     const eMsg = 'Hogehoge error!!';

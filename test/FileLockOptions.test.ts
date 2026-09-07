@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockUserOptions, FileLockUserOptionsResolver, InvalidOptions } from '../src/index';
+import { FileLock, FileLockOptions, InvalidOptions } from '../src/index';
+import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver';
 import { AnyCnameRecord } from 'node:dns';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LockError } from '../src/lib/LockBaseErrors';
@@ -15,12 +16,12 @@ const logger = new PrettyConsole({ level: 'trace' });
 FileLock.setConfig({ logger });
 
 interface TestOpts {
-  _resolvedOpts?: FileLockUserOptions
+  _resolvedOpts?: FileLockOptions
 };
 
-describe('FileLockUserOptions test.', () => {
+describe('FileLockOptions test.', () => {
 
-  function testToBeSameAsTheDefaultOptions(opts: FileLockUserOptions): void {
+  function testToBeSameAsTheDefaultOptions(opts: FileLockOptions): void {
     // Check basic options
     expect(opts.timeoutSec).toBeUndefined();
     expect(opts.timeoutMs).toBe(5000);
@@ -60,7 +61,7 @@ describe('FileLockUserOptions test.', () => {
 
   it("When the lock with xxxSec options only,  internally resolved options have valid calculated xxxMs properties.", async () => {
     const retVal = "test_001", key = retVal;
-    const opts: FileLockUserOptions & TestOpts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213};
+    const opts: FileLockOptions & TestOpts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213};
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -248,11 +249,11 @@ describe('FileLockUserOptions test.', () => {
     await testTypeErrorOption('retriesOnIOErr', 'string');
   });
 
-  function testNullKindValueOption(key: keyof FileLockUserOptions, value: undefined | null) {
-    const options: FileLockUserOptions = {};
+  function testNullKindValueOption(key: keyof FileLockOptions, value: undefined | null) {
+    const options: FileLockOptions = {};
     // テストのため強制型キャスト
     options[key] = value as any;
-    expect(() => new FileLockUserOptionsResolver(options)).toThrow(InvalidOptions);
+    expect(() => new FileLockOptionsResolver(options)).toThrow(InvalidOptions);
   }
 
   it("undefinedやnullを指定すると、エラーになる(timeoutSec).", async () => {
@@ -326,15 +327,15 @@ describe('FileLockUserOptions test.', () => {
   });
 
   it("解決済のoptionを変更して、再度解決すると、その結果が正しく反映されている.", async () => {
-    const options: FileLockUserOptions & {[_resolvedOpts: string]: FileLockUserOptions} = {};
-    const rOpts = new FileLockUserOptionsResolver(options).getOptions();
+    const options: FileLockOptions & {[_resolvedOpts: string]: FileLockOptions} = {};
+    const rOpts = new FileLockOptionsResolver(options).getOptions();
     options.allowReentry = true;
-    const rOpts2 = new FileLockUserOptionsResolver(options).getOptions()
+    const rOpts2 = new FileLockOptionsResolver(options).getOptions()
     expect(rOpts2.allowReentry).toBe(options.allowReentry);
     expect('_resolvedOpts' in options ? options._resolvedOpts?.allowReentry : 'error').toBe(options.allowReentry);
   });
 
-  //FileLockUserOptionsResolver
+  //FileLockOptionsResolver
 /*
   it("An `InvalidOptions` error occurs when an option value of a different type is specified(retriesOnIOErr).", async () => {
     await testTypeErrorOption('retriesOnIOErr', 'string');

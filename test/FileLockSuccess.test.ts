@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHistoryPath, getLockMetaPath, logger, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
-import { Config, FileLock, FileLockUserOptions } from '../src/index';
+import { FileLockConfig, FileLock, FileLockOptions } from '../src/index';
 import fs from 'node:fs';
 import path from 'node:path';
 
-let orgConfig: Config;
+let orgConfig: FileLockConfig;
 beforeEach(() => {
   orgConfig = FileLock.getConfig();
 });
@@ -77,7 +77,7 @@ describe('FileLock', () => {
  
     const key1 = "testKey_10000", key2 = 'testKey_20000';
     const ret = "OK";
-    const options: FileLockUserOptions = { allowReentry: true }
+    const options: FileLockOptions = { allowReentry: true }
     expect(await FileLock.withLock(key1, async (monitor1) => {
       return await FileLock.withLock(key2, async (monitor2) => {
         return await FileLock.withLock(
