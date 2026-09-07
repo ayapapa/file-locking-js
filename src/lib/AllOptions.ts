@@ -1,4 +1,4 @@
-import { LockBaseUserOptions } from "./LockBaseUserOptions.ts";
+import { LockBaseOptions } from "./LockBaseOptions.ts";
 import { LockBaseInternalState } from "./LockBaseInternalState.ts";
 
 /**
@@ -6,7 +6,7 @@ import { LockBaseInternalState } from "./LockBaseInternalState.ts";
  * A fusion of user options and internal options.
  */
 export type AllOptions<
-  U extends LockBaseUserOptions = LockBaseUserOptions,
+  U extends LockBaseOptions = LockBaseOptions,
   I extends LockBaseInternalState = LockBaseInternalState
 > = Required<U> & I & OptionsForTesting<U>;
 
@@ -15,7 +15,7 @@ export type AllOptions<
  * Keys of AllOptions 
  */
 export type AllOptionsKey<
-  U extends LockBaseUserOptions = LockBaseUserOptions,
+  U extends LockBaseOptions = LockBaseOptions,
   I extends LockBaseInternalState = LockBaseInternalState
 > = keyof AllOptions<U, I>;
 

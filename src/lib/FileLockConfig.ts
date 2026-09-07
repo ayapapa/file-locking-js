@@ -1,4 +1,4 @@
-import { FileLockUserOptions } from './FileLockUserOptions.ts';
+import { FileLockOptions } from './FileLockOptions.ts';
 import { type BaseConfig } from './LockBaseConfig.ts'
 
 /**
@@ -38,7 +38,7 @@ export interface FileLockConfig extends BaseConfig {
    * User default options used with `withLock()`.
    * Default is the return value of `FileLock.getDefaultOptions()`.. 
    */
-  userDefaultOptions?: FileLockUserOptions;
+  userDefaultOptions?: FileLockOptions;
 
   /**
    * Whether to keep a history of lock information.
