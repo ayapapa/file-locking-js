@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
-import { type LockBaseUserOptions } from './LockBaseUserOptions.ts';
+import { type LockBaseOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
 import { type BaseConfig, type LogProvider } from './LockBaseConfig.ts'
 
@@ -33,7 +33,7 @@ export interface ReentrantContext  {
  * from within that context.
  * @abstract
  */
-export class LockBase <U extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
+export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
 
   /** 
    * Static fieilds. 
@@ -74,7 +74,7 @@ export class LockBase <U extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @internal
    * Get basic default options. 
    */
-  public static getDefaultOptions(): LockBaseUserOptions {
+  public static getDefaultOptions(): LockBaseOptions {
     return {
       timeoutMs:      LockBase._defaultTimeoutMs,    // Default maximum wait time for lock release is 5 seconds
       ttlMs:          LockBase._defaultTtlMs,        // Default lock validity period (time to live) is 10 seconds

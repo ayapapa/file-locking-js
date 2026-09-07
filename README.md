@@ -1,10 +1,25 @@
+[![CI](https://github.com/ayapapa/file-locking-js/actions/workflows/ci.yml/badge.svg)](https://github.com/ayapapa/contracts-js/actions/workflows/ci.yml)
+![Coverage](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-total.svg)
+![Branches](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-branches.svg)
+![Functions](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-functions.svg)
+![Lines](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-lines.svg)
+![Statements](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-statements.svg)
+
+## Table of contents
+[Overview](#overview) | [API Reference](#api-reference) | [Installation](#installation) | [Usage](#usage)
+
 # file-locking-js
+
+## Overview
 A file-based locking utility designed to coordinate exclusive access across processes, threads, and asynchronous tasks within a thread. <br>
 
 Inspired by existing Node.js file-locking implementations and developed to explore a different API and locking model.<br>
 
 It enables the exclusive execution of operations—such as "resource access"—that require serialization across multiple processes.<br>
 Examples include limiting access to a specific service to a single process or thread at a time, or updating a document without interference from other processes.
+
+## API Reference
+[API document](https://github.com/ayapapa/file-locking-js/blob/main/docs/api.md)
 
 ## Installation
 ```bash
@@ -48,15 +63,6 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   Note1: It is not mandatory to interrupt the process when monitor.cancelled is true.<br>
   Note2: If `options.allowReentry` is true and a reentrant lock is acquired, the `monitor` passed to the initial lock operation (callback) is shared with the subsequent one.
 
-## API Reference
-[API document](https://github.com/ayapapa/file-locking-js/blob/main/docs/api.md)
-
-## Configuration
-
-
-## Options
-
-
 ## Usage
   ```js
   // Global default options (if necessary)
@@ -68,8 +74,10 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   
   FileLock.setConfig({ 
     lockDirectory: "Specify the directory path where the file containing lock information is stored.",
-    defaultOptions // If necessary
+    defaultOptions // Global default options, if necessary.
   }};
+
+  const options = { ttlMs: 5000 };
 
   const ret = await FileLock.withLock(
     "Specify the lock key.", 
@@ -77,7 +85,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
       "Describes the operations to be performed while the lock is held.";
       return "Specify the results if any.";
     },
-    { ttlMs: 5000 } // Overrides the global default options set via FileLock.SetConfig().
+    options // Overrides the global default options set via FileLock.SetConfig().
   );
   console.log(ret); // "Specify the results if any.";
   ```
