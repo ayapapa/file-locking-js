@@ -8,7 +8,7 @@ import { LockBaseInternalState } from "./LockBaseInternalState.ts";
 export type AllOptions<
   U extends LockBaseUserOptions = LockBaseUserOptions,
   I extends LockBaseInternalState = LockBaseInternalState
-> = U & I & OptionsForTesting<U>;
+> = Required<U> & I & OptionsForTesting<U>;
 
 /** 
  * @internal

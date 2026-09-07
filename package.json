@@ -29,11 +29,13 @@
     "test:ui": "vitest --ui",
     "coverage": "vitest run --coverage",
     "coverage:ui": "vitest run --coverage && start coverage/index.html",
-    "check": "npm run typecheck && npm run build && npm run build:doc && npm run coverage:ui",
+    "check": "npm run typecheck && npm run build && npm run build:doc && npm run coverage",
+    "check:ui": "npm run typecheck && npm run build && npm run build:doc && npm run coverage:ui",
+    "release:check": "npm run check",
     "prepublishOnly": "npm run release:check"
   },
   "devDependencies": {
-    "@ayapapa-npm/pretty-console-js": "^0.2.1",
+    "@ayapapa-npm/pretty-console-js": "^0.2.2",
     "@types/node": "^26.2.0",
     "@types/proper-lockfile": "^4.1.4",
     "@vitest/coverage-v8": "^4.1.11",
@@ -47,9 +49,8 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "@ayapapa-npm/contracts-js": "^0.3.0",
+    "@ayapapa-npm/contracts-js": "^0.4.3",
     "@ayapapa-npm/date-formatter-js": "^0.1.2",
-    "lru-cache": "^11.5.2",
-    "proper-lockfile": "^4.1.2"
+    "lru-cache": "^11.5.2"
   }
 }

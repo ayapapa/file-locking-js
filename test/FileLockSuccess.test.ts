@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
-import { logger, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
-import { FileLock, FileLockUserOptions } from '../src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getHistoryPath, getLockMetaPath, logger, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
+import { Config, FileLock, FileLockUserOptions } from '../src/index';
+import fs from 'node:fs';
+import path from 'node:path';
+
+let orgConfig: Config;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
 
 describe('FileLock', () => {
 
@@ -119,5 +131,87 @@ describe('FileLock', () => {
     catch (err) {
     }
   });
+
+  it("When debug mode is enabled, if no history, it has to be created.", async () => {
+    const hist = getHistoryPath();
+    const hist_bu = hist + '.backup';
+    if (fs.existsSync(hist)) {
+      fs.renameSync(hist, hist_bu);
+    }
+    expect.assertions(1);
+    FileLock.setConfig({ _debug: true });
+    try {
+      await FileLock.withLock('debug_mode_key', 
+        async () => {
+          await sleepAsync(100);
+        },
+      );
+      expect(fs.existsSync(hist)).toBeTruthy();
+    }
+    finally {
+      if (fs.existsSync(hist)) {
+        fs.rmSync(hist);
+      }
+      if (fs.existsSync(hist_bu)) {
+        fs.renameSync(hist_bu, hist);
+      }
+    }
+  });
+
+  it("履歴数1.", async () => {
+    const hist = getHistoryPath();
+    FileLock.setConfig({ _debug: true, maxHistoryEntries: 1 });
+    expect.assertions(2);
+    try {
+      await FileLock.withLock('debug_mode_key', 
+        async () => {
+          await sleepAsync(100);
+        },
+      );
+      expect(fs.existsSync(hist)).toBeTruthy();
+      const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
+      expect(Object.keys(h).length).toBe(1);
+    }
+    finally {
+    }
+  });
+
+  it("履歴数0.", async () => {
+    const hist = getHistoryPath();
+    FileLock.setConfig({ _debug: true, maxHistoryEntries: 0 });
+    expect.assertions(2);
+    try {
+      await FileLock.withLock('debug_mode_key', 
+        async () => {
+          await sleepAsync(100);
+        },
+      );
+      expect(fs.existsSync(hist)).toBeTruthy();
+      const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
+      expect(Object.keys(h).length).toBe(0);
+    }
+    finally {
+    }
+  });
+
+  it("ロック情報ディレクトリ残骸", async () => {
+    const key = 'Key_HogeHoge'
+    const metaDir = path.dirname(getLockMetaPath(key));
+    expect.assertions(1);
+    fs.mkdirSync(metaDir);
+    try {
+      await FileLock.withLock(key, 
+        async () => {
+          await sleepAsync(100);
+        },
+      );
+      expect(fs.existsSync(metaDir)).toBeFalsy();
+    }
+    finally {
+      if (fs.existsSync(metaDir)) fs.rmSync(metaDir, { recursive: true, force: true });
+    }
+  });
+
+  
 
 });

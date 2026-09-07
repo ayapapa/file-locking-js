@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLock, LockError } from '../src/index';
-import { getCallStack, LockBase, type ReentrantContext, sleepAsync, sleepSync } from '../src/lib/LockBase.ts';
+import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
+import { getCallStack, sleepAsync, sleepSync } from '../src/lib/Util.ts'
 
 const logger = new PrettyConsole({ level: 'trace' });
 
@@ -52,16 +53,16 @@ describe('FileLock', () => {
     }
 
     test_incReantryCount() {
-        this._incReantryCount({ _ownerId: "", _contextId: "" });
+        this._incReantryCount({ _ownerId: "", _contextId: "" } as any);
     }
 
     test_decReantryCount() {
-        this._decReantryCount({ _ownerId: "", _contextId: "" });
+        this._decReantryCount({ _ownerId: "", _contextId: "" } as any);
     }
 
     test_onError(err: Error, op: string) : Monitor {
       const opts = { _ownerId: "", _contextId: "" };
-      this._onError(err, op, opts);
+      this._onError(err, op, opts as any);
       return '_monitor' in opts ? opts._monitor as Monitor : { cancelled: false };
     }
   }

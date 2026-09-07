@@ -6,7 +6,7 @@
 
 # Class: FileLockUserOptionsResolver
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:10](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L10)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:10](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L10)
 
 **`Internal`**
 
@@ -22,7 +22,7 @@ A class that resolves UserOptions for FileLock.
 
 > **new FileLockUserOptionsResolver**(`options`, `defaultOptions?`): `FileLockUserOptionsResolver`
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:26](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L26)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:26](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L26)
 
 Constructor.
 
@@ -52,7 +52,7 @@ User options.
 
 > `protected` **options**: `AllOptions`\<[`FileLockUserOptions`](../interfaces/FileLockUserOptions.md), `FileLockInternalState`\>
 
-Defined in: [src/lib/LockBaseUserOptionsResolver.ts:53](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBaseUserOptionsResolver.ts#L53)
+Defined in: [src/lib/LockBaseUserOptionsResolver.ts:50](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBaseUserOptionsResolver.ts#L50)
 
 Current options.
 
@@ -62,11 +62,11 @@ Current options.
 
 ***
 
-### minHeartBeatTImeoutMs
+### minHeartBeatTimeoutMs
 
-> `readonly` `static` **minHeartBeatTImeoutMs**: `number` = `2000`
+> `readonly` `static` **minHeartBeatTimeoutMs**: `number` = `2000`
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:16](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L16)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:16](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L16)
 
 Static fields.
 
@@ -76,7 +76,7 @@ Static fields.
 
 > `protected` **\_getCheckTypePairs**(): `KeyTypeMap`\<[`FileLockUserOptions`](../interfaces/FileLockUserOptions.md)\>
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:31](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L31)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:31](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L31)
 
 Get the type-checking pairs `{'property name': 'value type'}` for the optional properties.
 
@@ -94,7 +94,7 @@ Get the type-checking pairs `{'property name': 'value type'}` for the optional p
 
 > `protected` **\_getTimeKeys**(): `TimeBasedKey`\<[`FileLockUserOptions`](../interfaces/FileLockUserOptions.md)\>[]
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:48](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L48)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:48](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L48)
 
 Get an array of time-related base names (keys) from the option properties.
 
@@ -112,7 +112,7 @@ Get an array of time-related base names (keys) from the option properties.
 
 > `protected` **\_normalizeOptions**(`defaultOpts?`): `void`
 
-Defined in: [src/lib/FileLockUserOptionsResolver.ts:60](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLockUserOptionsResolver.ts#L60)
+Defined in: [src/lib/FileLockUserOptionsResolver.ts:60](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLockUserOptionsResolver.ts#L60)
 
 **`Internal`**
 
@@ -140,7 +140,7 @@ Defalt options
 
 > **getOptions**(): `AllOptions`\<[`FileLockUserOptions`](../interfaces/FileLockUserOptions.md), `FileLockInternalState`\>
 
-Defined in: [src/lib/LockBaseUserOptionsResolver.ts:74](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBaseUserOptionsResolver.ts#L74)
+Defined in: [src/lib/LockBaseUserOptionsResolver.ts:71](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBaseUserOptionsResolver.ts#L71)
 
 Get current options.
 

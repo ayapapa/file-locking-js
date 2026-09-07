@@ -66,6 +66,12 @@ export function removeLockFiles(key: string) {
   if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath, { recursive: true, force: true });
 }
 
+export function getHistoryPath() {
+  const orgConf = FileLock.getConfig();
+  const dir = path.join(process.cwd(), '.lock');
+  return path.join(dir, 'history.json');
+}
+
 /**
  * テスト用ロック。
  * プライベートも利用するため、as anyを使用。
@@ -100,13 +106,14 @@ export class TestLock extends (FileLock as any) {
     return super._getReentrantContext();
   }
 
+  static getHistoryPath(): string {
+    return path.join(TestLock.getLockDirPath(), 'history.json')
+  }
+
   async testWithLockEmptyOptions(cb: () => any): Promise<any> {
     return super.withLock(cb, {});
   }
 
-
 }
-
-
 
 FileLock.setConfig({ logger, history: true });

@@ -35,6 +35,6 @@ export interface LockBaseInternalState {
   _contextId: string;
 
   /** Monitoring information to be passed to the callback function. */
-  _monitor?: Monitor;
+  _monitor: Monitor | null;
 }
 

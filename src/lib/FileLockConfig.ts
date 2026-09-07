@@ -30,7 +30,7 @@ export interface FileLockConfig extends BaseConfig {
 
   /**
    * Cache expiration time (milliseconds). 
-   * Default is `50000`.
+   * Default is `50000`. Specifying `0` also results in the default value.
    */
   cacheTtlMs?: number;
 
@@ -42,7 +42,7 @@ export interface FileLockConfig extends BaseConfig {
 
   /**
    * Whether to keep a history of lock information.
-   * If set to `true`, a history of lock information will be saved in a file named `history.json` in the lock directory.
+   * If `true`, a history of lock information will be appended into a file named `history.json` in the lock directory.
    * Default is `false`.
    */
   history?: boolean;
@@ -66,3 +66,4 @@ export interface FileLockConfig extends BaseConfig {
   _debug?: boolean;
 }
 
+// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！

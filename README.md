@@ -49,7 +49,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   Note2: If `options.allowReentry` is true and a reentrant lock is acquired, the `monitor` passed to the initial lock operation (callback) is shared with the subsequent one.
 
 ## API Reference
-[API document](docs/api.md)
+[API document](https://github.com/ayapapa/file-locking-js/blob/main/docs/api.md)
 
 ## Configuration
 

@@ -26,6 +26,8 @@
 
 ## Type Aliases
 
+- [CallbackOnLock](type-aliases/CallbackOnLock.md)
+- [LockErrorProps](type-aliases/LockErrorProps.md)
 - [LogProvider](type-aliases/LogProvider.md)
 
 ## References

@@ -24,11 +24,7 @@ export type KeyTypeMap<T> = Record<keyof T, any>;
 /**
  * @internal
  */
-/*
-export interface OptionsForTesting<T> {
-  _resolvedOpts?: T
-}
-*/
+
 /** Types of seconds-time-based key. */
 type SecKey<T> = `${TimeBasedKey<T>}Sec`;
 
@@ -39,18 +35,19 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
 //export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
 /**
+ * @internal
  * A class that resolves options.
- * Base class: Accepts a generic type T
- * T must inherit from LockBaseUserOptions (constraint) 
+ * Base class: Accepts a generic type U
+ * U must inherit from LockBaseUserOptions (constraint) 
  */
-export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState> {
+export class LockBaseUserOptionsResolver <U extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState> {
 
   /** Static methods. */
 
   /** Instance fields. */
 
   /** Current options. */
-  protected options: AllOptions<T, I>;
+  protected options: AllOptions<U, I>;
 
   /** Instance methods. */
 
@@ -59,10 +56,10 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * @param opts        User options.
    * @param defaultOptions Default options.
    */
-  constructor(userOpts: T, defaultOptions?: T) {
+  constructor(userOpts: U, defaultOptions?: U) {
     if ('_resolvedOpts' in userOpts) delete userOpts._resolvedOpts;
 
-    this.options = { ...userOpts } as AllOptions<T, I>;
+    this.options = { ...userOpts } as AllOptions<U, I>;
 
     this.#resolveOptions(defaultOptions);
 
@@ -71,7 +68,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
   }
 
   /** Get current options. */
-  public getOptions(): AllOptions<T, I> {
+  public getOptions(): AllOptions<U, I> {
     return this.options;
   }
 
@@ -95,8 +92,8 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
    * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
    */
-  protected _getTimeKeys(): TimeBasedKey<T>[] {
-    return ['timeout', 'ttl'] as TimeBasedKey<T>[];
+  protected _getTimeKeys(): TimeBasedKey<U>[] {
+    return ['timeout', 'ttl'] as TimeBasedKey<U>[];
   }
 
   /**
@@ -105,7 +102,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * @param defaultOptions  User default options
    * @protected
    */
-  protected _normalizeOptions(defaultOptions?: T): void {
+  protected _normalizeOptions(defaultOptions?: U): void {
     this.#convSecToMs();
 
     Object.assign(this.options, { ...defaultOptions,  ...this.options});
@@ -129,7 +126,7 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * Validate, transform, and complete the user options passed to the constructor.
    * @param defaultOpts  Defalt options
    */
-  #resolveOptions(defaultOpts?: T) {
+  #resolveOptions(defaultOpts?: U) {
     this.#validateOptions();
     this._normalizeOptions(defaultOpts);
   }
@@ -149,9 +146,9 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * @internal
    * get TimeBaseKey-> SecBaseKey map.
    */
-  #getSecKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
+  #getSecKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: AllOptionsKey<U> } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Sec` as AllOptionsKey<T>])
+      keys.map(key => [key, `${key}Sec` as AllOptionsKey<U>])
     );
   }
 
@@ -159,9 +156,9 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
    * @internal
    * get TimeBaseKey-> MsBaseKey map.
    */
-  #getMsKeyMap(keys: TimeBasedKey<T>[]): { [key: string]: AllOptionsKey<T> } {
+  #getMsKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: AllOptionsKey<U> } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Ms` as AllOptionsKey<T>])
+      keys.map(key => [key, `${key}Ms` as AllOptionsKey<U>])
     );
   }
 
@@ -190,11 +187,11 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
     const keys = this._getTimeKeys();
     // Treat this.options as a type containing only the time key (type assertion)
     // Here, use 'as unknown as ...' to safely cast via unknown
-    const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<T> | MsKey<T>, number>>
+    const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<U> | MsKey<U>, number>>
     
     keys.forEach(key => {
-      const fromKey = `${key}Sec` as SecKey<T>;
-      const toKey = `${key}Ms` as MsKey<T>;
+      const fromKey = `${key}Sec` as SecKey<U>;
+      const toKey = `${key}Ms` as MsKey<U>;
 
       const value = optionsAsNumbers[fromKey];
 
@@ -207,6 +204,6 @@ export class LockBaseUserOptionsResolver <T extends LockBaseUserOptions = LockBa
 }
 
 /** Enumerate typed object keys. */
-export function typedKeys<T extends object>(obj: T): Array<keyof T> {
-  return Object.keys(obj) as Array<keyof T>;
+export function typedKeys<U extends object>(obj: U): Array<keyof U> {
+  return Object.keys(obj) as Array<keyof U>;
 }

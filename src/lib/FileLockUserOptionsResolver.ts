@@ -13,7 +13,7 @@ export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<Fil
    * Static fields.
    */
 
-  static readonly minHeartBeatTImeoutMs: number = 2000;
+  static readonly minHeartBeatTimeoutMs: number = 2000;
 
   /**
    * Instance methods.
@@ -58,10 +58,11 @@ export class FileLockUserOptionsResolver extends LockBaseUserOptionsResolver<Fil
    * @protected
    */
   protected override _normalizeOptions(defaultOpts?: FileLockUserOptions): void {
+    // ★★★　この最小値補正も、親クラスに閉じ込めろ！！　こちらは、チェック対象リストを渡すだけ{key, minval} _checkMinValueParis()とかね！
     super._normalizeOptions(defaultOpts);
     this.options.heartbeatTimeoutMs = Math.max(
       this.options.heartbeatTimeoutMs ?? 0, 
-      FileLockUserOptionsResolver.minHeartBeatTImeoutMs
+      FileLockUserOptionsResolver.minHeartBeatTimeoutMs
     );
   }
 

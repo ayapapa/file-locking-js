@@ -9,3 +9,5 @@ export interface BaseConfig {
     */
    logger?: LogProvider;
  }
+
+// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！

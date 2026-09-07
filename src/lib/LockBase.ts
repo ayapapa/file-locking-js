@@ -11,6 +11,8 @@ const {REQUIRE_DEBUG} = Contracts;
 /** Definition of the callback function to be executed after acquiring the lock. */
 export type CallbackOnLock = (monitor: Monitor) => any;
 
+export type LogProviderInternal = Required<LogProvider>;
+
 /** 
  * @internal
  * Context object for reentrancy lock detection.
@@ -31,7 +33,7 @@ export interface ReentrantContext  {
  * from within that context.
  * @abstract
  */
-export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
+export class LockBase <U extends LockBaseUserOptions = LockBaseUserOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
 
   /** 
    * Static fieilds. 
@@ -88,7 +90,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @internal
    *  Logger.
    */
-  protected _logger: LogProvider;
+  protected _logger: Required<LogProvider>;
 
   /** 
    * @internal
@@ -109,13 +111,15 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    */
   protected constructor(key: string, config?: BaseConfig) {
     this._key = key;
-    this._logger = config?.logger ?? console;
-    if (this._logger === console) {
-      this._logger = {...console as LogProvider};
-      this._logger.trace = this._logger.debug;
+    let logger: LogProvider = config?.logger ?? console
+    if (logger === console) {
+      logger = {...console as LogProvider};
+      logger.trace = logger.debug;
     }
     // There are cases where 'fatal' is not present; in such instances, use 'error'.
-    if (!this._logger.fatal) this._logger.fatal = this._logger.error;
+    if (!logger.fatal) logger.fatal = logger.error;
+    // Make `fatal` mandatory.
+    this._logger = logger as Required<LogProvider>;
   }
 
   /**
@@ -129,7 +133,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: AllOptions<T, I>) => any, options: AllOptions<T, I>) {
+  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: AllOptions<U, I>) => any, options: AllOptions<U, I>) {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
     REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'Invalid execWithLock.', LockError, {code: 'EINVAL'});
 
@@ -174,7 +178,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options 
    * @abstract
    */
-  protected _incReantryCount(options: AllOptions<T, I>) {
+  protected _incReantryCount(options: AllOptions<U, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -184,7 +188,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options 
    * @abstract
    */
-  protected _decReantryCount(options: AllOptions<T, I>) {
+  protected _decReantryCount(options: AllOptions<U, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -194,7 +198,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options 
    * @abstract
    */
-  protected _prepare(options: AllOptions<T, I>): void {
+  protected _prepare(options: AllOptions<U, I>): void {
     this.#newMonitor(options);
   }
   
@@ -206,7 +210,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options 
    * @abstract
    */
-  protected _onError(err: unknown, operation: string, options: AllOptions<T, I>, codeIfNon: string = 'ELOCK') {
+  protected _onError(err: unknown, operation: string, options: AllOptions<U, I>, codeIfNon: string = 'ELOCK') {
     if (this.#isAlreadyCancelled(options)) return;
     const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
     this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
@@ -218,7 +222,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options 
    * @returns 
    */
-  #isAlreadyCancelled(options: AllOptions<T, I>): boolean {
+  #isAlreadyCancelled(options: AllOptions<U, I>): boolean {
     return options._monitor?.cancelled as boolean;
   }
 
@@ -237,7 +241,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param onLockFn  A user-specified function called during the lock.
    * @returns A `Promise` that resolves to the return value of onLockFn.
    */
-  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<T, I>) {
+  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
     REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
     const parent = this._getReentrantContext() as any;
     let child: ReentrantContext;
@@ -260,7 +264,7 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @internal
    * Check whether re-entrant locking is used.
    */
-  #isReentry(options: AllOptions): boolean {
+  #isReentry(options: AllOptions<U, I>): boolean {
     return Boolean(this._getReentrantContext()?.heldLocks.has(options._contextId));
   }
 
@@ -283,8 +287,8 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options
    * @returns A new monitor.
    */
-  #newMonitor(options: AllOptions<T, I>): Monitor {
-    this.#deleteMonitor(options);
+  #newMonitor(options: AllOptions<U, I>): Monitor {
+    //this.#deleteMonitor(options);
     return options._monitor = {cancelled:false, id: Math.random().toString(36).slice(2)};
   }
 
@@ -293,9 +297,11 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * Delete the monitor.
    * @param options
    */
+  /*
   #deleteMonitor(options: AllOptions): void {
     delete options._monitor;
   }
+  */
 
   /**
    * @internal
@@ -303,41 +309,12 @@ export class LockBase <T extends LockBaseUserOptions = LockBaseUserOptions, I ex
    * @param options
    * @returns Monitor reflecting the values.
    */
-  #setMonitor(mon: Monitor, options: AllOptions<T, I>): void {
+  #setMonitor(mon: Monitor, options: AllOptions<U, I>): void {
     options._monitor = options._monitor || this.#newMonitor(options);
     Object.assign(options._monitor, mon);
     //const curMon: Monitor = options._monitor ? options._monitor : this.#newMonitor(options);
     //return options._monitor = Object.assign(curMon, mon);
   }
 }
-
-/** 
- * @internal
- * Asynchronous sleep. 
- */
-export async function sleepAsync(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * @internal
- * Synchronous sleep. 
- */
-export function sleepSync(ms: number) {
-  const sab = new SharedArrayBuffer(4);
-  const int32 = new Int32Array(sab);
-  Atomics.wait(int32, 0, 0, ms);
-}
-
-/**
- * @internal
- * Get callstack. 
- */
-export function getCallStack(): string {
-  const obj: { stack?: string } = {};
-  Error.captureStackTrace(obj, getCallStack);
-  obj.stack = obj.stack ? obj.stack.replace(/^Error\b/, "Call stack") : `Call stack: couldn't get.`;
-  return obj.stack;
-} 
 
 export { Monitor };

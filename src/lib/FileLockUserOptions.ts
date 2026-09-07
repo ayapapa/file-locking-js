@@ -11,20 +11,23 @@ export interface FileLockUserOptions extends LockBaseUserOptions {
 
   /**
    * Polling interval (checking if locked) in milliseconds until timeout. 
-   * Cannot be used with pollIntervalSec. Default is 100.
+   * Cannot be used with pollIntervalSec. <br>
+   * Default is 100. Specifying `0` also results in the default value.
    */
   pollIntervalMs?: number;
 
   /**
    * Heartbeat interval in seconds while the locked process is running. 
    * The lock file is updated at this interval until the process completes. Internally converted to heartbeatIntervalMs. 
-   * Cannot be used with heartbeatIntervalMs. Defaults to the default value of heartbeatIntervalMs.
+   * Cannot be used with heartbeatIntervalMs. <br>
+   * Defaults to the default value of heartbeatIntervalMs. 
    */
   heartbeatIntervalSec?: number;
 
   /**
    * Heartbeat interval in milliseconds while the locked process is running. 
-   * The lock file is updated at this interval until the process completes. Cannot be used with heartbeatIntervalSec. Default is 1000.
+   * The lock file is updated at this interval until the process completes. Cannot be used with heartbeatIntervalSec.<br>
+   * Default is 1000. Specifying `0` also results in the default value.
    */
   heartbeatIntervalMs?: number;
 
@@ -58,8 +61,10 @@ export interface FileLockUserOptions extends LockBaseUserOptions {
 
   /**
    * Interval between lock file operation retries [milliseconds]. 
-   *  Cannot be used together with retryIntervalSec. Default is 100.
+   *  Cannot be used together with retryIntervalSec. Default and minimum is 100.
    */
   retryIntervalMs?: number;
 
 }
+
+// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！

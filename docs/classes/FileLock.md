@@ -6,7 +6,7 @@
 
 # Class: FileLock
 
-Defined in: [src/lib/FileLock.ts:70](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L70)
+Defined in: [src/lib/FileLock.ts:66](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L66)
 
 File locking. 
 Acquires a lock by creating a file derived from the specified key, executes the provided callback, and then releases the lock (by deleting the created file). 
@@ -23,7 +23,7 @@ Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed
 
 > `protected` **\_key**: `string`
 
-Defined in: [src/lib/LockBase.ts:97](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L97)
+Defined in: [src/lib/LockBase.ts:99](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L99)
 
 **`Internal`**
 
@@ -37,9 +37,9 @@ Lock key
 
 ### \_logger
 
-> `protected` **\_logger**: [`LogProvider`](../type-aliases/LogProvider.md)
+> `protected` **\_logger**: `Required`\<[`LogProvider`](../type-aliases/LogProvider.md)\>
 
-Defined in: [src/lib/LockBase.ts:91](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L91)
+Defined in: [src/lib/LockBase.ts:93](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L93)
 
 **`Internal`**
 
@@ -55,7 +55,7 @@ Logger.
 
 > `protected` `readonly` `static` **\_defaultAllowReentry**: `false` = `false`
 
-Defined in: [src/lib/LockBase.ts:44](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L44)
+Defined in: [src/lib/LockBase.ts:46](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L46)
 
 **`Internal`**
 
@@ -69,7 +69,7 @@ Defined in: [src/lib/LockBase.ts:44](https://github.com/ayapapa/file-lock-js/blo
 
 > `protected` `readonly` `static` **\_defaultTimeoutMs**: `5000` = `5000`
 
-Defined in: [src/lib/LockBase.ts:50](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L50)
+Defined in: [src/lib/LockBase.ts:52](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L52)
 
 **`Internal`**
 
@@ -83,7 +83,7 @@ Defined in: [src/lib/LockBase.ts:50](https://github.com/ayapapa/file-lock-js/blo
 
 > `protected` `readonly` `static` **\_defaultTtlMs**: `10000` = `10000`
 
-Defined in: [src/lib/LockBase.ts:56](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L56)
+Defined in: [src/lib/LockBase.ts:58](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L58)
 
 **`Internal`**
 
@@ -97,7 +97,7 @@ Defined in: [src/lib/LockBase.ts:56](https://github.com/ayapapa/file-lock-js/blo
 
 > `static` **\_lastOptions**: `AllOptions` \| `null` = `null`
 
-Defined in: [src/lib/FileLock.ts:81](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L81)
+Defined in: [src/lib/FileLock.ts:77](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L77)
 
 **`Internal`**
 
@@ -110,7 +110,7 @@ Defined in: [src/lib/FileLock.ts:81](https://github.com/ayapapa/file-lock-js/blo
 
 > `protected` **\_decReantryCount**(`options`): `void`
 
-Defined in: [src/lib/FileLock.ts:473](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L473)
+Defined in: [src/lib/FileLock.ts:477](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L477)
 
 **`Internal`**
 
@@ -137,7 +137,7 @@ And, when the counter becomes '0', release lock.
 
 > `protected` **\_incReantryCount**(`options`): `void`
 
-Defined in: [src/lib/FileLock.ts:459](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L459)
+Defined in: [src/lib/FileLock.ts:463](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L463)
 
 **`Internal`**
 
@@ -163,7 +163,7 @@ Increment lock counter.
 
 > `abstract` `protected` **\_onError**(`err`, `operation`, `options`, `codeIfNon?`): `void`
 
-Defined in: [src/lib/LockBase.ts:209](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L209)
+Defined in: [src/lib/LockBase.ts:213](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L213)
 
 **`Internal`**
 
@@ -201,7 +201,7 @@ Handle errors that occur while locked.
 
 > `protected` **\_prepare**(`options`): `void`
 
-Defined in: [src/lib/FileLock.ts:496](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L496)
+Defined in: [src/lib/FileLock.ts:500](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L500)
 
 Make advance preparations.
 
@@ -227,7 +227,7 @@ Options
 
 > `abstract` `protected` **\_withLock**(`onLockFn`, `execWithLock`, `options`): `Promise`\<`any`\>
 
-Defined in: [src/lib/LockBase.ts:132](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/LockBase.ts#L132)
+Defined in: [src/lib/LockBase.ts:136](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/LockBase.ts#L136)
 
 **`Internal`**
 
@@ -238,7 +238,7 @@ executes the function `onLockFn` under exclusive control, and returns a Promise 
 
 ##### onLockFn
 
-`CallbackOnLock`
+[`CallbackOnLock`](../type-aliases/CallbackOnLock.md)
 
 A user-specified callback function to be executed after acquiring the lock.
 
@@ -270,7 +270,7 @@ A `Promise` that resolves with the return value of `onLockFn`.
 
 > `static` **clearCache**(): `void`
 
-Defined in: [src/lib/FileLock.ts:289](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L289)
+Defined in: [src/lib/FileLock.ts:289](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L289)
 
 Clear `lock` instance cache.
 
@@ -282,29 +282,29 @@ Clear `lock` instance cache.
 
 ### getConfig()
 
-> `static` **getConfig**(): [`Config`](../interfaces/Config.md)
+> `static` **getConfig**(): `Required`\<[`Config`](../interfaces/Config.md)\>
 
-Defined in: [src/lib/FileLock.ts:236](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L236)
+Defined in: [src/lib/FileLock.ts:234](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L234)
 
-GEt current `Config`.
+Get current `Config`.
 
 #### Returns
 
-[`Config`](../interfaces/Config.md)
+`Required`\<[`Config`](../interfaces/Config.md)\>
 
 ***
 
 ### getDefaultConfig()
 
-> `static` **getDefaultConfig**(): [`Config`](../interfaces/Config.md)
+> `static` **getDefaultConfig**(): `Required`\<[`Config`](../interfaces/Config.md)\>
 
-Defined in: [src/lib/FileLock.ts:241](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L241)
+Defined in: [src/lib/FileLock.ts:239](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L239)
 
 Get default `Config`.
 
 #### Returns
 
-[`Config`](../interfaces/Config.md)
+`Required`\<[`Config`](../interfaces/Config.md)\>
 
 ***
 
@@ -312,7 +312,7 @@ Get default `Config`.
 
 > `static` **getDefaultOptions**(): [`FileLockUserOptions`](../interfaces/FileLockUserOptions.md)
 
-Defined in: [src/lib/FileLock.ts:276](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L276)
+Defined in: [src/lib/FileLock.ts:276](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L276)
 
 Get default options(`FileLockUserOptions`).
 
@@ -332,7 +332,7 @@ Deault options.
 
 > `static` **initialize**(): `void`
 
-Defined in: [src/lib/FileLock.ts:186](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L186)
+Defined in: [src/lib/FileLock.ts:184](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L184)
 
 Initialize.
 
@@ -346,7 +346,7 @@ Initialize.
 
 > `static` **resetConfig**(): `void`
 
-Defined in: [src/lib/FileLock.ts:231](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L231)
+Defined in: [src/lib/FileLock.ts:229](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L229)
 
 Reset `Config`.
 
@@ -360,7 +360,7 @@ Reset `Config`.
 
 > `static` **setConfig**(`config`): `void`
 
-Defined in: [src/lib/FileLock.ts:199](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L199)
+Defined in: [src/lib/FileLock.ts:197](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L197)
 
 Set `Config`.  現在設定の一部を書き換えると説明せよ！ see PrettyCOndole.
 At the same time, the cache is cleared.
@@ -381,7 +381,7 @@ At the same time, the cache is cleared.
 
 > `static` **withLock**(`key`, `onLockFn`, `options?`): `Promise`\<`any`\>
 
-Defined in: [src/lib/FileLock.ts:263](https://github.com/ayapapa/file-lock-js/blob/d5f018497cf77f372cc0e16dc32cbaec314894d5/src/lib/FileLock.ts#L263)
+Defined in: [src/lib/FileLock.ts:263](https://github.com/ayapapa/file-lock-js/blob/280ed101887cb488a682db8709ac88743dfafc1a/src/lib/FileLock.ts#L263)
 
 Acquires a lock for the specified key, executes the function `onLockFn` under exclusive control, 
 and returns a Promise that resolves with the return value of `onLockFn` after the lock is released.
@@ -396,9 +396,10 @@ Lock key.
 
 ##### onLockFn
 
-`CallbackOnLock`
+[`CallbackOnLock`](../type-aliases/CallbackOnLock.md)
 
 Callback function to execute while the lock is held.
+                 Both synchronous and asynchronous functions can be specified.
 
 ##### options?
 

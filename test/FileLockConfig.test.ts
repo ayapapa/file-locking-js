@@ -338,10 +338,6 @@ describe('FileLock', () => {
     }
   });
 
-  function isStringArray(value: unknown[]): boolean {
-    return value.every(v => typeof v === "string");
-  }
-
   it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
     const orgConf = FileLock.getConfig();
     const key = 'debug_mode_key_009'

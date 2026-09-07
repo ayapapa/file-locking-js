@@ -21,7 +21,7 @@ class LockDirectoryAccessFailed extends FileLockError {
   /**
    * Constructor.
    * @param fsErrorMsg   fs's error message.
-   * @param operation   Operation on the lock information storage directory.
+   * @param operation   Operation on the lock information directory.
    * @param code  Error code string.
    * @param params  Parameters.
    */
@@ -30,7 +30,7 @@ class LockDirectoryAccessFailed extends FileLockError {
     const props = { ...params?.props };
     if (path != null) props.path = path;
     if (fsErrMsg != null) props.fsErrMsg = fsErrMsg;
-    super(`Failed to ${operation} the lock information storage directory${path ? '('+path+')' : ""}.`, { code , props });
+    super(`Failed to ${operation} the lock information directory${path ? '('+path+')' : ""}.`, { code , props });
   }
 }
 

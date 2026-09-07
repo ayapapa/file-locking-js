@@ -1,7 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger, sleepAsync, getLockMeta, getLockMetaPath, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, FileLock } from '../src/index';
+import { AlreadyLocked, Config, FileLock } from '../src/index';
 import { randomUUID } from 'node:crypto';
+
+let orgConfig: Config;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
+
 
 describe('FileLock', () => {
 
