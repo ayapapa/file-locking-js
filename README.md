@@ -90,3 +90,5 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   console.log(ret); // "Specify the results if any.";
   ```
 
+## Examples
+(under construction)
