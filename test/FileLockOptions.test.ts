@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockOptions, InvalidOptions } from '../src/index';
+import { FileLock, FileLockError, FileLockOptions, InvalidOptions } from '../src/index';
 import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver';
 import { AnyCnameRecord } from 'node:dns';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LockError } from '../src/lib/LockBaseErrors';
+import { FileLockRequiredOptions } from '../src/lib/FileLockOptions';
 
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -336,10 +337,50 @@ describe('FileLockOptions test.', () => {
   });
 
   //FileLockOptionsResolver
-/*
-  it("An `InvalidOptions` error occurs when an option value of a different type is specified(retriesOnIOErr).", async () => {
-    await testTypeErrorOption('retriesOnIOErr', 'string');
+  class TestOptionResolver extends FileLockOptionsResolver {
+    constructor(options: FileLockOptions, defaultOpts: FileLockRequiredOptions) {
+      super(options, defaultOpts);
+    }
+
+    public test_getRequiredOptions_emptyOpts() {
+      this.options = {};
+      return super.getRequiredOptions();
+    }
+
+    public test_getRequiredOptions_noDefaults() {
+      this.defaultOptions = undefined;
+      return super.getRequiredOptions();
+    }
+  }
+
+  it("オプションが必須プロパティーをもっていない状態でデフォルトオプション未指定時にgetRequiredOptions()を呼ぶとエラー.", async () => {
+    const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
+    expect.assertions(2);
+    try {
+      or.test_getRequiredOptions_emptyOpts();
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject( {
+        code: 'EFILELOCK', 
+        message: "Missing required option: timeoutMs,ttlMs,allowReentry,pollIntervalMs,heartbeatIntervalMs,heartbeatTimeoutMs,retriesOnIOErr,retryIntervalMs"
+      })
+    }
   });
-*/
+
+  it("デフォルトオプション未指定時にgetRequiredOptions()を呼ぶとエラー.", async () => {
+    const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
+    expect.assertions(2);
+    try {
+      or.test_getRequiredOptions_noDefaults();
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject( {
+        code: 'EFILELOCK', 
+        message: "To generate required options, specify default options in the constructor."
+      })
+    }
+  });
 
 });

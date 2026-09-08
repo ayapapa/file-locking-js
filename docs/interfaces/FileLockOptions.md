@@ -6,7 +6,7 @@
 
 # Interface: FileLockOptions
 
-Defined in: [src/lib/FileLockOptions.ts:4](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L4)
+Defined in: [src/lib/FileLockOptions.ts:4](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L4)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [src/lib/FileLockOptions.ts:4](https://github.com/ayapapa/file-lock-
 
 > `optional` **allowReentry?**: `boolean`
 
-Defined in: [src/lib/LockBaseOptions.ts:65](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseOptions.ts#L65)
+Defined in: [src/lib/LockBaseOptions.ts:65](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseOptions.ts#L65)
 
 Controls the behavior when attempting to acquire a lock using the same key while already holding a lock for that key. <br>
  The default is `false` (re-entrant locking is prohibited; a DeadlockDetected error is thrown upon detection). <br>
@@ -62,7 +62,7 @@ Controls the behavior when attempting to acquire a lock using the same key while
 
 > `optional` **heartbeatIntervalMs?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:32](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L32)
+Defined in: [src/lib/FileLockOptions.ts:32](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L32)
 
 Heartbeat interval in milliseconds while the locked process is running. 
 The lock file is updated at this interval until the process completes. Cannot be used with heartbeatIntervalSec.<br>
@@ -74,7 +74,7 @@ Default is 1000. Specifying `0` also results in the default value.
 
 > `optional` **heartbeatIntervalSec?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:25](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L25)
+Defined in: [src/lib/FileLockOptions.ts:25](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L25)
 
 Heartbeat interval in seconds while the locked process is running. 
 The lock file is updated at this interval until the process completes. Internally converted to heartbeatIntervalMs. 
@@ -87,7 +87,7 @@ Defaults to the default value of heartbeatIntervalMs.
 
 > `optional` **heartbeatTimeoutMs?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:48](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L48)
+Defined in: [src/lib/FileLockOptions.ts:48](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L48)
 
 Validity period in milliseconds for the last heartbeat update. 
 If this amount of time has not elapsed since the last update, the process is considered to be still running. This cannot be used in conjunction with `heartbeatTimeoutSec`.
@@ -100,7 +100,7 @@ The default value is 10000.
 
 > `optional` **heartbeatTimeoutSec?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:40](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L40)
+Defined in: [src/lib/FileLockOptions.ts:40](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L40)
 
 Validity period in seconds for the last heartbeat update. 
 If this amount of time has not elapsed since the last update, the process is considered to be still running (heartbeat valid). 
@@ -113,7 +113,7 @@ Defaults to the default value of heartbeatTimeoutMs.
 
 > `optional` **pollIntervalMs?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:17](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L17)
+Defined in: [src/lib/FileLockOptions.ts:17](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L17)
 
 Polling interval (checking if locked) in milliseconds until timeout. 
 Cannot be used with pollIntervalSec. <br>
@@ -125,7 +125,7 @@ Default is 100. Specifying `0` also results in the default value.
 
 > `optional` **pollIntervalSec?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:10](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L10)
+Defined in: [src/lib/FileLockOptions.ts:10](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L10)
 
 Polling interval (checking if locked) in seconds until timeout. 
 Internally converted to pollIntervalMs. Cannot be used with pollIntervalMs. 
@@ -137,7 +137,7 @@ Defaults to the default value of pollIntervalMs.
 
 > `optional` **retriesOnIOErr?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:54](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L54)
+Defined in: [src/lib/FileLockOptions.ts:54](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L54)
 
 Number of retries for lock file operations in the event of an I/O error.
 Default is 1.
@@ -148,7 +148,7 @@ Default is 1.
 
 > `optional` **retryIntervalMs?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:66](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L66)
+Defined in: [src/lib/FileLockOptions.ts:66](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L66)
 
 Interval between lock file operation retries [milliseconds]. 
  Cannot be used together with retryIntervalSec. Default and minimum is 100.
@@ -159,7 +159,7 @@ Interval between lock file operation retries [milliseconds].
 
 > `optional` **retryIntervalSec?**: `number`
 
-Defined in: [src/lib/FileLockOptions.ts:60](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockOptions.ts#L60)
+Defined in: [src/lib/FileLockOptions.ts:60](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockOptions.ts#L60)
 
 Interval between lock file operation retries [seconds]. 
  Internally converted to retryIntervalMs. Cannot be used together with retryIntervalMs. Defaults to the default value of retryIntervalMs.
@@ -170,7 +170,7 @@ Interval between lock file operation retries [seconds].
 
 > `optional` **timeoutMs?**: `number`
 
-Defined in: [src/lib/LockBaseOptions.ts:15](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseOptions.ts#L15)
+Defined in: [src/lib/LockBaseOptions.ts:15](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseOptions.ts#L15)
 
 Maximum wait time to acquire the lock [milliseconds]. <br>
 Cannot be used in conjunction with timeoutSec. <br>
@@ -187,7 +187,7 @@ Default is `5000`.
 
 > `optional` **timeoutSec?**: `number`
 
-Defined in: [src/lib/LockBaseOptions.ts:7](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseOptions.ts#L7)
+Defined in: [src/lib/LockBaseOptions.ts:7](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseOptions.ts#L7)
 
 Maximum wait time (in seconds) to acquire the lock. <br>
  Cannot be used in conjunction with `timeoutMs`; it is internally converted to `timeoutMs`. The default value is the same as the default for `timeoutMs`.
@@ -202,7 +202,7 @@ Maximum wait time (in seconds) to acquire the lock. <br>
 
 > `optional` **ttlMs?**: `number`
 
-Defined in: [src/lib/LockBaseOptions.ts:30](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseOptions.ts#L30)
+Defined in: [src/lib/LockBaseOptions.ts:30](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseOptions.ts#L30)
 
 Lock validity period (time to live): the maximum time [milliseconds] from lock acquisition 
 until the callback function completes execution. An error (TTLExceeded) occurs if this 
@@ -219,7 +219,7 @@ Default is `5000`. Specifying `0` also results in the default value.
 
 > `optional` **ttlSec?**: `number`
 
-Defined in: [src/lib/LockBaseOptions.ts:22](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseOptions.ts#L22)
+Defined in: [src/lib/LockBaseOptions.ts:22](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseOptions.ts#L22)
 
 Lock validity period (time to live)—i.e., the maximum time [seconds] from lock acquisition 
 until the callback function completes execution. An error (TTLExceeded) occurs if this period is exceeded.<br>

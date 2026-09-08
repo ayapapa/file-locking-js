@@ -4,7 +4,7 @@ import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
-import { type BaseConfig, type LogProvider } from './LockBaseConfig.ts'
+import { type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -38,24 +38,6 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
   /** 
    * Static fieilds. 
    */
-
-  /**
-   * @internal
-   * 
-   */
-  protected static readonly _defaultAllowReentry = false;
-
-  /**
-   * @internal
-   * 
-   */
-  protected static readonly _defaultTimeoutMs = 5000;
-
-  /**
-   * @internal
-   * 
-   */
-  protected static readonly _defaultTtlMs = 10000;
   
   /**
    * @internal
@@ -74,14 +56,11 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
    * @internal
    * Get basic default options. 
    */
+/*
   public static getDefaultOptions(): LockBaseOptions {
-    return {
-      timeoutMs:      LockBase._defaultTimeoutMs,    // Default maximum wait time for lock release is 5 seconds
-      ttlMs:          LockBase._defaultTtlMs,        // Default lock validity period (time to live) is 10 seconds
-      allowReentry:   LockBase._defaultAllowReentry, // Default to disallowing re-entrant locks
-    };
+    return { ..._defaultBaseOptions };
   }
-
+*/
   /** 
    * Instance fieilds. 
    */
@@ -109,7 +88,7 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
    * @param key     Lock key.
    * @param config  Configuration.
    */
-  protected constructor(key: string, config?: BaseConfig) {
+  protected constructor(key: string, config?: LockBaseConfig) {
     this._key = key;
     let logger: LogProvider = config?.logger ?? console
     if (logger === console) {

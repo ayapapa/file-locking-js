@@ -6,7 +6,7 @@
 
 # Class: LockDirectoryCreationFailed
 
-Defined in: [src/lib/FileLockErrors.ts:54](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockErrors.ts#L54)
+Defined in: [src/lib/FileLockErrors.ts:54](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L54)
 
 Lock directory 'Creaate' error.
 
@@ -20,7 +20,7 @@ Lock directory 'Creaate' error.
 
 > **new LockDirectoryCreationFailed**(`fsErrorMsg`, `params?`): `LockDirectoryCreationFailed`
 
-Defined in: [src/lib/FileLockErrors.ts:60](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockErrors.ts#L60)
+Defined in: [src/lib/FileLockErrors.ts:60](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L60)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

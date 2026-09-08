@@ -6,7 +6,7 @@
 
 # Class: LockCompromised
 
-Defined in: [src/lib/FileLockErrors.ts:68](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockErrors.ts#L68)
+Defined in: [src/lib/FileLockErrors.ts:68](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L68)
 
 Lock compromised error.
 
@@ -20,7 +20,7 @@ Lock compromised error.
 
 > **new LockCompromised**(`reason`, `params?`): `LockCompromised`
 
-Defined in: [src/lib/FileLockErrors.ts:74](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/FileLockErrors.ts#L74)
+Defined in: [src/lib/FileLockErrors.ts:74](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L74)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/653811d8f46cf455d0a3fbe4a83a6c945d1bd2e7/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

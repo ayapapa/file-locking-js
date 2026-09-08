@@ -7,55 +7,22 @@ const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock } from "./LockBase.ts";
 import { LockError } from "./LockBaseErrors.ts";
-import { FileLockOptions } from './FileLockOptions.ts';
+import { defaultFileLockOptions, type FileLockRequiredOptions, type FileLockOptions } from './FileLockOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
-import { type FileLockConfig } from './FileLockConfig.ts';
-import { type LogProvider } from './LockBaseConfig.ts';
+import { _defaultConfig, type FileLockConfig } from './FileLockConfig.ts';
 import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
+import { FileLockMeta } from './FileLockMeta.ts'
 
 /** 
  * @ internal
  * All options type.
  */
-type AllOptions = AllOptionsT<FileLockOptions, FileLockInternalState>;
+//type AllOptions_ = AllOptionsT<FileLockOptions, FileLockInternalState>;
 
-/**
- * @internal 
- * Lock-related information
- */
-interface LockMetaData {
-  /** Lock execution owner ID. */
-  ownerId: string,
-
-  /** ID of the process executing the lock. */
-  processId?: number,
-
-  /** ID of the parent process of the lock-executing process. */
-  parentProcessId?: number,
-
-  /** An array containing the command-line arguments passed when the Node.js process was launched.  */
-  processArgv?: string[],
-
-  /** Lock expiration time. */
-  expirationTime: number,
-
-  /** 
-   * The valid duration since the last heartbeat.
-   * Exceeding this limit is one of the factors used to determine that the lock is invalid.
-   */
-  heartbeatTimeoutMs: number,
-
-  /** The last heartbeat time. */
-  lastHeartbeatAt: number,
-
-  /** Lock counter.
-   * A value that increments or decrements when re-entrant locking is permitted. 
-   */
-  counter: number
-}
+type AllOptions = AllOptionsT<FileLockRequiredOptions, FileLockInternalState>;
 
 /**
 * File locking. 
@@ -63,7 +30,7 @@ interface LockMetaData {
 * While the file exists, no other lock can be acquired for the same key. 
 * Settings such as `timeoutMs` allow for waiting until an unreleased lock is freed. 
 */
-export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
+export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternalState> {
  
   /** 
    * Static fields 
@@ -74,53 +41,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * 最近使ったオプション(static `withLock()`内で解決されたオプション）を保存する。
    * 本来は、`withLock()`の呼び出しごとに新しいオプションが解決されるため、staticに保存する必要はないが、テストのために保存する。
    */
-  public static _lastOptions: AllOptions | null = null;
-
-  /** Default values for configuratins. */
-  static readonly #defaultDebug: boolean = false;
-
-  /**
-   * @internal
-   * Default cache enabled. Default is `true`.
-   */
-  static readonly #defaultCache: boolean = true;
-
-  /**
-   * @internal
-   * Default maximum number of cache entries. 0 means cache is disabled, even if `cache` is true.
-   */
-  static readonly #defaultCacheMaxNum: number = 100;
-
-  /**
-   * @internal
-   * Default cache expiration time (milliseconds).
-   */
-  static readonly #defaultCacheTtlMs: number = 50000;
-
-  /**
-   * @internal
-   * Default history enabled. Default is `false`.
-   */
-  static readonly #defaultHistory: boolean = false;
-
-  /**
-   * @internal
-   * Default lock directory. Default is `null`.
-   */
-  static readonly #defaultLockDirectory: string | null = null;
-
-  /**
-   * @internal
-   * Default logger. Default is `console`.
-   */
-  static readonly #defaultLogger: LogProvider = console;
-
-  /**
-   * @internal
-   * Default number of history entries to keep.
-   * If the number of entries exceeds this value, the oldest entries will be deleted in order.
-   */
-  static readonly #defaultMaxHistoryEntries: number = 100;
+  public static _lastOptions: FileLockRequiredOptions | null = null;
 
   /**
    * @internal
@@ -129,38 +50,6 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * つまり、単独で1秒以上の存在するディレクトリは無効と判定される。
    */
   static readonly #fileDirExpirationMs: number = 1000; // 1 second
-
-  /** Default values for options. */
-  /**
-   * @internal
-   * Default polling interval (milliseconds) for checking if locked. Default is 100.
-   */
-  static readonly #defaultPollIntervalMs       = 100;
-
-  /**
-   * @internal
-   * Default heartbeat interval (milliseconds). Default is 1000.
-   */
-  static readonly #defaultHeartbeatIntervalMs  = 1000;
-  
-  /**
-   * @internal
-   * Default heartbeat timeout (milliseconds). Default is 10000.
-   */
-  static readonly #defaultHeartbeatTimeoutMs   = 10000;
-  
-  /**
-   * @internal
-   * Default number of retries on I/O error. Default is 1.
-   */
-  static readonly #defaultRetriesOnIOErr       = 1;
-  
-  /**
-   * @internal
-   * Default interval (milliseconds) between retries on I/O error. Default is 100.
-   */
-  static readonly #defaultRetryIntervalMs      = 100;
-
 
   /** 
    * @internal
@@ -206,10 +95,10 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
     // Clear chache
     FileLock.clearCache();
 
-    FileLock.#config.cacheMaxNum = FileLock.#config.cacheMaxNum;// ?? FileLock.#defaultCacheMaxNum;
+    FileLock.#config.cacheMaxNum = FileLock.#config.cacheMaxNum;
     if (FileLock.#config.cacheMaxNum === 0) FileLock.#config.cache = false;
 
-    FileLock.#config.cacheTtlMs = FileLock.#config.cacheTtlMs;// || FileLock.#defaultCacheTtlMs;
+    FileLock.#config.cacheTtlMs = FileLock.#config.cacheTtlMs;
 
         // If cache is enabled, (Re)create cache.
     if (FileLock.#config.cache) {
@@ -238,17 +127,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
 
   /** Get default `Config`. */
   public static getDefaultConfig(): Required<FileLockConfig> {
-    return {
-      _debug:             FileLock.#defaultDebug,
-      cache:              FileLock.#defaultCache,
-      cacheMaxNum:        FileLock.#defaultCacheMaxNum,
-      cacheTtlMs:         FileLock.#defaultCacheTtlMs,
-      userDefaultOptions: FileLock.getDefaultOptions(),
-      history:            FileLock.#defaultHistory,
-      lockDirectory:      FileLock.#defaultLockDirectory,
-      logger:             FileLock.#defaultLogger,
-      maxHistoryEntries:  FileLock.#defaultMaxHistoryEntries,
-    };
+    return FileLock.#copyConfig(_defaultConfig);
   }
 
   /**
@@ -264,8 +143,8 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockOptions  = {}): Promise<any> {
     REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { code: 'EINVAL' });
     // Resolve options.  If userDefaultOptions is specified in the config, it will be used as the default options.
-    const defaultOpts = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
-    const rOpt = new FileLockOptionsResolver(options, defaultOpts).getOptions();
+    const defaultOpts: FileLockRequiredOptions = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
+    const rOpt = new FileLockOptionsResolver(options, defaultOpts).getRequiredOptions();
     FileLock._lastOptions = rOpt;
     return FileLock._getLock(key).withLock(onLockFn, rOpt);
   }
@@ -274,17 +153,9 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * Get default options(`FileLockOptions`).
    * @returns Deault options.
    */
-  public static override getDefaultOptions(): FileLockOptions {
-    return {
-      ...super.getDefaultOptions(),
-      pollIntervalMs:       FileLock.#defaultPollIntervalMs,
-      heartbeatIntervalMs:  FileLock.#defaultHeartbeatIntervalMs,
-      heartbeatTimeoutMs:   FileLock.#defaultHeartbeatTimeoutMs,
-      retriesOnIOErr:       FileLock.#defaultRetriesOnIOErr,
-      retryIntervalMs:      FileLock.#defaultRetryIntervalMs,
-    }
+  public static getDefaultOptions(): FileLockRequiredOptions {
+    return { ...defaultFileLockOptions };
   }
-
 
   /** Clear `lock` instance cache. */
   public static clearCache() {
@@ -508,7 +379,12 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
                                               // to the lock directory configuration.
     options._historyFile = path.join(dirPath, 'history.json');
   }
-
+/*
+  #isResolvedOptions(options: AllOptions): boolean {
+    const rKeys = //型のキー列挙と、その型へのキャスト（文字列はだめ）　そして、備えているかをチェックする
+    return false;
+  };
+*/
   /**
    * @internal
    * Acquires a lock, executes the function `onLockFn` under exclusive control, 
@@ -518,8 +394,12 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param options   Options
    * @return A Promise that resolves with the return value of onLockFn.
    */
-  private async withLock(onLockFn: CallbackOnLock, options: AllOptions): Promise<any> {
-    REQUIRE_DEBUG(Boolean(options._resolvedOpts), "The option remains unresolved.", InvalidOptions, { name: 'options', props: options });
+  private async withLock(onLockFn: CallbackOnLock, userOpts: FileLockRequiredOptions): Promise<any> {
+    REQUIRE_DEBUG(FileLockOptionsResolver.isRequiredOptions(userOpts, FileLock.getDefaultOptions()), 
+      "The option remains unresolved.", InvalidOptions, { name: 'userOpts', props: { options: userOpts } } );
+
+    // 指定されたオプションと内部状態を結合したものをオプションとして再構成。
+    const options = { ...userOpts } as AllOptions;
 
     this._prepare(options);
 
@@ -689,7 +569,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * Whether the lock has expired.
    * @param options 
    */
-  #isLockExpired(meta: LockMetaData): boolean {
+  #isLockExpired(meta: FileLockMeta): boolean {
     this._logger.trace("Lock file contents in isLockExpired():", meta);
     const expired = meta.expirationTime <= Date.now();
     const dead = meta.lastHeartbeatAt + meta.heartbeatTimeoutMs <= Date.now();
@@ -758,7 +638,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param options 
    * @param errMsg 
    */
-  #removeFile(meta: LockMetaData | null, options: AllOptions, errMsg?: string): void {
+  #removeFile(meta: FileLockMeta | null, options: AllOptions, errMsg?: string): void {
     try {
       meta = meta || this.#getInfoIfExists(options);
     }
@@ -836,7 +716,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param options Options.
    * @returns null if not exist, or the contents as object.
    */
-  #getInfoIfExists(options: AllOptions): LockMetaData | null {
+  #getInfoIfExists(options: AllOptions): FileLockMeta | null {
     if (!fs.existsSync(options._filePath)) {
       return null;
     }
@@ -850,7 +730,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param  options          Options.
    * @returns Lock information object.
    */
-  #getInfo(options: AllOptions): LockMetaData {
+  #getInfo(options: AllOptions): FileLockMeta {
     if (!fs.existsSync(options._filePath)) {
       throw new LockCompromised('The lock information file does not exist.', {key: this._key, props: { file: options._filePath } });
     }
@@ -862,7 +742,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
       `Couldn't read the lock information file.`
     );
 
-    let meta: LockMetaData;
+    let meta: FileLockMeta;
     try {
       meta = JSON.parse(contents);
     }
@@ -881,7 +761,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
     }
 
     // Check contents.
-    const check = (key: keyof LockMetaData, type: string | ((v: unknown) => boolean), optional: boolean = false) => {
+    const check = (key: keyof FileLockMeta, type: string | ((v: unknown) => boolean), optional: boolean = false) => {
       // キーが存在するなら型チェック成功なら真
       if (key in meta) {
         if (
@@ -919,7 +799,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param meta      Lock information.
    * @param withLock  ロックするか否か。。。たぶん、今後不要！
    */
-  #updateInfo(options: AllOptions, meta: LockMetaData) {
+  #updateInfo(options: AllOptions, meta: FileLockMeta) {
     // For debug
     if (this.#isDebug()) {
       Object.assign(
@@ -952,7 +832,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
    * @param meta 
    * @param options 
    */
-  #addHistory(meta: LockMetaData, options: AllOptions): void {
+  #addHistory(meta: FileLockMeta, options: AllOptions): void {
     const historyFile = options._historyFile;
     const contents = this.#accessInfo(
       historyFile, 
@@ -961,7 +841,7 @@ export class FileLock extends LockBase<FileLockOptions, FileLockInternalState> {
       "Couldn't read the history file."
     );
 
-    let history: Record<string, { meta: LockMetaData, options: AllOptions }> = {};
+    let history: Record<string, { meta: FileLockMeta, options: AllOptions }> = {};
     try {
       history = contents ? JSON.parse(contents) : {};
     }

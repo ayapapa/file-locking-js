@@ -1,4 +1,4 @@
-import { LockBaseOptions } from './LockBaseOptions.ts';
+import { defaultLockBaseOptions, type LockBaseRequiredOptions, type LockBaseOptions } from './LockBaseOptions.ts';
 
 // User options for FileLock (inherits from LockBaseOptions)
 export interface FileLockOptions extends LockBaseOptions {
@@ -68,3 +68,30 @@ export interface FileLockOptions extends LockBaseOptions {
 }
 
 // ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
+
+export type FileLockRequiredOptions = Required<Pick<FileLockOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'>> & LockBaseRequiredOptions;
+/*
+export const _fileLockRequiredOptions = [
+  ..._lockBaseRequiredOptions,
+  'pollIntervalMs',
+  'heartbeatIntervalMs',
+  'heartbeatTimeoutMs',
+  'retriesOnIOErr',
+  'retryIntervalMs'
+]  as const satisfies readonly (keyof FileLockOptions)[];
+*/
+
+/**
+ * @internal
+ */
+export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
+  ...defaultLockBaseOptions,
+  pollIntervalMs:       100,
+  heartbeatIntervalMs:  1000,
+  heartbeatTimeoutMs:   10000,
+  retriesOnIOErr:       1,
+  retryIntervalMs:      100,
+};
+
+export const requiredFileLockOptionsKeys = Object.keys(defaultFileLockOptions) as readonly (keyof FileLockRequiredOptions)[];
+

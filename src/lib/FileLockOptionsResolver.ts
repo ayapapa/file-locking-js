@@ -1,13 +1,13 @@
 import { LockBaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseOptionsResolver.ts';
-import { FileLockOptions } from './FileLockOptions.ts';
-import { FileLockInternalState } from './FileLockInternalState.ts';
+import { FileLockOptions, FileLockRequiredOptions } from './FileLockOptions.ts';
+//import { FileLockInternalState } from './FileLockInternalState.ts';
 //import { NumberArray } from 'lru-cache/raw';
 
 /**
  * @internal
  * A class that resolves Options for FileLock.
  */
-export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockInternalState> {
+export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockRequiredOptions> {
   
   /**
    * Static fields.
@@ -23,7 +23,7 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
    * Constructor.
    * @param options User options.
    */
-  constructor(options: FileLockOptions, defaultOptions?: FileLockOptions ) {
+  constructor(options: FileLockOptions, defaultOptions?: FileLockRequiredOptions ) {
     super(options, defaultOptions);
   };
 
@@ -57,7 +57,7 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
    * @param defaultOpts  Defalt options
    * @protected
    */
-  protected override _normalizeOptions(defaultOpts?: FileLockOptions): void {
+  protected override _normalizeOptions(defaultOpts?: FileLockRequiredOptions): void {
     // ★★★　この最小値補正も、親クラスに閉じ込めろ！！　こちらは、チェック対象リストを渡すだけ{key, minval} _checkMinValueParis()とかね！
     super._normalizeOptions(defaultOpts);
     this.options.heartbeatTimeoutMs = Math.max(

@@ -65,5 +65,22 @@ export interface LockBaseOptions {
    allowReentry?: boolean;
 }
 
-
 // ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
+
+/**
+ * @internal
+ * 必須プロパティのみからなる内部用のオプション型。
+ */
+export type LockBaseRequiredOptions = Required<Pick<LockBaseOptions, 'timeoutMs' | 'ttlMs' | 'allowReentry'>>;
+
+//export const _lockBaseRequiredOptions = ['timeoutMs', 'ttlMs', 'allowReentry'] as const satisfies readonly (keyof LockBaseOptions)[];
+
+/**
+ * @internal
+ * 
+ */
+export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
+  timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
+  ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
+  allowReentry:   false,  // Default to disallowing re-entrant locks
+};

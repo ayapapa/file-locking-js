@@ -1,9 +1,10 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { AllOptions, AllOptionsKey } from './AllOptions.ts';
-import { type LockBaseOptions } from './LockBaseOptions.ts';
+//import { AllOptions, AllOptionsKey } from './AllOptions.ts';
+import { type LockBaseOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { InvalidOptions } from './LockBaseErrors.ts';
-import { LockBaseInternalState } from './LockBaseInternalState.ts';
+import { FileLockError } from './FileLockErrors.ts';
+//import { LockBaseInternalState } from './LockBaseInternalState.ts';
 
 const {REQUIRE} = Contracts;
 
@@ -40,14 +41,29 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
  * Base class: Accepts a generic type U
  * U must inherit from LockBaseOptions (constraint) 
  */
-export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOptions, I extends LockBaseInternalState = LockBaseInternalState> {
+export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOptions, R extends LockBaseRequiredOptions = LockBaseRequiredOptions> {
+  //I extends LockBaseInternalState = LockBaseInternalState> {
 
   /** Static methods. */
+
+  public static isRequiredOptions<O extends object, D extends object>(options: O, defaults: D, missings?: string[]): boolean {
+    const keys = Object.keys(defaults) as (keyof O)[];
+    let ret = true;
+    for (const key of keys) {
+      if (options[key] == null) {
+        ret = false;
+        missings?.push(String(key));
+      }
+    }
+    return ret;
+  }
 
   /** Instance fields. */
 
   /** Current options. */
-  protected options: AllOptions<U, I>;
+  protected options: U; //AllOptions<U, I>;
+
+  protected defaultOptions?: R;//AllOptions<U, I>;
 
   /** Instance methods. */
 
@@ -56,10 +72,11 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @param opts        User options.
    * @param defaultOptions Default options.
    */
-  constructor(userOpts: U, defaultOptions?: U) {
+  constructor(userOpts: U, defaultOptions?: R) {
     if ('_resolvedOpts' in userOpts) delete userOpts._resolvedOpts;
 
-    this.options = { ...userOpts } as AllOptions<U, I>;
+    this.options = { ...userOpts };// as AllOptions<U, I>;
+    if (defaultOptions) this.defaultOptions = { ...defaultOptions };
 
     this.#resolveOptions(defaultOptions);
 
@@ -67,9 +84,25 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
 
   }
 
-  /** Get current options. */
-  public getOptions(): AllOptions<U, I> {
+  /** Get options. */
+  public getOptions(): U/*AllOptions<U, I>*/ {
     return this.options;
+  }
+
+  /** Get an option consisting of required properties. Error if any properties are missing. */
+  //public getRequiredOptions/*<K extends keyof U>*/(/*keys: readonly K[]*/): R/*AllOptions<Required<Pick<U, K>>, I>*/ {
+  public getRequiredOptions(): R {
+    if (!this.defaultOptions) {
+      throw new FileLockError("To generate required options, specify default options in the constructor.", { code: 'EFILELOCK' });
+    }
+    
+    const missings: string[] = [];
+    if (LockBaseOptionsResolver.isRequiredOptions(this.options, this.defaultOptions, missings)) {
+      // 必須キー構成のオプションであることを確認済みのため、型キャストして返す。
+      return this.options as unknown as R;
+    }
+
+    throw new FileLockError(`Missing required option: ${missings}`, { code: 'EFILELOCK' })
   }
 
   /**
@@ -102,7 +135,7 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @param defaultOptions  User default options
    * @protected
    */
-  protected _normalizeOptions(defaultOptions?: U): void {
+  protected _normalizeOptions(defaultOptions?: R): void {
     this.#convSecToMs();
 
     Object.assign(this.options, { ...defaultOptions,  ...this.options});
@@ -126,7 +159,7 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * Validate, transform, and complete the user options passed to the constructor.
    * @param defaultOpts  Defalt options
    */
-  #resolveOptions(defaultOpts?: U) {
+  #resolveOptions(defaultOpts?: R) {
     this.#validateOptions();
     this._normalizeOptions(defaultOpts);
   }
@@ -146,9 +179,9 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @internal
    * get TimeBaseKey-> SecBaseKey map.
    */
-  #getSecKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: AllOptionsKey<U> } {
+  #getSecKeyMap(keys: TimeBasedKey<U>[]): { [key: string]:keyof U/* AllOptionsKey<U>*/ } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Sec` as AllOptionsKey<U>])
+      keys.map(key => [key, `${key}Sec` as keyof U/*AllOptionsKey<U>*/])
     );
   }
 
@@ -156,9 +189,9 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @internal
    * get TimeBaseKey-> MsBaseKey map.
    */
-  #getMsKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: AllOptionsKey<U> } {
+  #getMsKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: keyof U/*AllOptionsKey<U>*/ } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Ms` as AllOptionsKey<U>])
+      keys.map(key => [key, `${key}Ms` as keyof U/*AllOptionsKey<U>*/])
     );
   }
 

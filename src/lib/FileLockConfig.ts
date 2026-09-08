@@ -1,10 +1,10 @@
-import { FileLockOptions } from './FileLockOptions.ts';
-import { type BaseConfig } from './LockBaseConfig.ts'
+import { defaultFileLockOptions, type FileLockOptions, } from './FileLockOptions.ts';
+import { defaultLockBaseConfig, type LockBaseConfig } from './LockBaseConfig.ts'
 
 /**
  * FileLock cofiguration. 
  */
-export interface FileLockConfig extends BaseConfig {
+export interface FileLockConfig extends LockBaseConfig {
   /**
    * Specifies the directory path to stored locking imformations.
    * If it has been specified, use this as the top priority.
@@ -67,3 +67,17 @@ export interface FileLockConfig extends BaseConfig {
 }
 
 // ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
+/**
+ * @internal
+ */
+export const _defaultConfig: Readonly<Required<FileLockConfig>> = {
+  ...defaultLockBaseConfig,
+  _debug:             false,
+  cache:              true,
+  cacheMaxNum:        100,
+  cacheTtlMs:         50000,
+  userDefaultOptions: { ...defaultFileLockOptions },
+  history:            false,
+  lockDirectory:      null,
+  maxHistoryEntries:  100,
+};
