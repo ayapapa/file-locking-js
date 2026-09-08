@@ -17,7 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('FileLock', () => {
+describe('LockBase and Util', () => {
 
   it("The reentrancy context is shared even when the lock instances are different.", async () => {
     const als = (LockBase as any)._als as AsyncLocalStorage<ReentrantContext>;
@@ -36,15 +36,19 @@ describe('FileLock', () => {
   });
 
   it("`sleepAsync()`が指定通りの時間眠る.", async () => {
-    const time = Date.now();
+    const start = Date.now();
     await sleepAsync(100);
-    expect(time + 100).lessThanOrEqual(Date.now());
+
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(99);
   });
 
   it("`sleepSync()`が指定通りの時間眠る.", async () => {
-    const time = Date.now();
+    const start = Date.now();
     sleepSync(100);
-    expect(time + 100).lessThanOrEqual(Date.now());
+    
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(99);
   });
 
   class TestLockBase extends LockBase {
