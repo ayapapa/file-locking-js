@@ -3,7 +3,7 @@ export interface Monitor {
   /** Whether the operation was cancelled. */
   cancelled: boolean;
 
-  /** The reason for cancellation determined by FileLock.. */
+  /** The reason for cancellation determined by FileLock. */
   reason?: string;
 
   /** The object actually caught by the try-catch block. */

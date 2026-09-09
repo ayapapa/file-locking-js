@@ -35,10 +35,11 @@ export interface FileLockConfig extends LockBaseConfig {
   cacheTtlMs?: number;
 
   /**
-   * User default options used with `withLock()`.
-   * Default is the return value of `FileLock.getDefaultOptions()`.. 
+   * Global default options.
+   * These are used as the default values ​​for options specified in `withLock()`.
+   * Default is the return value of `FileLock.getDefaultOptions()`. 
    */
-  userDefaultOptions?: FileLockOptions;
+  defaultOptions?: FileLockOptions;
 
   /**
    * Whether to keep a history of lock information.
@@ -76,7 +77,7 @@ export const _defaultConfig: Readonly<Required<FileLockConfig>> = {
   cache:              true,
   cacheMaxNum:        100,
   cacheTtlMs:         50000,
-  userDefaultOptions: { ...defaultFileLockOptions },
+  defaultOptions:     { ...defaultFileLockOptions },
   history:            false,
   lockDirectory:      null,
   maxHistoryEntries:  100,

@@ -4,7 +4,7 @@ import { PrettyConsole, LogEntry } from '@ayapapa-npm/pretty-console-js';
 import * as Pino from 'pino'
 import { pino } from 'pino'
 
-import { FileLock, FileLockUserOptions, LogProvider } from '../src/index';
+import { FileLock } from '../src/index';
 
 export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));

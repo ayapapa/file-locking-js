@@ -1,19 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, LockError } from '../src/index';
+import { FileLock, FileLockConfig, LockError } from '../src/index';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
 import { getCallStack, sleepAsync, sleepSync } from '../src/lib/Util.ts'
 
-const logger = new PrettyConsole({ level: 'trace' });
-
-FileLock.setConfig({ logger });
-
+let orgConfig: FileLockConfig;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
 
 afterEach(() => {
+  FileLock.setConfig(orgConfig);
   vi.restoreAllMocks();
 });
 

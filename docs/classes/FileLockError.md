@@ -6,7 +6,7 @@
 
 # Class: FileLockError
 
-Defined in: [src/lib/FileLockErrors.ts:6](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L6)
+Defined in: [src/lib/FileLockErrors.ts:6](https://github.com/ayapapa/file-lock-js/blob/011a25c8bdd33bc82a43cf82cbb8fd220f049122/src/lib/FileLockErrors.ts#L6)
 
 Basic lock handling error.
 
@@ -24,7 +24,7 @@ Basic lock handling error.
 
 > **new FileLockError**(`msg?`, `params?`): `FileLockError`
 
-Defined in: [src/lib/FileLockErrors.ts:12](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/FileLockErrors.ts#L12)
+Defined in: [src/lib/FileLockErrors.ts:12](https://github.com/ayapapa/file-lock-js/blob/011a25c8bdd33bc82a43cf82cbb8fd220f049122/src/lib/FileLockErrors.ts#L12)
 
 Constructor.
 
@@ -74,7 +74,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/011a25c8bdd33bc82a43cf82cbb8fd220f049122/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

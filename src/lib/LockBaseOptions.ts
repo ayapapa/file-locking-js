@@ -10,6 +10,7 @@ export interface LockBaseOptions {
    * Maximum wait time to acquire the lock [milliseconds]. <br>
    * Cannot be used in conjunction with timeoutSec. <br>
    * `0` does not wait for the preceding unlock. 
+   * The minimum value is `0`; if a value lower than this is specified, this minimum value is used.
    * Default is `5000`.
    */
   timeoutMs?: number;
@@ -25,7 +26,8 @@ export interface LockBaseOptions {
    * Lock validity period (time to live): the maximum time [milliseconds] from lock acquisition 
    * until the callback function completes execution. An error (TTLExceeded) occurs if this 
    * period is exceeded. Cannot be used in conjunction with ttlSec.<br>
-   * Default is `5000`. Specifying `0` also results in the default value.
+   * The minimum value is `1000`; if a value lower than this is specified, this minimum value is used.
+   * Default is `5000`.
    */
   ttlMs?: number;
 
@@ -73,8 +75,6 @@ export interface LockBaseOptions {
  */
 export type LockBaseRequiredOptions = Required<Pick<LockBaseOptions, 'timeoutMs' | 'ttlMs' | 'allowReentry'>>;
 
-//export const _lockBaseRequiredOptions = ['timeoutMs', 'ttlMs', 'allowReentry'] as const satisfies readonly (keyof LockBaseOptions)[];
-
 /**
  * @internal
  * 
@@ -84,3 +84,10 @@ export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
   ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
   allowReentry:   false,  // Default to disallowing re-entrant locks
 };
+
+export type LockBaseMinimumOptions = Record<'timeoutMs' | 'ttlMs', number >;
+
+export const minimumLockBaseOptions: Readonly<LockBaseMinimumOptions> = {
+  timeoutMs:      0,    // Not wait for the release of the preceding-stage lock.
+  ttlMs:          1000, // The minimum lifetime for the callback processing after acquiring the lock is 1 second.
+}

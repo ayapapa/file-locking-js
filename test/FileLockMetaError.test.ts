@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { FileLock, LockCompromised } from '../src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
+import { FileLock, FileLockConfig, LockCompromised } from '../src/index';
 
+let orgConfig: FileLockConfig;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
 
 describe('FileLock', () => {
 

@@ -1,20 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLock, FileLockError, FileLockOptions, InvalidOptions } from '../src/index';
+import { FileLock, FileLockConfig, FileLockError, FileLockOptions, InvalidOptions } from '../src/index';
 import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver';
 import { AnyCnameRecord } from 'node:dns';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LockError } from '../src/lib/LockBaseErrors';
-import { FileLockRequiredOptions } from '../src/lib/FileLockOptions';
+import { FileLockRequiredOptions, minimumFileLockOptions } from '../src/lib/FileLockOptions';
+import { TestLock } from './FileLockTestCommon';
+
+let orgConfig: FileLockConfig;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
 
 async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-const logger = new PrettyConsole({ level: 'trace' });
-
-FileLock.setConfig({ logger });
 
 interface TestOpts {
   _resolvedOpts?: FileLockOptions
@@ -254,7 +261,7 @@ describe('FileLockOptions test.', () => {
     const options: FileLockOptions = {};
     // テストのため強制型キャスト
     options[key] = value as any;
-    expect(() => new FileLockOptionsResolver(options)).toThrow(InvalidOptions);
+    expect(() => new FileLockOptionsResolver(options, minimumFileLockOptions)).toThrow(InvalidOptions);
   }
 
   it("undefinedやnullを指定すると、エラーになる(timeoutSec).", async () => {
@@ -329,9 +336,9 @@ describe('FileLockOptions test.', () => {
 
   it("解決済のoptionを変更して、再度解決すると、その結果が正しく反映されている.", async () => {
     const options: FileLockOptions & {[_resolvedOpts: string]: FileLockOptions} = {};
-    const rOpts = new FileLockOptionsResolver(options).getOptions();
+    const rOpts = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions();
     options.allowReentry = true;
-    const rOpts2 = new FileLockOptionsResolver(options).getOptions()
+    const rOpts2 = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions()
     expect(rOpts2.allowReentry).toBe(options.allowReentry);
     expect('_resolvedOpts' in options ? options._resolvedOpts?.allowReentry : 'error').toBe(options.allowReentry);
   });
@@ -339,7 +346,7 @@ describe('FileLockOptions test.', () => {
   //FileLockOptionsResolver
   class TestOptionResolver extends FileLockOptionsResolver {
     constructor(options: FileLockOptions, defaultOpts: FileLockRequiredOptions) {
-      super(options, defaultOpts);
+      super(options, minimumFileLockOptions, defaultOpts);
     }
 
     public test_getRequiredOptions_emptyOpts() {
@@ -381,6 +388,30 @@ describe('FileLockOptions test.', () => {
         message: "To generate required options, specify default options in the constructor."
       })
     }
+  });
+
+  it("数値系オプションに最小値未満を設定すると、最小値2000がセットされる.", async () => {
+    const opts = {
+      timeoutMs:            -1,
+      ttlMs:                -1,
+      pollIntervalMs:       -1,
+      heartbeatIntervalMs:  -1,
+      heartbeatTimeoutMs:   -1,
+      retriesOnIOErr:       -1,
+      retryIntervalMs:      -1,
+    };
+    const exp = {
+      timeoutMs:            0,
+      ttlMs:                1000,
+      pollIntervalMs:       100,
+      heartbeatIntervalMs:  1000,
+      heartbeatTimeoutMs:   2000,
+      retriesOnIOErr:       0,
+      retryIntervalMs:      100,
+    };
+    // withLockにおけるオプションの値はケースによって変更されることを確認する
+      FileLock.withLock('testKey8989', () => {}, opts);
+      expect(TestLock._lastOptions).toMatchObject(exp);
   });
 
 });

@@ -1,10 +1,20 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
 import { logger, sleepAsync } from './FileLockTestCommon.ts'
+
+let orgConfig: FileLockConfig;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
 
 describe('FileLock', () => {
 
@@ -20,7 +30,7 @@ describe('FileLock', () => {
       let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
-      config = {...FileLock.getDefaultConfig(), userDefaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
+      config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
     }
@@ -29,38 +39,31 @@ describe('FileLock', () => {
     }
   });
 
-  it("heartbeatTimeoutMsに0を設定すると、最小値2000がセットされる.", async () => {
-    const orgConf = FileLock.getConfig();
-    try {
-      // コンフィグ設定におけるデフォルトオプションの値は解決されることを確認
-      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 0 } });
-      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
+  class TestLock extends (FileLock as any) {};
 
-      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 1000 } });
-      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
-
-      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 1999 } });
-      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2000);
-
-      FileLock.setConfig({ userDefaultOptions: { heartbeatTimeoutMs: 2001 } });
-      expect(FileLock.getConfig().userDefaultOptions?.heartbeatTimeoutMs).toBe(2001);
-
-      // withLockにおけるオプションの値はケースによって変更されることを確認する
-      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 0 });
-      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
-   
-      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 1999 });
-      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
-
-      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 2000});
-      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2000);
-
-      FileLock.withLock('testKey8989', () => {}, { heartbeatTimeoutMs: 2001});
-      expect(FileLock._lastOptions?.heartbeatTimeoutMs).toBe(2001);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+  it("数値系オプションに最小値未満を設定すると、最小値2000がセットされる.", async () => {
+    const defaults = {
+      timeoutMs:            -1,
+      ttlMs:                -1,
+      pollIntervalMs:       -1,
+      heartbeatIntervalMs:  -1,
+      heartbeatTimeoutMs:   -1,
+      retriesOnIOErr:       -1,
+      retryIntervalMs:      -1,
+    };
+    const exp = {
+      timeoutMs:            0,
+      ttlMs:                1000,
+      pollIntervalMs:       100,
+      heartbeatIntervalMs:  1000,
+      heartbeatTimeoutMs:   2000,
+      retriesOnIOErr:       0,
+      retryIntervalMs:      100,
+    };
+    // コンフィグ設定におけるデフォルトオプションの値は解決されることを確認
+    FileLock.setConfig({ defaultOptions: defaults });
+    const udo = TestLock.getConfig().defaultOptions;
+    expect(TestLock.getConfig().defaultOptions).toMatchObject(exp);
   });
 
   it("`You can specify `console` as the logger, " +
@@ -324,7 +327,7 @@ describe('FileLock', () => {
     const stat_before = fs.statSync(hist);
     expect.assertions(1);
     try {
-      FileLock.setConfig({ _debug: true });
+      FileLock.setConfig({ _debug: true, history: false });
       await FileLock.withLock('debug_mode_key', 
         async () => {
           await sleepAsync(500);

@@ -1,5 +1,5 @@
 import { LockBaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseOptionsResolver.ts';
-import { FileLockOptions, FileLockRequiredOptions } from './FileLockOptions.ts';
+import { FileLockMinimumOptions, FileLockOptions, FileLockRequiredOptions } from './FileLockOptions.ts';
 //import { FileLockInternalState } from './FileLockInternalState.ts';
 //import { NumberArray } from 'lru-cache/raw';
 
@@ -7,7 +7,7 @@ import { FileLockOptions, FileLockRequiredOptions } from './FileLockOptions.ts';
  * @internal
  * A class that resolves Options for FileLock.
  */
-export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockRequiredOptions> {
+export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockMinimumOptions, FileLockRequiredOptions> {
   
   /**
    * Static fields.
@@ -23,8 +23,8 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
    * Constructor.
    * @param options User options.
    */
-  constructor(options: FileLockOptions, defaultOptions?: FileLockRequiredOptions ) {
-    super(options, defaultOptions);
+  constructor(options: FileLockOptions, minimumOptions: FileLockMinimumOptions, defaultOptions?: FileLockRequiredOptions ) {
+    super(options, minimumOptions, defaultOptions);
   };
 
   /** Get the type-checking pairs `{'property name': 'value type'}` for the optional properties. */
@@ -57,14 +57,17 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
    * @param defaultOpts  Defalt options
    * @protected
    */
-  protected override _normalizeOptions(defaultOpts?: FileLockRequiredOptions): void {
+  // これもう要らない
+  /*
+  protected override _normalizeOptions(): void {
     // ★★★　この最小値補正も、親クラスに閉じ込めろ！！　こちらは、チェック対象リストを渡すだけ{key, minval} _checkMinValueParis()とかね！
-    super._normalizeOptions(defaultOpts);
+    super._normalizeOptions();
     this.options.heartbeatTimeoutMs = Math.max(
       this.options.heartbeatTimeoutMs ?? 0, 
       FileLockOptionsResolver.minHeartBeatTimeoutMs
     );
   }
+  */
 
 }
 

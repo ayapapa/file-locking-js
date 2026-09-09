@@ -1,12 +1,12 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
 //import { AllOptions, AllOptionsKey } from './AllOptions.ts';
-import { type LockBaseOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
+import { type LockBaseOptions, type LockBaseMinimumOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { InvalidOptions } from './LockBaseErrors.ts';
 import { FileLockError } from './FileLockErrors.ts';
 //import { LockBaseInternalState } from './LockBaseInternalState.ts';
 
-const {REQUIRE} = Contracts;
+const {REQUIRE, REQUIRE_DEBUG, VERIFY_DEBUG} = Contracts;
 
 /** Types of time-based key. */
 export type TimeBasedKey<T> = {
@@ -32,7 +32,6 @@ type SecKey<T> = `${TimeBasedKey<T>}Sec`;
 /** Types of millisecond-time-based key. */
 type MsKey<T> = `${TimeBasedKey<T>}Ms`;
 
-
 //export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
 /**
@@ -41,7 +40,11 @@ type MsKey<T> = `${TimeBasedKey<T>}Ms`;
  * Base class: Accepts a generic type U
  * U must inherit from LockBaseOptions (constraint) 
  */
-export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOptions, R extends LockBaseRequiredOptions = LockBaseRequiredOptions> {
+export class LockBaseOptionsResolver <
+  O extends LockBaseOptions = LockBaseOptions,
+  M extends LockBaseMinimumOptions = LockBaseMinimumOptions,
+  R extends LockBaseRequiredOptions = LockBaseRequiredOptions,
+  > {
   //I extends LockBaseInternalState = LockBaseInternalState> {
 
   /** Static methods. */
@@ -61,9 +64,11 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
   /** Instance fields. */
 
   /** Current options. */
-  protected options: U; //AllOptions<U, I>;
+  protected options: O; //AllOptions<O, I>;
 
-  protected defaultOptions?: R;//AllOptions<U, I>;
+  protected defaultOptions?: R | null;//AllOptions<O, I>;
+
+  protected minimumOptions: M;
 
   /** Instance methods. */
 
@@ -72,25 +77,28 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @param opts        User options.
    * @param defaultOptions Default options.
    */
-  constructor(userOpts: U, defaultOptions?: R) {
+  constructor(userOpts: O, minimumOptions: M, defaultOptions?: R) {
     if ('_resolvedOpts' in userOpts) delete userOpts._resolvedOpts;
 
-    this.options = { ...userOpts };// as AllOptions<U, I>;
-    if (defaultOptions) this.defaultOptions = { ...defaultOptions };
+    this.options = { ...userOpts };// as AllOptions<O, I>;
+    this.minimumOptions = { ...minimumOptions };
+    // Avoid using an if-statement to address a coverage issue.
+    this.defaultOptions = defaultOptions ? { ...defaultOptions } : null;
 
-    this.#resolveOptions(defaultOptions);
+    this.#resolveOptions();
 
     Object.assign(userOpts, { _resolvedOpts: this.options })
 
   }
 
   /** Get options. */
-  public getOptions(): U/*AllOptions<U, I>*/ {
+  public getOptions(): O/*AllOptions<O, I>*/ {
     return this.options;
   }
 
-  /** Get an option consisting of required properties. Error if any properties are missing. */
-  //public getRequiredOptions/*<K extends keyof U>*/(/*keys: readonly K[]*/): R/*AllOptions<Required<Pick<U, K>>, I>*/ {
+  /** 
+   * Get an option consisting of required properties. Error if any properties are missing. 
+   */
   public getRequiredOptions(): R {
     if (!this.defaultOptions) {
       throw new FileLockError("To generate required options, specify default options in the constructor.", { code: 'EFILELOCK' });
@@ -125,8 +133,8 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * If a subclass handles extended options that include similar keys, override this function and add the relevant keys to the array. 
    * @returns Array of time-related keys requiring unit conversion (seconds to milliseconds).
    */
-  protected _getTimeKeys(): TimeBasedKey<U>[] {
-    return ['timeout', 'ttl'] as TimeBasedKey<U>[];
+  protected _getTimeKeys(): TimeBasedKey<O>[] {
+    return ['timeout', 'ttl'] as TimeBasedKey<O>[];
   }
 
   /**
@@ -135,10 +143,46 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @param defaultOptions  User default options
    * @protected
    */
-  protected _normalizeOptions(defaultOptions?: R): void {
+  protected _normalizeOptions(): void {
     this.#convSecToMs();
 
-    Object.assign(this.options, { ...defaultOptions,  ...this.options});
+    // Apply minimum value
+    this.#applyMinimum();    
+
+    // Apply default values
+    this.#applyDefaults();
+  }
+
+
+  #applyMinimum() {
+    const min = this.minimumOptions as Record<string, number>;
+
+    REQUIRE_DEBUG(
+      Object.values(min).every((value) => typeof value === 'number'),
+      'オプション最小値セット(minimumOptions)に数値以外のプロパティが含まれています。',
+      InvalidOptions,
+      { name: 'this->minimumOptions', props: { minimumOptions: min } }
+    );
+
+    const opt = this.options as unknown as Record<string, number>;
+    const keys = Object.keys(this.minimumOptions);
+    keys.forEach((key) => {
+      if (key in this.options) {
+
+        VERIFY_DEBUG(
+          typeof opt[key] === 'number',
+          `オプションのプロパティ(${key})の値は数値でなければなりません。`,
+          InvalidOptions,
+          { name: 'this->options', props: { key, value: opt[key] } }
+        );
+
+        opt[key] = Math.max(opt[key], min[key]);
+      }
+    });
+  }
+
+  #applyDefaults() {
+    Object.assign(this.options, { ...this.defaultOptions,  ...this.options});
   }
 
   /**
@@ -159,9 +203,9 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * Validate, transform, and complete the user options passed to the constructor.
    * @param defaultOpts  Defalt options
    */
-  #resolveOptions(defaultOpts?: R) {
+  #resolveOptions() {
     this.#validateOptions();
-    this._normalizeOptions(defaultOpts);
+    this._normalizeOptions();
   }
 
   /**
@@ -179,9 +223,9 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @internal
    * get TimeBaseKey-> SecBaseKey map.
    */
-  #getSecKeyMap(keys: TimeBasedKey<U>[]): { [key: string]:keyof U/* AllOptionsKey<U>*/ } {
+  #getSecKeyMap(keys: TimeBasedKey<O>[]): { [key: string]:keyof O/* AllOptionsKey<U>*/ } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Sec` as keyof U/*AllOptionsKey<U>*/])
+      keys.map(key => [key, `${key}Sec` as keyof O/*AllOptionsKey<U>*/])
     );
   }
 
@@ -189,9 +233,9 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
    * @internal
    * get TimeBaseKey-> MsBaseKey map.
    */
-  #getMsKeyMap(keys: TimeBasedKey<U>[]): { [key: string]: keyof U/*AllOptionsKey<U>*/ } {
+  #getMsKeyMap(keys: TimeBasedKey<O>[]): { [key: string]: keyof O/*AllOptionsKey<U>*/ } {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Ms` as keyof U/*AllOptionsKey<U>*/])
+      keys.map(key => [key, `${key}Ms` as keyof O/*AllOptionsKey<O>*/])
     );
   }
 
@@ -220,11 +264,11 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
     const keys = this._getTimeKeys();
     // Treat this.options as a type containing only the time key (type assertion)
     // Here, use 'as unknown as ...' to safely cast via unknown
-    const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<U> | MsKey<U>, number>>
+    const optionsAsNumbers = this.options as unknown as Partial<Record<SecKey<O> | MsKey<O>, number>>
     
     keys.forEach(key => {
-      const fromKey = `${key}Sec` as SecKey<U>;
-      const toKey = `${key}Ms` as MsKey<U>;
+      const fromKey = `${key}Sec` as SecKey<O>;
+      const toKey = `${key}Ms` as MsKey<O>;
 
       const value = optionsAsNumbers[fromKey];
 
@@ -237,6 +281,6 @@ export class LockBaseOptionsResolver <U extends LockBaseOptions = LockBaseOption
 }
 
 /** Enumerate typed object keys. */
-export function typedKeys<U extends object>(obj: U): Array<keyof U> {
-  return Object.keys(obj) as Array<keyof U>;
+export function typedKeys<O extends object>(obj: O): Array<keyof O> {
+  return Object.keys(obj) as Array<keyof O>;
 }

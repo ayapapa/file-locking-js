@@ -1,4 +1,4 @@
-import { defaultLockBaseOptions, type LockBaseRequiredOptions, type LockBaseOptions } from './LockBaseOptions.ts';
+import { defaultLockBaseOptions, minimumLockBaseOptions, type LockBaseMinimumOptions, type LockBaseRequiredOptions, type LockBaseOptions } from './LockBaseOptions.ts';
 
 // User options for FileLock (inherits from LockBaseOptions)
 export interface FileLockOptions extends LockBaseOptions {
@@ -12,6 +12,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Polling interval (checking if locked) in milliseconds until timeout. 
    * Cannot be used with pollIntervalSec. <br>
+   * The minimum value is 100; if a value lower than this is specified, this minimum value is used.
    * Default is 100. Specifying `0` also results in the default value.
    */
   pollIntervalMs?: number;
@@ -27,7 +28,8 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Heartbeat interval in milliseconds while the locked process is running. 
    * The lock file is updated at this interval until the process completes. Cannot be used with heartbeatIntervalSec.<br>
-   * Default is 1000. Specifying `0` also results in the default value.
+   * The minimum value is 1000; if a value lower than this is specified, this minimum value is used.
+   * Default is 1000.
    */
   heartbeatIntervalMs?: number;
 
@@ -43,25 +45,29 @@ export interface FileLockOptions extends LockBaseOptions {
    * Validity period in milliseconds for the last heartbeat update. 
    * If this amount of time has not elapsed since the last update, the process is considered to be still running. This cannot be used in conjunction with `heartbeatTimeoutSec`.
    * The minimum value is 2000; if a value lower than this is specified, this minimum value is used.
-   * The default value is 10000.
+   * Default is 10000.
    */
   heartbeatTimeoutMs?: number;
 
   /**
    * Number of retries for lock file operations in the event of an I/O error.
+   * The minimum value is 0; if a value lower than this is specified, this minimum value is used.
    * Default is 1.
    */
   retriesOnIOErr?: number;
 
   /**
    * Interval between lock file operation retries [seconds]. 
-   *  Internally converted to retryIntervalMs. Cannot be used together with retryIntervalMs. Defaults to the default value of retryIntervalMs.
+   * Internally converted to retryIntervalMs. Cannot be used together with retryIntervalMs. 
+   * Defaults to the default value of retryIntervalMs.
    */
   retryIntervalSec?: number;
 
   /**
    * Interval between lock file operation retries [milliseconds]. 
-   *  Cannot be used together with retryIntervalSec. Default and minimum is 100.
+   * Cannot be used together with retryIntervalSec. 
+   * The minimum value is 100; if a value lower than this is specified, this minimum value is used.
+   * Default is 100.
    */
   retryIntervalMs?: number;
 
@@ -70,16 +76,6 @@ export interface FileLockOptions extends LockBaseOptions {
 // ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
 
 export type FileLockRequiredOptions = Required<Pick<FileLockOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'>> & LockBaseRequiredOptions;
-/*
-export const _fileLockRequiredOptions = [
-  ..._lockBaseRequiredOptions,
-  'pollIntervalMs',
-  'heartbeatIntervalMs',
-  'heartbeatTimeoutMs',
-  'retriesOnIOErr',
-  'retryIntervalMs'
-]  as const satisfies readonly (keyof FileLockOptions)[];
-*/
 
 /**
  * @internal
@@ -93,5 +89,16 @@ export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
   retryIntervalMs:      100,
 };
 
-export const requiredFileLockOptionsKeys = Object.keys(defaultFileLockOptions) as readonly (keyof FileLockRequiredOptions)[];
-
+export type FileLockMinimumOptions = Record<'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs', number> & LockBaseMinimumOptions;
+/**
+ * @internal
+ * 数値系プロパティの最小値。本値未満の数値は最小値に置き換えられる。
+ */
+export const minimumFileLockOptions: Readonly<FileLockMinimumOptions> = {
+  ...minimumLockBaseOptions,
+  pollIntervalMs:       100,
+  heartbeatIntervalMs:  1000,
+  heartbeatTimeoutMs:   2000,
+  retriesOnIOErr:       0,
+  retryIntervalMs:      100,
+}

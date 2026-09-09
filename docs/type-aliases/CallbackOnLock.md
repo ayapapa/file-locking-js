@@ -8,7 +8,7 @@
 
 > **CallbackOnLock** = (`monitor`) => `any`
 
-Defined in: [src/lib/LockBase.ts:12](https://github.com/ayapapa/file-lock-js/blob/17de2828088c860064e647e72109816942d47edf/src/lib/LockBase.ts#L12)
+Defined in: [src/lib/LockBase.ts:12](https://github.com/ayapapa/file-lock-js/blob/011a25c8bdd33bc82a43cf82cbb8fd220f049122/src/lib/LockBase.ts#L12)
 
 Definition of the callback function to be executed after acquiring the lock.
 

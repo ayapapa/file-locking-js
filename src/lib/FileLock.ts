@@ -7,7 +7,7 @@ const { REQUIRE, REQUIRE_DEBUG } = Contracts;
 
 import { LockBase, type CallbackOnLock } from "./LockBase.ts";
 import { LockError } from "./LockBaseErrors.ts";
-import { defaultFileLockOptions, type FileLockRequiredOptions, type FileLockOptions } from './FileLockOptions.ts';
+import { defaultFileLockOptions, minimumFileLockOptions, type FileLockRequiredOptions, type FileLockOptions } from './FileLockOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
@@ -41,7 +41,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * 最近使ったオプション(static `withLock()`内で解決されたオプション）を保存する。
    * 本来は、`withLock()`の呼び出しごとに新しいオプションが解決されるため、staticに保存する必要はないが、テストのために保存する。
    */
-  public static _lastOptions: FileLockRequiredOptions | null = null;
+  protected static _lastOptions: FileLockRequiredOptions | null = null;
 
   /**
    * @internal
@@ -86,9 +86,9 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    */
   public static setConfig(config: FileLockConfig): void {
     const dConf = FileLock.#copyConfig(config);
-    // ★★★　ここで、userDefaultOptionsが指定されていたら、解決しておかないといけないね！！★★★
-    if (dConf.userDefaultOptions) {
-      dConf.userDefaultOptions = new FileLockOptionsResolver(dConf.userDefaultOptions).getOptions();
+    // ★★★　ここで、defaultOptionsが指定されていたら、解決しておかないといけないね！！★★★
+    if (dConf.defaultOptions) {
+      dConf.defaultOptions = new FileLockOptionsResolver(dConf.defaultOptions, minimumFileLockOptions).getOptions();
     }
     FileLock.#config = { ...FileLock.getConfig(), ...dConf };
 
@@ -142,10 +142,16 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockOptions  = {}): Promise<any> {
     REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { code: 'EINVAL' });
-    // Resolve options.  If userDefaultOptions is specified in the config, it will be used as the default options.
-    const defaultOpts: FileLockRequiredOptions = { ...FileLock.getDefaultOptions(), ...FileLock.#config.userDefaultOptions };
-    const rOpt = new FileLockOptionsResolver(options, defaultOpts).getRequiredOptions();
+
+    // If defaultOptions is specified in the config, it will be used as the default options.
+    const defaultOpts: FileLockRequiredOptions = { ...FileLock.getDefaultOptions(), ...FileLock.#config.defaultOptions };
+
+    // Resolve options.
+    const rOpt = new FileLockOptionsResolver(options, minimumFileLockOptions, defaultOpts).getRequiredOptions();
+
+    // For testing
     FileLock._lastOptions = rOpt;
+    
     return FileLock._getLock(key).withLock(onLockFn, rOpt);
   }
 
@@ -287,7 +293,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    */
   static #copyConfig<T extends FileLockConfig>(config: T): T {
     const ret = { ...config };
-    if (config.userDefaultOptions) ret.userDefaultOptions = { ...config.userDefaultOptions };
+    if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
     // If specified undefined, delete it.
     for (let key in ret) {
       if (ret[key] === undefined) delete ret[key];
@@ -867,7 +873,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   }
 
   #isDebug(): boolean {
-    return FileLock.#config._debug/* ?? false*/;
+    return FileLock.#config._debug;
   }
 }
 

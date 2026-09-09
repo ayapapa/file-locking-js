@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileLockConfig, FileLock } from '../src/index.ts';
 import { logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
-FileLock.setConfig({ logger });
+let orgConfig: FileLockConfig;
+beforeEach(() => {
+  orgConfig = FileLock.getConfig();
+});
+
+afterEach(() => {
+  FileLock.setConfig(orgConfig);
+  vi.restoreAllMocks();
+});
 
 describe('FileLock', () => {
 
