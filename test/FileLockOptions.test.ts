@@ -257,84 +257,81 @@ describe('FileLockOptions test.', () => {
     await testTypeErrorOption('retriesOnIOErr', 'string');
   });
 
-  function testNullKindValueOption(key: keyof FileLockOptions, value: undefined | null) {
+  function _testNullKindValueOption(key: keyof FileLockOptions, value: undefined | null) {
     const options: FileLockOptions = {};
     // テストのため強制型キャスト
     options[key] = value as any;
-    expect(() => new FileLockOptionsResolver(options, minimumFileLockOptions)).toThrow(InvalidOptions);
+    try {
+      new FileLockOptionsResolver(options, minimumFileLockOptions);
+    }
+    catch (err) {
+      expect(err).toBeInstanceOf(InvalidOptions);
+      expect(err).toMatchObject({ code: 'EINVAL', name: key, message: `[REQUIRE] The type of option ${key} is incorrect.` })
+    }
   }
 
-  it("undefinedやnullを指定すると、エラーになる(timeoutSec).", async () => {
-    testNullKindValueOption('timeoutSec', null);
-    testNullKindValueOption('timeoutSec', undefined);
+  function testNullKindValueOption(key: keyof FileLockOptions) {
+    expect.assertions(4);
+    _testNullKindValueOption(key, null);
+    _testNullKindValueOption(key, undefined);
+  }
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutSec).", async () => {
+    testNullKindValueOption('timeoutSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(timeoutMs).", async () => {
-    testNullKindValueOption('timeoutMs', null);
-    testNullKindValueOption('timeoutMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutMs).", async () => {
+    testNullKindValueOption('timeoutMs')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(ttlSec).", async () => {
-    testNullKindValueOption('ttlSec', null);
-    testNullKindValueOption('ttlSec', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlSec).", async () => {
+    testNullKindValueOption('ttlSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(ttlMs).", async () => {
-    testNullKindValueOption('ttlMs', null);
-    testNullKindValueOption('ttlMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlMs).", async () => {
+    testNullKindValueOption('ttlMs')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(allowReentry).", async () => {
-    testNullKindValueOption('allowReentry', null);
-    testNullKindValueOption('allowReentry', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(allowReentry).", async () => {
+    testNullKindValueOption('allowReentry')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(pollIntervalSec).", async () => {
-    testNullKindValueOption('pollIntervalSec', null);
-    testNullKindValueOption('pollIntervalSec', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalSec).", async () => {
+    testNullKindValueOption('pollIntervalSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(pollIntervalMs).", async () => {
-    testNullKindValueOption('pollIntervalMs', null);
-    testNullKindValueOption('pollIntervalMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalMs).", async () => {
+    testNullKindValueOption('pollIntervalMs')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(heartbeatIntervalSec).", async () => {
-    testNullKindValueOption('heartbeatIntervalSec', null);
-    testNullKindValueOption('heartbeatIntervalSec', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalSec).", async () => {
+    testNullKindValueOption('heartbeatIntervalSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(heartbeatIntervalMs).", async () => {
-    testNullKindValueOption('heartbeatIntervalMs', null);
-    testNullKindValueOption('heartbeatIntervalMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalMs).", async () => {
+    testNullKindValueOption('heartbeatIntervalMs')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(heartbeatTimeoutSec).", async () => {
-    testNullKindValueOption('heartbeatTimeoutSec', null);
-    testNullKindValueOption('heartbeatTimeoutSec', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTimeoutSec).", async () => {
+    testNullKindValueOption('heartbeatTimeoutSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(heartbeatTimeoutMs).", async () => {
-    testNullKindValueOption('heartbeatTimeoutMs', null);
-    testNullKindValueOption('heartbeatTimeoutMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTimeoutMs).", async () => {
+    testNullKindValueOption('heartbeatTimeoutMs')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(retriesOnIOErr).", async () => {
-    testNullKindValueOption('retriesOnIOErr', null);
-    testNullKindValueOption('retriesOnIOErr', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retriesOnIOErr).", async () => {
+    testNullKindValueOption('retriesOnIOErr')
   });
   
-  it("undefinedやnullを指定すると、エラーになる(retryIntervalSec).", async () => {
-    testNullKindValueOption('retryIntervalSec', null);
-    testNullKindValueOption('retryIntervalSec', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalSec).", async () => {
+    testNullKindValueOption('retryIntervalSec')
   });
 
-  it("undefinedやnullを指定すると、エラーになる(retryIntervalMs).", async () => {
-    testNullKindValueOption('retryIntervalMs', null);
-    testNullKindValueOption('retryIntervalMs', undefined);
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalMs).", async () => {
+    testNullKindValueOption('timeoutSec')
   });
 
-  it("解決済のoptionを変更して、再度解決すると、その結果が正しく反映されている.", async () => {
+  it("When a resolved option is modified and resolved again, the result is correctly reflected.", async () => {
     const options: FileLockOptions & {[_resolvedOpts: string]: FileLockOptions} = {};
     const rOpts = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions();
     options.allowReentry = true;
@@ -360,37 +357,37 @@ describe('FileLockOptions test.', () => {
     }
   }
 
-  it("オプションが必須プロパティーをもっていない状態でデフォルトオプション未指定時にgetRequiredOptions()を呼ぶとエラー.", async () => {
+  it("Calling `getRequiredOptions()` results in an error if an option lacks a required property and no default options have been specified.", async () => {
     const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
     expect.assertions(2);
     try {
       or.test_getRequiredOptions_emptyOpts();
     }
     catch (err) {
-      expect(err).instanceOf(FileLockError);
+      expect(err).instanceOf(InvalidOptions);
       expect(err).toMatchObject( {
-        code: 'EFILELOCK', 
+        code: 'EINVAL', 
         message: "Missing required option: timeoutMs,ttlMs,allowReentry,pollIntervalMs,heartbeatIntervalMs,heartbeatTimeoutMs,retriesOnIOErr,retryIntervalMs"
       })
     }
   });
 
-  it("デフォルトオプション未指定時にgetRequiredOptions()を呼ぶとエラー.", async () => {
+  it("Calling getRequiredOptions() without specifying default options results in an error.", async () => {
     const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
     expect.assertions(2);
     try {
       or.test_getRequiredOptions_noDefaults();
     }
     catch (err) {
-      expect(err).instanceOf(FileLockError);
+      expect(err).instanceOf(InvalidOptions);
       expect(err).toMatchObject( {
-        code: 'EFILELOCK', 
-        message: "To generate required options, specify default options in the constructor."
+        code: 'EINVAL', 
+        message: "To generate required options, specify `defaultOptions` in the constructor."
       })
     }
   });
 
-  it("数値系オプションに最小値未満を設定すると、最小値2000がセットされる.", async () => {
+  it("If a value less than the minimum is specified for a numeric option, the minimum value is set.", async () => {
     const opts = {
       timeoutMs:            -1,
       ttlMs:                -1,
@@ -409,9 +406,9 @@ describe('FileLockOptions test.', () => {
       retriesOnIOErr:       0,
       retryIntervalMs:      100,
     };
-    // withLockにおけるオプションの値はケースによって変更されることを確認する
-      FileLock.withLock('testKey8989', () => {}, opts);
-      expect(TestLock._lastOptions).toMatchObject(exp);
+
+    FileLock.withLock('testKey8989', () => {}, opts);
+    expect(TestLock._lastOptions).toMatchObject(exp);
   });
 
 });

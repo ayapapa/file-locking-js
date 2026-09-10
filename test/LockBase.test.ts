@@ -36,19 +36,21 @@ describe('LockBase and Util', () => {
     });
   });
 
-  it("`sleepAsync()`が指定通りの時間眠る.", async () => {
+  it("`sleepAsync()` sleeps for the specified duration.", async () => {
     const start = Date.now();
     await sleepAsync(100);
 
     const elapsed = Date.now() - start;
+    // Verify that at least 99 ms have elapsed to account for margin of error.
     expect(elapsed).toBeGreaterThanOrEqual(99);
   });
 
-  it("`sleepSync()`が指定通りの時間眠る.", async () => {
+  it("`sleepSync()` sleeps for the specified duration.", async () => {
     const start = Date.now();
     sleepSync(100);
     
     const elapsed = Date.now() - start;
+    // Verify that at least 99 ms have elapsed to account for margin of error.
     expect(elapsed).toBeGreaterThanOrEqual(99);
   });
 
@@ -86,29 +88,29 @@ describe('LockBase and Util', () => {
     }
   }
 
-  it("`LockBase._incReantryCount()`を実装しないと未実装エラー.", async () => {
+  it("Failing to implement `LockBase._incReantryCount()` results in a `not implemented` error.", async () => {
     testNotImpleMethod(() => {
       new TestLockBase().test_incReantryCount();
     });
   });
 
-  it("`LockBase._decReantryCount()`を実装しないと未実装エラー.", async () => {
+  it("Failure to implement `LockBase._decReantryCount()` results in an `not implemented` error.", async () => {
     testNotImpleMethod(() => {
       new TestLockBase().test_decReantryCount();
     });
   });
 
-  it("`LockBase._onError()`で、codeを持たないエラーを指定すると、、、.", async () => {
+  it("When you specify an error that does not have a code in `LockBase._onError()`.", async () => {
     const tl = new TestLockBase();
     const operation = 'OP';
     const mon = tl.test_onError(new Error("test `LockBase._onError()`"), operation);
     expect(mon.cancelled).toBeTruthy();
     expect(typeof mon.id === 'string' && mon.id.length > 0).toBeTruthy()
     expect(mon.operation).toBe(operation)
-    expect(mon.reason).toBe('ELOCK'); // 未指定時のデフォルトの理由
+    expect(mon.reason).toBe('ELOCK'); // Reason for the default when unspecified
   });
 
-  it("stack が undefined なら`Call stack: couldn't get.`を返す", () => {
+  it("If `stack` is undefined, return `Call stack: couldn't get.`", () => {
     vi.spyOn(Error, 'captureStackTrace').mockImplementation((targetObject: object) => {});
 
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);

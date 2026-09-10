@@ -85,7 +85,7 @@ export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
   allowReentry:   false,  // Default to disallowing re-entrant locks
 };
 
-export type LockBaseMinimumOptions = Record<'timeoutMs' | 'ttlMs', number >;
+export type LockBaseMinimumOptions = Pick<LockBaseRequiredOptions, 'timeoutMs' | 'ttlMs'>;
 
 export const minimumLockBaseOptions: Readonly<LockBaseMinimumOptions> = {
   timeoutMs:      0,    // Not wait for the release of the preceding-stage lock.

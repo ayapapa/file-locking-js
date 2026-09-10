@@ -12,7 +12,7 @@ import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
-import { _defaultConfig, type FileLockConfig } from './FileLockConfig.ts';
+import { defaultFileLockConfig, type FileLockConfig } from './FileLockConfig.ts';
 import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
 import { FileLockMeta } from './FileLockMeta.ts'
 
@@ -86,7 +86,11 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    */
   public static setConfig(config: FileLockConfig): void {
     const dConf = FileLock.#copyConfig(config);
-    // ★★★　ここで、defaultOptionsが指定されていたら、解決しておかないといけないね！！★★★
+    if (dConf.cacheTtlMs != null) dConf.cacheTtlMs = Math.max(dConf.cacheTtlMs, defaultFileLockConfig.cacheTtlMs);
+    if (dConf.cacheMaxNum != null) dConf.cacheMaxNum  = Math.max(dConf.cacheMaxNum, 0);
+    if (dConf.maxHistoryEntries != null) dConf.maxHistoryEntries = Math.max(dConf.maxHistoryEntries, 0);
+
+    // If defaultOptions is specified, resolve it.
     if (dConf.defaultOptions) {
       dConf.defaultOptions = new FileLockOptionsResolver(dConf.defaultOptions, minimumFileLockOptions).getOptions();
     }
@@ -95,12 +99,11 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     // Clear chache
     FileLock.clearCache();
 
-    FileLock.#config.cacheMaxNum = FileLock.#config.cacheMaxNum;
     if (FileLock.#config.cacheMaxNum === 0) FileLock.#config.cache = false;
 
     FileLock.#config.cacheTtlMs = FileLock.#config.cacheTtlMs;
 
-        // If cache is enabled, (Re)create cache.
+    // If cache is enabled, (Re)create cache.
     if (FileLock.#config.cache) {
       const opts: LRUCache.Options<string, FileLock, unknown> = {
         max: FileLock.#config.cacheMaxNum,
@@ -127,7 +130,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /** Get default `Config`. */
   public static getDefaultConfig(): Required<FileLockConfig> {
-    return FileLock.#copyConfig(_defaultConfig);
+    return FileLock.#copyConfig(defaultFileLockConfig);
   }
 
   /**

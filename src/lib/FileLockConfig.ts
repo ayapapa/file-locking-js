@@ -24,13 +24,14 @@ export interface FileLockConfig extends LockBaseConfig {
   /**
    * Maximum number that can be cached. 
    * `0` means `cache` is disabled, even if `cache` is true.
+   * Minimum is `0`; if a value lower than this is specified, this minimum value is used.
    * Default is `100`.
    */
   cacheMaxNum?: number;
 
   /**
    * Cache expiration time (milliseconds). 
-   * Default is `50000`. Specifying `0` also results in the default value.
+   * Default and minimum `10000`.
    */
   cacheTtlMs?: number;
 
@@ -51,6 +52,7 @@ export interface FileLockConfig extends LockBaseConfig {
   /**
    * Maximum number of history entries to keep.
    * If the number of entries exceeds this value, the oldest entries will be deleted in order.
+   * Minimum is `0`; if a value lower than this is specified, this minimum value is used.
    * Default is `100`.
    */
   maxHistoryEntries?: number;
@@ -71,12 +73,12 @@ export interface FileLockConfig extends LockBaseConfig {
 /**
  * @internal
  */
-export const _defaultConfig: Readonly<Required<FileLockConfig>> = {
+export const defaultFileLockConfig: Readonly<Required<FileLockConfig>> = {
   ...defaultLockBaseConfig,
   _debug:             false,
   cache:              true,
   cacheMaxNum:        100,
-  cacheTtlMs:         50000,
+  cacheTtlMs:         10000,
   defaultOptions:     { ...defaultFileLockOptions },
   history:            false,
   lockDirectory:      null,

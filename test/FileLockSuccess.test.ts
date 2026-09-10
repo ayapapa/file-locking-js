@@ -123,8 +123,9 @@ describe('FileLock', () => {
     )})).toBe(retVal);
   });
 
-  it("空のoptionを非スタティックFileLock.withLock()に渡す.", async () => {
-    // 非デバッグモードで、実施せよ（そうでないと、REQUIRE＿DEBUGにひっかかるぜ）
+  it("Pass an empty option to the non-static FileLock.withLock().", async () => {
+    // Run it in non-debug mode (otherwise, you'll trigger REQUIRE_DEBUG).
+    FileLock.setConfig( { _debug: false });
     try {
       expect(await new TestLock().testWithLockEmptyOptions(() => "OK")).toBe("OK");
     }
@@ -158,7 +159,7 @@ describe('FileLock', () => {
     }
   });
 
-  it("履歴数1.", async () => {
+  it("maxHistoryEntries: 1", async () => {
     const hist = getHistoryPath();
     FileLock.setConfig({ _debug: true, maxHistoryEntries: 1 });
     expect.assertions(2);
@@ -176,28 +177,24 @@ describe('FileLock', () => {
     }
   });
 
-  it("履歴数0.", async () => {
+  it("maxHistoryEntries: 0", async () => {
     const hist = getHistoryPath();
     FileLock.setConfig({ _debug: true, maxHistoryEntries: 0 });
-    expect.assertions(2);
-    try {
-      await FileLock.withLock('debug_mode_key', 
-        async () => {
-          await sleepAsync(100);
-        },
-      );
-      expect(fs.existsSync(hist)).toBeTruthy();
-      const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
-      expect(Object.keys(h).length).toBe(0);
-    }
-    finally {
-    }
+    await FileLock.withLock('debug_mode_key', 
+      async () => {
+        await sleepAsync(100);
+      },
+    );
+    expect(fs.existsSync(hist)).toBeTruthy();
+    const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
+    expect(Object.keys(h).length).toBe(0);
   });
 
-  it("ロック情報ディレクトリ残骸", async () => {
+  it("A case where only the lock information directory remains.", async () => {
     const key = 'Key_HogeHoge'
     const metaDir = path.dirname(getLockMetaPath(key));
     expect.assertions(1);
+    // Generate a state containing only the lock information directory (without meta-information).
     fs.mkdirSync(metaDir);
     try {
       await FileLock.withLock(key, 
@@ -205,13 +202,16 @@ describe('FileLock', () => {
           await sleepAsync(100);
         },
       );
+      // After waiting for a certain period, the lock is determined to be invalid, 
+      // and processing completes successfully.
+      // Therefore, the directory created above should have been deleted.
       expect(fs.existsSync(metaDir)).toBeFalsy();
     }
     finally {
+      // To handle cases where execution does not complete successfully, 
+      // delete the directory created above if it still exists.      
       if (fs.existsSync(metaDir)) fs.rmSync(metaDir, { recursive: true, force: true });
     }
   });
-
-  
 
 });

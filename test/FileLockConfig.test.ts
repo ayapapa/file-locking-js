@@ -6,6 +6,10 @@ import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
 import { logger, sleepAsync } from './FileLockTestCommon.ts'
 
+type NumberKeys<T> = {
+    [K in keyof T]-?: T[K] extends number ? K : never
+}[keyof T];
+
 let orgConfig: FileLockConfig;
 beforeEach(() => {
   orgConfig = FileLock.getConfig();
@@ -41,7 +45,9 @@ describe('FileLock', () => {
 
   class TestLock extends (FileLock as any) {};
 
-  it("数値系オプションに最小値未満を設定すると、最小値2000がセットされる.", async () => {
+  it("In `setConfig()`, if a value lower than the minimum is specified " +
+    "for a numeric property among the default options, " +
+    "the minimum value is set.", async () => {
     const defaults = {
       timeoutMs:            -1,
       ttlMs:                -1,
@@ -60,7 +66,7 @@ describe('FileLock', () => {
       retriesOnIOErr:       0,
       retryIntervalMs:      100,
     };
-    // コンフィグ設定におけるデフォルトオプションの値は解決されることを確認
+    // Verify that the default option values ​​in the configuration settings are resolved.
     FileLock.setConfig({ defaultOptions: defaults });
     const udo = TestLock.getConfig().defaultOptions;
     expect(TestLock.getConfig().defaultOptions).toMatchObject(exp);
@@ -72,7 +78,7 @@ describe('FileLock', () => {
 
     const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
-    //expect.assertions(3);
+    expect.assertions(3);
     try {
       FileLock.setConfig({ logger: console });
 
@@ -94,6 +100,7 @@ describe('FileLock', () => {
 
   async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
     set();
+    expect.assertions(5);
     try {
       const retVal = "test_001", key = retVal;
       fs.rmSync(dir, { force: true, recursive: true });
@@ -124,7 +131,6 @@ describe('FileLock', () => {
   }
 
   it("The directory specified in `FileLock.setCondig()` is created.", async () => {
-    console.log("######START The directory specified...#####");
     const dir = path.join(process.cwd(), '.lock');
     let orgConf: FileLockConfig;
     await testLockDirectoryCreation(
@@ -207,7 +213,7 @@ describe('FileLock', () => {
   it("An error occurs because the directory path specified in `FileLock.setConfig()` already exists but is not a directory.", async () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.writeFileSync(dir, "");
-    //expect.assertions(5);
+    expect.assertions(2);
     const orgConf = FileLock.getConfig();
     try {
       FileLock.setConfig({ lockDirectory: dir, logger });
@@ -222,11 +228,6 @@ describe('FileLock', () => {
     catch (err: any) {
       expect(err).instanceOf(FileLockError);
       expect(err.code).toBe('ENOTDIR');
-      /*
-      expect(err.fsErrorCode).toBe('ENOTDIR');
-      expect(err.fsErrorMsg.includes(dir)).toBe(true);
-      expect(err.fsErrorMsg.includes('not a directory')).toBe(true);
-      */
     }
     finally {
       fs.rmSync(dir, { force: true, recursive: true });
@@ -365,46 +366,65 @@ describe('FileLock', () => {
     }
   });
 
-  it("cacheMaxNumをundefined指定.", async () => {
-    const orgConf = FileLock.getConfig();
-    expect.assertions(1);
-    try {
-      FileLock.setConfig({ cacheMaxNum: undefined });
-      const config = FileLock.getConfig();
-      expect(config.cacheMaxNum).toBe(100);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+  function testConfigMinVal(key: keyof FileLockConfig, exp: number, val?: number, additinalExp?: () => void) {
+    expect.assertions(additinalExp ? 2 : 1);
+    const config = {} as Record<keyof NumberKeys<FileLockConfig>, number | undefined>;
+    config[key] = val;
+    FileLock.setConfig(config);
+    const gConf = FileLock.getConfig();
+    expect(gConf[key]).toBe(exp);
+    if (additinalExp) additinalExp();
+  }
+
+  it("cacheMaxNum: undefined", async () => {
+    testConfigMinVal('cacheMaxNum', 100, undefined);
   });
 
-  // cacheMaxNum 0
-  it("cacheMaxNumを0.", async () => {
-    const orgConf = FileLock.getConfig();
-    expect.assertions(2);
-    try {
-      FileLock.setConfig({ cacheMaxNum: 0 });
-      const config = FileLock.getConfig();
-      expect(config.cacheMaxNum).toBe(0);
-      expect(config.cache).toBeFalsy();
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+  it("cacheMaxNum: 0", async () => {
+    testConfigMinVal('cacheMaxNum', 0, 0, () => expect(FileLock.getConfig().cache).toBeFalsy());
   });
 
-  //cacheTtlMs 
-  it("cacheTtlMsをunddfined.", async () => {
-    const orgConf = FileLock.getConfig();
-    expect.assertions(1);
-    try {
-      FileLock.setConfig({ cacheTtlMs: undefined });
-      const config = FileLock.getConfig();
-      expect(config.cacheTtlMs).toBe(50000);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+  it("cacheMaxNum: -1", async () => {
+    testConfigMinVal('cacheMaxNum', 0, -1, () => expect(FileLock.getConfig().cache).toBeFalsy());
   });
 
+  it("cacheMaxNum: 1", async () => {
+    testConfigMinVal('cacheMaxNum', 1, 1);
+  });
+
+  it("cacheTtlMs: undefined", async () => {
+    testConfigMinVal('cacheTtlMs', 10000, undefined);
+  });
+
+  it("cacheTtlMs: 0", async () => {
+    testConfigMinVal('cacheTtlMs', 10000, 0);
+  });
+
+  it("cacheTtlMs: -1", async () => {
+    testConfigMinVal('cacheTtlMs', 10000, -1);
+  });
+
+  it("cacheTtlMs: 10001", async () => {
+    testConfigMinVal('cacheTtlMs', 10001, 10001);
+  });
+
+  it("maxHistoryEntries: undefined", async () => {
+    testConfigMinVal('maxHistoryEntries', 100, undefined);
+  });
+
+  it("maxHistoryEntries: 0", async () => {
+    testConfigMinVal('maxHistoryEntries', 0, 0);
+  });
+
+  it("maxHistoryEntries: -1", async () => {
+    testConfigMinVal('maxHistoryEntries', 0, -1);
+  });
+
+  it("maxHistoryEntries: 101", async () => {
+    testConfigMinVal('maxHistoryEntries', 99, 99);
+  });
+
+  it("maxHistoryEntries: 101", async () => {
+    testConfigMinVal('maxHistoryEntries', 101, 101);
+  });
 });

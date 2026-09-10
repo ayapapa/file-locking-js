@@ -289,49 +289,49 @@ describe('FileLock', () => {
     msg ? expect(err.message).toBe(msg) : expect(err.message).toBe('null');
   }
 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(TTLExceeded).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", async () => {
     testNoParamsError(LockError);
   });
 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(TTLExceeded).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", async () => {
     testNoParamsError(TTLExceeded, 'The maximum processing time(options.ttlMs milliseconds) while locked has been exceeded.');
   });
 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(AlreadyLocked).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(AlreadyLocked).", async () => {
     testNoParamsError(AlreadyLocked , "Could not lock because the 'key' is already locked.");
   });
 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(InvalidOptions).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(InvalidOptions).", async () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options is invalid.");
   });
   
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(DeadlockDetected).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(DeadlockDetected).", async () => {
     testNoParamsError(DeadlockDetected  , "A deadlock was detected.");
   });
 
   //LockDirectoryAccessFailed 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockDirectoryStatFailed).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockDirectoryStatFailed).", async () => {
     testNoParamsError(LockDirectoryStatFailed  , "Failed to check the status of the lock information directory.");
   });
 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockDirectoryCreationFailed).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockDirectoryCreationFailed).", async () => {
     testNoParamsError(LockDirectoryCreationFailed  , "Failed to create the lock information directory.");
   });
 
   //LockCompromised 
-  it("エラークラスをパラメータ無しでnewすると、デフォルトのメッセージになる(LockCompromised).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockCompromised).", async () => {
     testNoParamsError(LockCompromised  , "The lock has been compromised.");
   });
 
 
-  it("InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる.", async () => {
+  it("If `InvalidOptions` has no message but a `param` is specified, the resulting message includes `'param.name'`.", async () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options(PARAM) is invalid.", { name: "PARAM"});
-    logger.log(`InvalidOptionsにメッセージ無し、かつ、paramを指定すると、'param.name'を含んだメッセージになる. => OK`)
   });
   
 
-  it("ロックコールバックでエラーになったとき", async () => {
+  it("If an error occurs in the lock callback, that error can be caught.", async () => {
     let mon: Monitor = { cancelled: false };
+    expect.assertions(3);
     try {
       await FileLock.withLock(
         'testKey_8131',
@@ -343,14 +343,16 @@ describe('FileLock', () => {
     }
     catch (err) {
       expect(mon?.cancelled).toBeTruthy();
+      expect(err).instanceOf(Error);
+      expect(err).toMatchObject({ message: "Callback error!" });
     }
 
   });
 
-  it("リエントラントロックコールバックでエラーになったとき", async () => {
+  it("If an error occurs within the reentrant lock callback, that error can be caught.", async () => {
     let mon1: Monitor = { cancelled: false };
     let mon2: Monitor = { cancelled: false };
-    expect.assertions(6);
+    expect.assertions(3);
     try {
       await FileLock.withLock(
         'testKey_18465',
@@ -370,17 +372,14 @@ describe('FileLock', () => {
     catch (err) { // EREENTLOCK
       expect(err).instanceOf(Error);;
       expect(mon1).toBe(mon2);
-      expect(mon1?.cancelled).toBeTruthy();
-      expect(mon1?.reason).toBe('ECALLBACK');
-      expect(mon1?.operation).contains("Re-entrant locking callback.");
-      expect(mon1?.cause).toBe(err);
+      expect(mon1).toMatchObject({ cancelled: true, reason: 'ECALLBACK', operation: "Re-entrant locking callback.", cause: err});
     }
   });
 
-  it("リエントラントロックコールバックでエラーになったとき2(エラー以外を投げる)", async () => {
+  it("When an error occurs in the reentrant lock callback(throwing something other than an error).", async () => {
     let mon1: Monitor = { cancelled: false };
     let mon2: Monitor = { cancelled: false };
-    expect.assertions(6);
+    expect.assertions(3);
     try {
       await FileLock.withLock(
         'testKey_18465',
@@ -400,21 +399,17 @@ describe('FileLock', () => {
     catch (err) {
       expect(err).contains("Reentrant callback error!");
       expect(mon1).toBe(mon2);
-      expect(mon1?.cancelled).toBeTruthy();
-      expect(mon1?.reason).toBe('ECALLBACK');
-      expect(mon1?.operation).contains("Re-entrant locking callback.");
-      expect(mon1?.cause).toBe(err);
+      expect(mon1).toMatchObject({ cancelled: true, reason: 'ECALLBACK', operation: "Re-entrant locking callback.", cause: err});
     }
   });
 
-  it("リエントラントロック処理中にファイル読み込みエラー発生", async () => {
+  it("File read error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
-    expect.assertions(4);
+    expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
-          //vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
           vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error("readFileSync error!"), { code: 'ERMOON' }); });
 
           await FileLock.withLock(
@@ -426,30 +421,28 @@ describe('FileLock', () => {
       );
     }
     catch (err) { // EREENTLOCK
-      if (err instanceof Error) {
-        expect(err).instanceOf(FileLockError);
-        expect(err.message).contains(`Couldn't read the lock information file.(readFileSync error!)`);
-        expect('code' in err && err.code).toBe('ERMOON');
-        const metaPath = TestLock.getLockMetaFilePath(key);
-        expect('file' in err && err.file).contains(metaPath);
-      }
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code: 'ERMOON', 
+        message: "Couldn't read the lock information file.(readFileSync error!)",
+        file: TestLock.getLockMetaFilePath(key)
+      });
     }
     finally {
-      // 読みが失敗するので、ロック情報ファイルの中味を確認できず、勝手に削除できない⇒他ロックからはロック済と判定されることになる
-      // このため、ここで強制的にファイルを削除する
+      // Since the read operation fails, the contents of the lock information file cannot be verified, preventing it from being deleted normally—meaning other locks will perceive it as still locked.
+      // Therefore, the file is forcibly deleted here.
       removeLockFiles(key);
     }
   });
 
-  it("リエントラントロック処理中にファイル書き込みエラー発生", async () => {
+  it("File write error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
-    expect.assertions(4);
+    expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
           vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
-          //vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error("readFileSync error!"), { code: 'ERMOON' }); });
 
           await FileLock.withLock(
             key,
@@ -460,19 +453,18 @@ describe('FileLock', () => {
       );
     }
     catch (err) {
-      if (err instanceof Error) {
-        expect(err).instanceOf(FileLockError);
-        expect(err.message).contains(`Couldn't update the lock information file.(writeFileSync error!)`);
-        expect('code' in err && err.code).toBe('EWMOON');
-        const metaPath = TestLock.getLockMetaFilePath(key);
-        expect('file' in err && err.file).contains(metaPath);
-      }
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code:     'EWMOON',
+        message:  `Couldn't update the lock information file.(writeFileSync error!)`,
+        file:     TestLock.getLockMetaFilePath(key)
+      });
     }
   });
 
-  it("ロック処理中にファイル書き込みエラー発生", async () => {
+  it("File write error occurred during lock processing.", async () => {
     const key = 'testKey_18465xx'
-    expect.assertions(4);
+    expect.assertions(2);
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     try {
       await FileLock.withLock(
@@ -483,19 +475,18 @@ describe('FileLock', () => {
       );
     }
     catch (err) {
-      if (err instanceof Error) {
-        expect(err).instanceOf(FileLockError);
-        expect(err.message).contains(`Couldn't update the lock information file.(writeFileSync error!)`);
-        expect('code' in err && err.code).toBe('EWMOON');
-        const metaPath = TestLock.getLockMetaFilePath(key);
-        expect('file' in err && err.file).contains(metaPath);
-      }
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code:     'EWMOON',
+        message:  `Couldn't update the lock information file.(writeFileSync error!)`,
+        file:     TestLock.getLockMetaFilePath(key)
+      });
     }
   });
 
-  it("ロック処理中のメタファイルが不正だったとき（JSONパース出来なかったとき）", async () => {
+  it("When a metafile being locked is invalid (i.e., JSON parsing failed)", async () => {
     const key = 'testKey_18465xx'
-    expect.assertions(3);
+    expect.assertions(2);
     const metaPath = getLockMetaPath(key);
     try {
       fs.writeFileSync(metaPath, '');
@@ -507,14 +498,12 @@ describe('FileLock', () => {
       );
     }
     catch (err) {
-      if (err instanceof Error) {
-        expect(err).instanceOf(LockCompromised);
-        expect(err.message).contains(`Couldn't parse the lock information file, it is probably broken.`);
-        expect(err).toMatchObject( {
-          code: 'ECOMPROMISED',
-          file: metaPath
-        });
-      }
+      expect(err).instanceOf(LockCompromised);
+      expect(err).toMatchObject( {
+        code: 'ECOMPROMISED',
+        message: `The lock(key: ${key}) has been compromised(Couldn't parse the lock information file, it is probably broken.).`,
+        file: metaPath
+      });
     }
     finally {
       fs.rmSync(metaPath);
@@ -522,7 +511,7 @@ describe('FileLock', () => {
   });
 
 
-  it("history JSON 解析エラー", async () => {
+  it("history JSON parsing error", async () => {
     const histPath = TestLock.getHistoryPath();
     const key = 'testKey_18465xxxx'
     const histBu = histPath + '.bu';
@@ -543,13 +532,11 @@ describe('FileLock', () => {
       );
     }
     catch (err) {
-      if (err instanceof Error) {
-        expect(err).instanceOf(FileLockError);
-        expect(err).toMatchObject({
-          code:     "EHISTORY",
-          message:  "Failed to parse the history file."
-        });
-      }
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code:     "EHISTORY",
+        message:  "Failed to parse the history file."
+      });
     }
     finally {
       fs.rmSync(histPath);

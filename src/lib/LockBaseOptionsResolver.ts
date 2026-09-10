@@ -1,10 +1,7 @@
 // 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
-//import { AllOptions, AllOptionsKey } from './AllOptions.ts';
 import { type LockBaseOptions, type LockBaseMinimumOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { InvalidOptions } from './LockBaseErrors.ts';
-import { FileLockError } from './FileLockErrors.ts';
-//import { LockBaseInternalState } from './LockBaseInternalState.ts';
 
 const {REQUIRE, REQUIRE_DEBUG, VERIFY_DEBUG} = Contracts;
 
@@ -17,7 +14,6 @@ export type TimeBasedKey<T> = {
         : never
       : never
 }[keyof T];
-
 
 /** Type of Key-Type map. */
 export type KeyTypeMap<T> = Record<keyof T, any>;
@@ -101,7 +97,7 @@ export class LockBaseOptionsResolver <
    */
   public getRequiredOptions(): R {
     if (!this.defaultOptions) {
-      throw new FileLockError("To generate required options, specify default options in the constructor.", { code: 'EFILELOCK' });
+      throw new InvalidOptions("To generate required options, specify `defaultOptions` in the constructor.", { name: 'this.defaultOptions' });
     }
     
     const missings: string[] = [];
@@ -109,8 +105,9 @@ export class LockBaseOptionsResolver <
       // 必須キー構成のオプションであることを確認済みのため、型キャストして返す。
       return this.options as unknown as R;
     }
-
-    throw new FileLockError(`Missing required option: ${missings}`, { code: 'EFILELOCK' })
+    else {
+      throw new InvalidOptions(`Missing required option: ${missings}`, { name: 'this.options', props: { options: this.options } })
+    }
   }
 
   /**
@@ -151,27 +148,28 @@ export class LockBaseOptionsResolver <
 
     // Apply default values
     this.#applyDefaults();
-  }
-
+  } 
 
   #applyMinimum() {
+    // Since property type inference does not work as expected, cast the object to Record<string, number>
+    // and perform validation to ensure type safety.
     const min = this.minimumOptions as Record<string, number>;
+    const opt = this.options as unknown as Record<string, number>;
 
     REQUIRE_DEBUG(
       Object.values(min).every((value) => typeof value === 'number'),
-      'オプション最小値セット(minimumOptions)に数値以外のプロパティが含まれています。',
+      'The minimum options set (minimumOptions) contains properties that are not numbers.',
       InvalidOptions,
       { name: 'this->minimumOptions', props: { minimumOptions: min } }
     );
 
-    const opt = this.options as unknown as Record<string, number>;
     const keys = Object.keys(this.minimumOptions);
     keys.forEach((key) => {
       if (key in this.options) {
 
         VERIFY_DEBUG(
           typeof opt[key] === 'number',
-          `オプションのプロパティ(${key})の値は数値でなければなりません。`,
+          `The value of the option property (${key}) must be a number.`,
           InvalidOptions,
           { name: 'this->options', props: { key, value: opt[key] } }
         );

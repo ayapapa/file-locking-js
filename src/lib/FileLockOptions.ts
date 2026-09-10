@@ -12,7 +12,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Polling interval (checking if locked) in milliseconds until timeout. 
    * Cannot be used with pollIntervalSec. <br>
-   * The minimum value is 100; if a value lower than this is specified, this minimum value is used.
+   * Minimum is 100; if a value lower than this is specified, this minimum value is used.
    * Default is 100. Specifying `0` also results in the default value.
    */
   pollIntervalMs?: number;
@@ -28,7 +28,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Heartbeat interval in milliseconds while the locked process is running. 
    * The lock file is updated at this interval until the process completes. Cannot be used with heartbeatIntervalSec.<br>
-   * The minimum value is 1000; if a value lower than this is specified, this minimum value is used.
+   * Minimum is 1000; if a value lower than this is specified, this minimum value is used.
    * Default is 1000.
    */
   heartbeatIntervalMs?: number;
@@ -44,14 +44,14 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Validity period in milliseconds for the last heartbeat update. 
    * If this amount of time has not elapsed since the last update, the process is considered to be still running. This cannot be used in conjunction with `heartbeatTimeoutSec`.
-   * The minimum value is 2000; if a value lower than this is specified, this minimum value is used.
+   * Minimum is 2000; if a value lower than this is specified, this minimum value is used.
    * Default is 10000.
    */
   heartbeatTimeoutMs?: number;
 
   /**
    * Number of retries for lock file operations in the event of an I/O error.
-   * The minimum value is 0; if a value lower than this is specified, this minimum value is used.
+   * Minimum is 0; if a value lower than this is specified, this minimum value is used.
    * Default is 1.
    */
   retriesOnIOErr?: number;
@@ -66,7 +66,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Interval between lock file operation retries [milliseconds]. 
    * Cannot be used together with retryIntervalSec. 
-   * The minimum value is 100; if a value lower than this is specified, this minimum value is used.
+   * Minimum is 100; if a value lower than this is specified, this minimum value is used.
    * Default is 100.
    */
   retryIntervalMs?: number;
@@ -89,7 +89,7 @@ export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
   retryIntervalMs:      100,
 };
 
-export type FileLockMinimumOptions = Record<'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs', number> & LockBaseMinimumOptions;
+export type FileLockMinimumOptions = Pick<FileLockRequiredOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'> & LockBaseMinimumOptions;
 /**
  * @internal
  * 数値系プロパティの最小値。本値未満の数値は最小値に置き換えられる。
