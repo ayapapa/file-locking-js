@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { LockError, DeadlockDetected } from './LockBaseErrors.ts';
+import { LockError, DeadlockDetected, TTLExceeded } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
-import { type LockBaseOptions } from './LockBaseOptions.ts';
+import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
 import { type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
 
@@ -33,7 +33,7 @@ export interface ReentrantContext  {
  * from within that context.
  * @abstract
  */
-export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
+export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
 
   /** 
    * Static fieilds. 
@@ -77,8 +77,18 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
    */
   protected _key: string;
 
-  /** Context ID (for reentrant lock detection). */
-  //#contextId: string;
+  /**
+   * @internal
+   * Function that signals a forced termination.
+   */
+  #onExitReject: ((reason?: unknown) => void) | null = null;
+
+  /**
+   * 強制終了
+   */
+  protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    this.#onExitReject?.(new LockError("Forced termination.", { code: String(code ?? 'ELOCK'), props: { reason: signal ?? 'ELOCK'}}));
+  }
 
   /** Instance methods. */
 
@@ -112,16 +122,15 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, execWithLock: (cb: () => any, opt: AllOptions<U, I>) => any, options: AllOptions<U, I>) {
+  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
-    REQUIRE_DEBUG(execWithLock && typeof execWithLock === 'function', 'Invalid execWithLock.', LockError, {code: 'EINVAL'});
 
-    const execDependingOnReentry = async () => {
+    const whithLockInContext = async () => {
       // Preparing for recursive lock checks.
       const rc = this._getReentrantContext();
       if (!rc) {
         // Since there is no context for reentrancy lock detection yet, I will create a new context and call `withLock` again within it.
-        return this.#runInNewContext(() => execDependingOnReentry());
+        return this.#runInNewContext(() => whithLockInContext());
       }
 
       // Re-entry lock check.
@@ -131,24 +140,103 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
 
         // Since re-entry is permitted, increment the lock count and then execute the callback.
         this._logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
-        this._incReantryCount(options);
-        try {
-          return await this.#execCallback(onLockFn, options);
-        }
-        catch (err) {
-          this._onError(err, 'Re-entrant locking callback.', options, 'ECALLBACK');
-          throw err;
-        }
-        finally {
-          this._decReantryCount(options);
-        }
+        return this.#execWithoutLock(onLockFn, options)
       }
 
       // Exeute locking operations.
-      return execWithLock(() => this.#execCallback(onLockFn, options), options);
+      return this.#execWithLock(onLockFn, options);
     }
     
-    return execDependingOnReentry();
+    try {
+      return await whithLockInContext();
+    }
+    catch (err) {
+      this._logger.fatal('Error occurred.', err);
+    }
+  }
+
+  protected async _acquire(options: AllOptions<U, I>) {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  protected _release(options: AllOptions<U, I>) {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  #createTtlTimer(options: AllOptions<U, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
+    let id: NodeJS.Timeout | null = null;
+    const ttlMs = options.ttlMs;
+    const promise = new Promise((_, reject) => {
+      id = setTimeout(() => {
+        reject(new TTLExceeded(null, { ttlMs, props: { key: this._key } }));
+      },
+      ttlMs);
+    });
+    return { id, promise };
+  }
+
+  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+    await this._acquire(options);
+
+    // Create TTL timer
+    const ttlTimer = this.#createTtlTimer(options);
+
+    // A race between callback processing and the TTL timer.
+    try {
+      const cbPromise = this.#execCallback(onLockFn, options);
+      return await Promise.race([cbPromise, ttlTimer.promise])
+        .finally(() => { // In any case, turn off the timer.
+          // Avoid if statements as a measure against coverage issue
+          ttlTimer.id && clearTimeout(ttlTimer.id);
+        }
+      );
+    }
+    catch (err) {
+      this._onError(err, 'Callback or Timer in withLock()', options, 'ECALLBACK');
+      throw err;
+    }
+    finally {
+      this._release(options);
+    }
+  }
+
+  #onExitPromise() {
+    let onExitResolve!: ((v: unknown) => void);
+    return {
+      promise: new Promise((resolve, reject) => {
+        onExitResolve = resolve;
+        this.#onExitReject = reject;
+      }),
+      onExitResolve
+    };
+  }
+
+  async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+    this._incReantryCount(options);
+    // Create TTL timer
+    const ttlTimer = this.#createTtlTimer(options);
+    try {
+      const cbPromise = this.#execCallback(onLockFn, options);
+
+      const onExitPromise = this.#onExitPromise();
+
+      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
+        .finally(() => { // In any case, turn off the timer.
+          // Avoid if statements as a measure against coverage issue
+          ttlTimer.id && clearTimeout(ttlTimer.id);
+          onExitPromise.onExitResolve('No forced termination');
+          this.#onExitReject = null;
+        }
+      );
+      //return await this.#execCallback(onLockFn, options);
+    }
+    catch (err) {
+      this._onError(err, 'Re-entrant locking callback.', options, 'ECALLBACK');
+      throw err;
+    }
+    finally {
+      this._decReantryCount(options);
+    }
   }
 
   /**
@@ -296,4 +384,4 @@ export class LockBase <U extends LockBaseOptions = LockBaseOptions, I extends Lo
   }
 }
 
-export { Monitor };
+export { type Monitor };

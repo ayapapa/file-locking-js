@@ -1,5 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { onExit } from 'signal-exit';
+
 import { LRUCache } from 'lru-cache';
 import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
 import { Contracts } from '@ayapapa-npm/contracts-js';
@@ -10,18 +12,16 @@ import { LockError } from "./LockBaseErrors.ts";
 import { defaultFileLockOptions, minimumFileLockOptions, type FileLockRequiredOptions, type FileLockOptions } from './FileLockOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
 import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
-import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, TTLExceeded } from './FileLockErrors.ts';
+import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
 import { defaultFileLockConfig, type FileLockConfig } from './FileLockConfig.ts';
 import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
-import { FileLockMeta } from './FileLockMeta.ts'
+import { type FileLockMeta } from './FileLockMeta.ts'
 
 /** 
  * @ internal
  * All options type.
  */
-//type AllOptions_ = AllOptionsT<FileLockOptions, FileLockInternalState>;
-
 type AllOptions = AllOptionsT<FileLockRequiredOptions, FileLockInternalState>;
 
 /**
@@ -190,6 +190,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   
   /**
    * @internal
+   * Get `cache` instance. <br>
    * It is set to `private` for testing purposes.
    */
   private static _getCache(): LRUCache<string, FileLock> | null {
@@ -328,9 +329,8 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
-   * Creates a FileLock instance. <br>
+   * Creates a FileLock instance.
    * @param {string}  key Locking key.
-   * @internal
    */
   private constructor(key: string) {
     super(key, FileLock.#config);
@@ -375,6 +375,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   }
 
   /**
+   * @internal
    * Make advance preparations.
    * @param options Options
    */
@@ -384,16 +385,11 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     const fileDir     = path.join(dirPath, this._key);
     options._filePath     = path.join(fileDir, 'meta.json');
     options._contextId    = options._filePath;  // Use the file path as the context ID 
-                                              // to avoid issues caused by changes 
-                                              // to the lock directory configuration.
+                                                // to avoid issues caused by changes 
+                                                // to the lock directory configuration.
     options._historyFile = path.join(dirPath, 'history.json');
   }
-/*
-  #isResolvedOptions(options: AllOptions): boolean {
-    const rKeys = //型のキー列挙と、その型へのキャスト（文字列はだめ）　そして、備えているかをチェックする
-    return false;
-  };
-*/
+
   /**
    * @internal
    * Acquires a lock, executes the function `onLockFn` under exclusive control, 
@@ -407,90 +403,87 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     REQUIRE_DEBUG(FileLockOptionsResolver.isRequiredOptions(userOpts, FileLock.getDefaultOptions()), 
       "The option remains unresolved.", InvalidOptions, { name: 'userOpts', props: { options: userOpts } } );
 
-    // 指定されたオプションと内部状態を結合したものをオプションとして再構成。
+    // Reconstructs the options by combining the specified options with the internal state.
     const options = { ...userOpts } as AllOptions;
-
     this._prepare(options);
 
-    return super._withLock(
-      onLockFn,
-
-      async (cb, opts) => { // `cb` is a callback in the parent class that wraps `onLockFn`.
-
-        await this.#acquire(opts);
-
-        // Create TTL timer
-        let ttlTimeoutId: NodeJS.Timeout;
-        const ttlMs = opts.ttlMs;// || LockBase._defaultTtlMs;
-        const timeoutPr = new Promise((_, reject) => {
-          ttlTimeoutId = setTimeout(() => {
-            reject(new TTLExceeded(null, { ttlMs, props: { key: this._key, file: opts._filePath } }));
-          },
-          ttlMs);
-        });
-
-        // A race between callback processing and the TTL timer.
-        try {
-          return await Promise.race([cb(), timeoutPr])
-            .finally(() => { // In any case, turn off the timer.
-              // Avoid if statements as a measure against coverage issue
-              ttlTimeoutId && clearTimeout(ttlTimeoutId);
-            }
-          );
-        }
-        catch (err) {
-          this._onError(err, 'Callback or Timer in withLock()', opts, 'ECALLBACK');
-          throw err;
-        }
-        finally {
-          this.#release(opts);
-        }
-      },
-      options
-    );
-
+    return super._withLock(onLockFn, options);
   }
 
   /**
+   * @internal
    * Acquire the lock. 
    * In practice, if a lock is already held, wait for it to be released before acquiring the lock. 
    * Throw an error (exception) if the specified timeout is exceeded.
    * @param options  Options
    */
-  async #acquire(options: AllOptions): Promise<void> {
+  protected override async _acquire(options: AllOptions): Promise<void> {
     const start = Date.now();
-    const timeoutTime = start + (options.timeoutMs/* ?? LockBase._defaultTimeoutMs*/);
-    const pollIntervalMs = options.pollIntervalMs;// || FileLock.#defaultPollIntervalMs;
+    const timeoutTime = start + options.timeoutMs;
+    const pollIntervalMs = options.pollIntervalMs;
     while (!this.#tryLock(options)) {
       if (Date.now() >= timeoutTime) {
         throw new AlreadyLocked('', {key: this._key, props: { file: options._filePath } });
       }
       await sleepAsync(pollIntervalMs);
     }
+    this._logger.trace('Acquired the lock.')
   }
+ /* 
+  async #acquire(options: AllOptions): Promise<void> {
+    const start = Date.now();
+    const timeoutTime = start + options.timeoutMs;
+    const pollIntervalMs = options.pollIntervalMs;
+    while (!this.#tryLock(options)) {
+      if (Date.now() >= timeoutTime) {
+        throw new AlreadyLocked('', {key: this._key, props: { file: options._filePath } });
+      }
+      await sleepAsync(pollIntervalMs);
+    }
+    this._logger.trace('Acquired the lock.')
+  }
+*/
+  /**
+   * @internal
+   * Release lock. <br>
+   * In practice, the counter is decremented, and the lock is released when it reaches zero.
+   * @param options Options.
+   */
+  protected override _release(options: AllOptions) {
+    this._decReantryCount(options);
+  }
+  /*
+  #release(options: AllOptions): void {
+    this._decReantryCount(options);
+  }
+    */
 
   /**
-   * ファイル生成。
-   * ★★★、、、、proper-filelockの使い道を再検討せよ！　そもそも、これをつかって、最初にロックを試みて、だめなら、待つ！　そのうえで、自前のロック情報の中身をみる。。。ロック中は、このproper-filelockもロックを外さない。
-   * つまり、２重ロック厳格さを導入するのである。
+   * @internal
+   * Create the lock information file.
    * @param options Options.
    */
   #createFile(options: AllOptions) {
-    const ttlMs = options.ttlMs;// || LockBase._defaultTtlMs;
-    const heartbeatTimeoutMs = options.heartbeatTimeoutMs/* ?? FileLock.#defaultHeartbeatTimeoutMs*/;
-    const ownerId = crypto.randomUUID();
 
+    const dir = path.dirname(options._filePath);
+
+    // Create the lock key directory.
+    this.#accessInfo(
+      dir,
+      (): void => {
+        fs.mkdirSync(dir, { recursive: true });
+      },
+      options,
+      "Failed to create the lock key directory."
+    );
+
+    // Create the lock information file.
     this.#updateInfo(
       options,
       {
-        ownerId: options._ownerId = ownerId,
-        /*
-        processId: process.pid,
-        parentProcessId: process.ppid,
-        processArgv: process.argv,
-        */
-        expirationTime: Date.now() + ttlMs,
-        heartbeatTimeoutMs: heartbeatTimeoutMs,
+        ownerId: options._ownerId = crypto.randomUUID(),
+        expirationTime: Date.now() + options.ttlMs,
+        heartbeatTimeoutMs: options.heartbeatTimeoutMs,
         lastHeartbeatAt: Date.now(),
         counter: 1
       },
@@ -519,40 +512,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   #tryLock(options: AllOptions): boolean {
     if (this.#released === false) return false;
 
-    const dir = path.dirname(options._filePath);
-    const lockable = this.#accessInfo(
-      dir, 
-      (): boolean => {
-        if (fs.existsSync(dir) === false) return true; // 専用ディレクトリが無いのでロック可能
+    // Check lockable
+    if (this.#isLockable(options) === false) return false;
 
-        const meta = this.#getInfoIfExists(options); // ロック情報ファイルがあるかどうかを確認する。なければ、ロック可能。
-        if (meta) {
-          if (this.#isLockExpired(meta) === false) return false; // This lock is alive.
-        } 
-        else { // Found a directory that does not contain lock information.
-          if (this.#isDirExpired(dir, options) === false) return false;
-        }
-
-        // ゴミを削除する。
-        this.#removeFile(meta, options, `Couldn't remove the lock information file because it is expired.`);
-        return true;
-      },
-      options,
-      "ほげほげほげ"
-    );
-    if (lockable === false) return false;
-
-    // 専用ロックディレクトリを作成する。
-    this.#accessInfo(
-      dir,
-      (): void => {
-        fs.mkdirSync(dir, { recursive: true });
-      },
-      options,
-      "ほげほげほげほげ"
-    );      
-
-    // Create lock information file. 
+    // Create the lock information file. 
     this.#createFile(options);
 
     // Start the heartbeat.
@@ -565,12 +528,33 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
-   * Release lock. 
-   * In practice, the counter is decremented, and the lock is released when it reaches zero.
-   * @param options Options.
+   * Check lockable.
+   * @param options 
+   * @returns 
    */
-  #release(options: AllOptions): void {
-    this._decReantryCount(options);
+  #isLockable(options: AllOptions): boolean {
+    const dir = path.dirname(options._filePath);
+    return this.#accessInfo(
+      dir, 
+      (): boolean => {
+        if (fs.existsSync(dir) === false) return true; // Locking is possible because the lock key directory does not exist.
+
+        const meta = this.#getInfoIfExists(options);
+        if (meta) {
+          if (this.#isLockExpired(meta) === false) return false; // This lock is alive.
+        } 
+        else { // Found a directory that does not contain lock information.
+          if (this.#isDirExpired(dir, options) === false) return false;
+        }
+
+        // Delete stale information.
+        this.#removeFile(meta, options, `Couldn't remove the lock information file because it is expired.`);
+
+        return true;
+      },
+      options,
+      "Failed to verify whether locking is possible."
+    );
   }
 
   /**
@@ -582,6 +566,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     this._logger.trace("Lock file contents in isLockExpired():", meta);
     const expired = meta.expirationTime <= Date.now();
     const dead = meta.lastHeartbeatAt + meta.heartbeatTimeoutMs <= Date.now();
+    this._logger.trace("expired:", expired, "dead:", dead);
     return expired && dead;
   }
 
@@ -599,8 +584,6 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     this.#heartbeatTimer = setInterval(
       async () => {
-        //if (this.#released) return this.#stopHeartbeat();
-        
         try {
           this.#updateHeartbeat(options);
         }
@@ -610,11 +593,8 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
           this._onError(err, 'updateHeartbeat', options);
           // To maintain the lock, the heartbeat is not stopped here.
         }
-
-        // Therefore, the lock-released flag is checked even after the update.
-        //if (this.#released) return this.#stopHeartbeat();
       },
-      options.heartbeatIntervalMs// || FileLock.#defaultHeartbeatIntervalMs
+      options.heartbeatIntervalMs
     );
   }
 
@@ -673,14 +653,8 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options Options.
    */
   #actuallyRelease(options: AllOptions) {
-    //if (options.release) options.release();
     this.#removeFile(null, options);
-
     this.#stopHeartbeat()
-
-    //pLockfile.unlockSync(options._filePath);
-
-    //delete options.release;
     options._ownerId = null;
     //this.ownerId = null;
     this.#released = true;
@@ -714,7 +688,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         (detailMsg = `(${err.message})`) && 
         (code = ('code' in err && err.code) as string);
 
-        throw new FileLockError(`${errMsg}${detailMsg}`, {code, props: { file: name } });
+        throw new FileLockError(`${errMsg}${detailMsg}`, {code, props: { file: name, cause: err } });
       }
     }
   }
@@ -758,7 +732,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     catch (err) {
       throw new LockCompromised(
         `Couldn't parse the lock information file, it is probably broken.`,
-        {key: this._key, props: { file: options._filePath, key: this._key, optionsOwnerId: options._ownerId } });
+        {key: this._key, props: { file: options._filePath, contents, key: this._key, optionsOwnerId: options._ownerId } });
     }
 
     if(options._ownerId && options._ownerId !== meta.ownerId) {
@@ -878,7 +852,35 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   #isDebug(): boolean {
     return FileLock.#config._debug;
   }
+
+  #onExit(code: number | null | undefined, signal: NodeJS.Signals | null): void {
+    this._onExit(code, signal);
+  }
+
+  /**
+   * @internal
+   * @param code 
+   * @param signal 
+   */
+  public static onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    if (FileLock.#cache) {
+      FileLock.#cache.forEach( lock => {
+        lock.#onExit(code, signal);
+      });
+    }
+  }
 }
 
 // Initialize
 FileLock.initialize();
+
+// Remove acquired locks on exit
+onExit((code, signal) => {
+  console.log("★ FileLock onExit entered");
+
+  FileLock.onExit(code, signal);
+
+  console.log("★ FileLock.onExit returned");
+
+  FileLock.getConfig().logger.trace("Exited by", code, signal);
+});

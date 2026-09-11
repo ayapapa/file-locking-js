@@ -30,12 +30,6 @@ export class DeadlockDetected extends LockError {
    */
   constructor(msg?: string | null, params?: { key: string, props?: LockErrorProps }) {
     msg = msg || 'A deadlock was detected.';
-    // key が有効な場合のみ props に key を追加する
-    // if 文にするとカバレッジツールが else パスを誤判定するため、
-    // スプレッド演算子で分岐を回避している
-    //const props = params?.key ? { ...params?.props , key: params.key } : { ...params?.props }
-    //const key = params?.key;
-    //const props = { ...params?.props, ...(key != null && { key }) }
     super(msg, {
       code: 'EDEADLK' ,
       props: params?.key ? { ...params?.props , key: params.key } : { ...params?.props }

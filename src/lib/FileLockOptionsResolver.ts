@@ -1,5 +1,5 @@
 import { LockBaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseOptionsResolver.ts';
-import { FileLockMinimumOptions, FileLockOptions, FileLockRequiredOptions } from './FileLockOptions.ts';
+import { type FileLockMinimumOptions, type FileLockOptions, type FileLockRequiredOptions } from './FileLockOptions.ts';
 //import { FileLockInternalState } from './FileLockInternalState.ts';
 //import { NumberArray } from 'lru-cache/raw';
 
@@ -50,24 +50,6 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
     bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTimeout', 'retryInterval');
     return bases;
   }
-
-  /**
-   * @internal
-   * Transform, and complete options.
-   * @param defaultOpts  Defalt options
-   * @protected
-   */
-  // これもう要らない
-  /*
-  protected override _normalizeOptions(): void {
-    // ★★★　この最小値補正も、親クラスに閉じ込めろ！！　こちらは、チェック対象リストを渡すだけ{key, minval} _checkMinValueParis()とかね！
-    super._normalizeOptions();
-    this.options.heartbeatTimeoutMs = Math.max(
-      this.options.heartbeatTimeoutMs ?? 0, 
-      FileLockOptionsResolver.minHeartBeatTimeoutMs
-    );
-  }
-  */
 
 }
 

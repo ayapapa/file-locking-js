@@ -67,6 +67,14 @@ describe('LockBase and Util', () => {
         this._decReantryCount({ _ownerId: "", _contextId: "" } as any);
     }
 
+    async test_acquire() {
+        await this._acquire({ _ownerId: "", _contextId: "" } as any);
+    }
+
+    test_release() {
+        this._release({ _ownerId: "", _contextId: "" } as any);
+    }
+
     test_onError(err: Error, op: string) : Monitor {
       const opts = { _ownerId: "", _contextId: "" };
       this._onError(err, op, opts as any);
@@ -74,10 +82,10 @@ describe('LockBase and Util', () => {
     }
   }
 
-  function testNotImpleMethod(cb: () => void) {
+  async function testNotImpleMethod(cb: () => void) {
     expect.assertions(3)
     try {
-      cb();
+      await cb();
     }
     catch (err) {
       if (err instanceof Error) {
@@ -89,14 +97,26 @@ describe('LockBase and Util', () => {
   }
 
   it("Failing to implement `LockBase._incReantryCount()` results in a `not implemented` error.", async () => {
-    testNotImpleMethod(() => {
+    await testNotImpleMethod(() => {
       new TestLockBase().test_incReantryCount();
     });
   });
 
   it("Failure to implement `LockBase._decReantryCount()` results in an `not implemented` error.", async () => {
-    testNotImpleMethod(() => {
+    await testNotImpleMethod(() => {
       new TestLockBase().test_decReantryCount();
+    });
+  });
+
+  it("Failure to implement `LockBase._acquire()` results in an `not implemented` error.", async () => {
+    await testNotImpleMethod(async () => {
+      await (new TestLockBase().test_acquire());
+    });
+  });
+
+  it("Failure to implement `LockBase._release()` results in an `not implemented` error.", async () => {
+    await testNotImpleMethod(() => {
+      new TestLockBase().test_release();
     });
   });
 

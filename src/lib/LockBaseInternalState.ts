@@ -21,9 +21,6 @@ export interface Monitor {
  * Basic status information.
  */
 export interface LockBaseInternalState {
-  /** Whether the BaseUserOptions was resolved. */
-  //resolved: boolean;
-
   /** Lock owner id. */
   _ownerId: string | null;
 
@@ -35,6 +32,6 @@ export interface LockBaseInternalState {
   _contextId: string;
 
   /** Monitoring information to be passed to the callback function. */
-  _monitor: Monitor | null;
+  _monitor: Monitor;
 }
 

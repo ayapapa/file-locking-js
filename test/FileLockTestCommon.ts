@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { PrettyConsole, LogEntry } from '@ayapapa-npm/pretty-console-js';
+import { PrettyConsole, type LogEntry } from '@ayapapa-npm/pretty-console-js';
 import * as Pino from 'pino'
 import { pino } from 'pino'
 
-import { FileLock } from '../src/index';
+import { FileLock } from '../src/index.ts';
 
 export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -116,4 +116,4 @@ export class TestLock extends (FileLock as any) {
 
 }
 
-FileLock.setConfig({ logger, history: true });
+FileLock.setConfig({ logger, history: true, _debug: true });

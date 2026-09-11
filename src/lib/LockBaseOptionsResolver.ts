@@ -152,19 +152,19 @@ export class LockBaseOptionsResolver <
 
   #applyMinimum() {
     // Since property type inference does not work as expected, cast the object to Record<string, number>
-    // and perform validation to ensure type safety.
+    // and validate to ensure type safety.
     const min = this.minimumOptions as Record<string, number>;
     const opt = this.options as unknown as Record<string, number>;
 
     REQUIRE_DEBUG(
-      Object.values(min).every((value) => typeof value === 'number'),
+      Object.values(min).every(value => typeof value === 'number'),
       'The minimum options set (minimumOptions) contains properties that are not numbers.',
       InvalidOptions,
       { name: 'this->minimumOptions', props: { minimumOptions: min } }
     );
 
     const keys = Object.keys(this.minimumOptions);
-    keys.forEach((key) => {
+    keys.forEach(key => {
       if (key in this.options) {
 
         VERIFY_DEBUG(
@@ -211,9 +211,7 @@ export class LockBaseOptionsResolver <
    * Validate options.
    */
   #validateOptions() {
-    // 型チェック
     this.#checkTypes();
-    // 併用チェック
     this.#checkCompeting();
   }
 
@@ -221,9 +219,9 @@ export class LockBaseOptionsResolver <
    * @internal
    * get TimeBaseKey-> SecBaseKey map.
    */
-  #getSecKeyMap(keys: TimeBasedKey<O>[]): { [key: string]:keyof O/* AllOptionsKey<U>*/ } {
+  #getSecKeyMap(keys: TimeBasedKey<O>[]): Record<string, keyof O> {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Sec` as keyof O/*AllOptionsKey<U>*/])
+      keys.map(key => [key, `${key}Sec` as keyof O])
     );
   }
 
@@ -231,9 +229,9 @@ export class LockBaseOptionsResolver <
    * @internal
    * get TimeBaseKey-> MsBaseKey map.
    */
-  #getMsKeyMap(keys: TimeBasedKey<O>[]): { [key: string]: keyof O/*AllOptionsKey<U>*/ } {
+  #getMsKeyMap(keys: TimeBasedKey<O>[]): Record<string, keyof O> {
     return Object.fromEntries(
-      keys.map(key => [key, `${key}Ms` as keyof O/*AllOptionsKey<O>*/])
+      keys.map(key => [key, `${key}Ms` as keyof O])
     );
   }
 

@@ -1,5 +1,5 @@
-import { LockBaseOptions } from "./LockBaseOptions.ts";
-import { LockBaseInternalState } from "./LockBaseInternalState.ts";
+import { type LockBaseOptions } from "./LockBaseOptions.ts";
+import { type LockBaseInternalState } from "./LockBaseInternalState.ts";
 
 /**
  * @internal 

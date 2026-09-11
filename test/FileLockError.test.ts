@@ -60,7 +60,7 @@ describe('FileLock', () => {
 
   it("Calling `withLock` with the same `key` twice asynchronously results " +
     "in the second lock timing out when using `Promise.all()`.", async () => {
-
+console.log("#############");
     const key = "testKey";
     const a =  FileLock.withLock(key, async () => {
         await sleepAsync(3000);
@@ -86,6 +86,7 @@ describe('FileLock', () => {
       // aを待つ
       try {await a} catch(e) {};
     }
+console.log("#############");
   });
 
   it("Calling `withLock` with the same key inside a callback function "+

@@ -51,6 +51,7 @@
   "dependencies": {
     "@ayapapa-npm/contracts-js": "^0.4.3",
     "@ayapapa-npm/date-formatter-js": "^0.1.2",
-    "lru-cache": "^11.5.2"
+    "lru-cache": "^11.5.2",
+    "signal-exit": "^4.1.0"
   }
 }
