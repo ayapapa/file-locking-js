@@ -41,21 +41,21 @@ export class LockBaseOptionsResolver <
   M extends LockBaseMinimumOptions = LockBaseMinimumOptions,
   R extends LockBaseRequiredOptions = LockBaseRequiredOptions,
   > {
-  //I extends LockBaseInternalState = LockBaseInternalState> {
 
   /** Static methods. */
 
-  public static isRequiredOptions<O extends object, D extends object>(options: O, defaults: D, missings?: string[]): boolean {
+  public static isRequiredOptions<O extends object, D extends object>(options: O, defaults: D, missings: string[] = []): boolean {
     const keys = Object.keys(defaults) as (keyof O)[];
     let ret = true;
     for (const key of keys) {
       if (options[key] == null) {
         ret = false;
-        missings?.push(String(key));
+        missings.push(String(key));
       }
     }
     return ret;
   }
+  
 
   /** Instance fields. */
 

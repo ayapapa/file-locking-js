@@ -429,20 +429,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     }
     this._logger.trace('Acquired the lock.')
   }
- /* 
-  async #acquire(options: AllOptions): Promise<void> {
-    const start = Date.now();
-    const timeoutTime = start + options.timeoutMs;
-    const pollIntervalMs = options.pollIntervalMs;
-    while (!this.#tryLock(options)) {
-      if (Date.now() >= timeoutTime) {
-        throw new AlreadyLocked('', {key: this._key, props: { file: options._filePath } });
-      }
-      await sleepAsync(pollIntervalMs);
-    }
-    this._logger.trace('Acquired the lock.')
-  }
-*/
+
   /**
    * @internal
    * Release lock. <br>
@@ -452,11 +439,6 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   protected override _release(options: AllOptions) {
     this._decReantryCount(options);
   }
-  /*
-  #release(options: AllOptions): void {
-    this._decReantryCount(options);
-  }
-    */
 
   /**
    * @internal
@@ -512,7 +494,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   #tryLock(options: AllOptions): boolean {
     if (this.#released === false) return false;
 
-    // Check lockable
+    // Check lockable, and if lockable, create lock key directry
     if (this.#isLockable(options) === false) return false;
 
     // Create the lock information file. 
@@ -537,20 +519,33 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     return this.#accessInfo(
       dir, 
       (): boolean => {
-        if (fs.existsSync(dir) === false) return true; // Locking is possible because the lock key directory does not exist.
+        let ret = false;
+        try {
+          if (fs.existsSync(dir) === false) return ret = true; // Locking is possible because the lock key directory does not exist.
 
-        const meta = this.#getInfoIfExists(options);
-        if (meta) {
-          if (this.#isLockExpired(meta) === false) return false; // This lock is alive.
-        } 
-        else { // Found a directory that does not contain lock information.
-          if (this.#isDirExpired(dir, options) === false) return false;
+          const meta = this.#getInfoIfExists(options);
+          if (meta) {
+            if (this.#isLockExpired(meta) === false) return ret = false; // This lock is alive.
+          } 
+          else { // Found a directory that does not contain lock information.
+            if (this.#isDirExpired(dir, options) === false) return ret = false;
+          }
+
+          // Delete stale information.
+          this.#removeFile(meta, options, true);
+          return ret = true;
         }
-
-        // Delete stale information.
-        this.#removeFile(meta, options, `Couldn't remove the lock information file because it is expired.`);
-
-        return true;
+        finally {
+          if (ret === true) {
+            try {
+               fs.mkdirSync(dir);
+            }
+            catch (err) {
+              // mkdirSyncにエラーを発生させたテストが必要！！
+              return false;
+            }
+          }
+        }
       },
       options,
       "Failed to verify whether locking is possible."
@@ -627,7 +622,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options 
    * @param errMsg 
    */
-  #removeFile(meta: FileLockMeta | null, options: AllOptions, errMsg?: string): void {
+  #removeFile(meta: FileLockMeta | null, options: AllOptions, force: boolean = false): void {
     try {
       meta = meta || this.#getInfoIfExists(options);
     }
@@ -635,7 +630,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       return;
     }
 
-    if (meta && meta.ownerId !== options._ownerId) return; // It's compromised, so do not remove it.
+    if (force !== true && meta && meta.ownerId !== options._ownerId) return; // It's compromised, so do not remove it.
 
     // Remove the entire lock key directory.
     const dir = path.dirname(options._filePath)
@@ -643,7 +638,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       dir,
       () => fs.rmSync(dir, { recursive: true, force: true }),
       options,
-      errMsg || `Couldn't remove the lock information file.`
+      `Couldn't remove the lock information file.`
     );
   };
 
@@ -720,7 +715,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     const contents = this.#accessInfo(
       options._filePath,
-      () => fs.readFileSync(options._filePath), 
+      () => fs.readFileSync(options._filePath, 'utf8'), 
       options, 
       `Couldn't read the lock information file.`
     );

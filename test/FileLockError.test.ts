@@ -511,7 +511,6 @@ console.log("#############");
     }
   });
 
-
   it("history JSON parsing error", async () => {
     const histPath = TestLock.getHistoryPath();
     const key = 'testKey_18465xxxx'

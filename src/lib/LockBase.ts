@@ -152,6 +152,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
     }
     catch (err) {
       this._logger.fatal('Error occurred.', err);
+      throw err;
     }
   }
 
