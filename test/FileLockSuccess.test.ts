@@ -17,7 +17,7 @@ afterEach(() => {
 describe('FileLock', () => {
 
   it("The lock is successfully acquired, and the return value of the callback is obtained.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "test_00111", key = retVal;
     const opts =  {timeoutSec : 1 } as any;
     expect(await FileLock.withLock(key, 
       async () => {
@@ -186,7 +186,8 @@ describe('FileLock', () => {
       },
     );
     expect(fs.existsSync(hist)).toBeTruthy();
-    const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
+    const c = fs.readFileSync(hist, 'utf-8');
+    const h = JSON.parse(c);
     expect(Object.keys(h).length).toBe(0);
   });
 
@@ -195,7 +196,7 @@ describe('FileLock', () => {
     const metaDir = path.dirname(getLockMetaPath(key));
     expect.assertions(1);
     // Generate a state containing only the lock information directory (without meta-information).
-    fs.mkdirSync(metaDir);
+    if (fs.existsSync(metaDir) === false) fs.mkdirSync(metaDir);
     try {
       await FileLock.withLock(key, 
         async () => {

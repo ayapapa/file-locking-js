@@ -10,4 +10,7 @@ export interface FileLockInternalState extends LockBaseInternalState {
 
   /** Path to the lock information update history file. */
   _historyFile: string;
+
+  /** Mutual exclusion flag for history updates. */
+  //_historyInLocked: boolean;
 }

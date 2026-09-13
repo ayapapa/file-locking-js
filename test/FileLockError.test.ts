@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import fs, { rmSync } from 'node:fs';
+import fs, { PathLike, rmSync } from 'node:fs';
 import path from 'node:path';
 import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles, TestLock, getLockMetaPath  } from './FileLockTestCommon.ts';
 import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
@@ -60,7 +60,6 @@ describe('FileLock', () => {
 
   it("Calling `withLock` with the same `key` twice asynchronously results " +
     "in the second lock timing out when using `Promise.all()`.", async () => {
-console.log("#############");
     const key = "testKey";
     const a =  FileLock.withLock(key, async () => {
         await sleepAsync(3000);
@@ -86,7 +85,6 @@ console.log("#############");
       // aを待つ
       try {await a} catch(e) {};
     }
-console.log("#############");
   });
 
   it("Calling `withLock` with the same key inside a callback function "+
@@ -404,6 +402,35 @@ console.log("#############");
     }
   });
 
+  it("mkdir error occurred during reentrant lock processing.", async () => {
+    const key = 'testKey_mkdir_error'
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { throw Object.assign(new Error("mkdirSync error!"), { code: 'EMKDIR' }); });
+    expect.assertions(2);
+    try {
+      await FileLock.withLock(
+        key,
+        async (monitor1: Monitor) => {
+          await sleepAsync(200);
+        },
+        { timeoutMs: 100 }
+      );
+    }
+    catch (err) {
+      expect(err).instanceOf(AlreadyLocked);
+      expect(err).toMatchObject({
+        code: "ELOCKED", 
+        key: "testKey_mkdir_error",
+        message: "Could not lock because the 'testKey_mkdir_error' is already locked.",
+        file: TestLock.getLockMetaFilePath(key)
+      });
+    }
+    finally {
+      // Since the read operation fails, the contents of the lock information file cannot be verified, preventing it from being deleted normally—meaning other locks will perceive it as still locked.
+      // Therefore, the file is forcibly deleted here.
+      //removeLockFiles(key);
+    }
+  });
+
   it("File read error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
     expect.assertions(2);
@@ -485,16 +512,59 @@ console.log("#############");
     }
   });
 
-  it("When a metafile being locked is invalid (i.e., JSON parsing failed)", async () => {
+  it("existsSync が、特定ファイルが無いにも関わらず、に一度だけtrueを返す.", async () => {
+    const key = 'testKey_existsSync_error'
+    const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: PathLike) => {
+      if (name === TestLock.getLockMetaFilePath(key)) {
+        spy.mockRestore();
+        return true;
+      }
+      return false;
+    });
+
+    //expect.assertions(2);
+    expect(await FileLock.withLock(
+      key,
+      async (monitor1: Monitor) => {
+        await sleepAsync(200);
+        return 'completed';
+      },
+    )).toBe('completed');
+
+  });
+
+  it("existsSync error occurred during reentrant lock processing.", async () => {
+    const key = 'testKey_existsSync_error'
+    const spy = vi.spyOn(fs, 'existsSync').mockImplementation(() => {
+      throw new FileLockError("existsSync test error!!");
+    });
+
+    try {
+      await FileLock.withLock(
+        key,
+        async (monitor1: Monitor) => {
+          await sleepAsync(200);
+          return 'completed';
+        },
+      )
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect((err as FileLockError).message).contains("existsSync test error!!");
+    }
+
+  });
+
+    it("When a metafile being locked is invalid (i.e., JSON parsing failed)", async () => {
     const key = 'testKey_18465xx'
     expect.assertions(2);
     const metaPath = getLockMetaPath(key);
     try {
-      fs.writeFileSync(metaPath, '');
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
-          await sleepAsync(100);
+          fs.writeFileSync(metaPath, '');
+          await sleepAsync(1000);
         }
       );
     }
@@ -506,9 +576,23 @@ console.log("#############");
         file: metaPath
       });
     }
-    finally {
-      fs.rmSync(metaPath);
-    }
+  });
+
+  it("壊れたメタファイルがあっった場合無効と判定し、ロックを正常に実行する。", async () => {
+    const key = 'testKey_18465xx'
+
+    const metaPath = getLockMetaPath(key);
+    fs.mkdirSync(path.dirname(metaPath));
+    fs.writeFileSync(metaPath, '');
+
+    await FileLock.withLock(
+      key,
+      async (monitor1: Monitor) => {
+        await sleepAsync(100);
+      }
+    );
+
+    expect(fs.existsSync(metaPath)).toBeFalsy();
   });
 
   it("history JSON parsing error", async () => {
@@ -516,18 +600,20 @@ console.log("#############");
     const key = 'testKey_18465xxxx'
     const histBu = histPath + '.bu';
 
+
     fs.renameSync(histPath, histBu);
     
     fs.writeFileSync(histPath, '()');
 
     FileLock.setConfig({ history: true });
     
+    //const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
-          await sleepAsync(100);
+          await sleepAsync(500);
         },
       );
     }
@@ -541,6 +627,44 @@ console.log("#############");
     finally {
       fs.rmSync(histPath);
       fs.renameSync(histBu, histPath);
+    }
+  });
+
+  // FileLock.onExit
+  it("history JSON parsing error", async () => {
+    const key = 'OnExitTest';
+    let mon: Monitor = { cancelled: false };
+    try {
+      await FileLock.withLock(key, async monitor => {
+        mon = monitor;
+        await sleepAsync(200);
+        FileLock.onExit(2, 'SIGTERM');
+        },
+        {}
+      );
+    }
+    catch (err) {
+      expect(err).toMatchObject({
+        code: "ETERM",
+        exitReason: {
+          code: 2,
+          signal: "SIGTERM",
+        },
+        message: "Forced termination."
+      });
+        expect(mon).toMatchObject({
+        cancelled: true,
+        reason: "ETERM",
+        cause: {
+          code: "ETERM",
+          exitReason: {
+            code: 2,
+            signal: "SIGTERM",
+          },
+        },
+        operation: "Callback or Timer in withLock().",
+      })
+      console.log(err);
     }
   });
 

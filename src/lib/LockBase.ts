@@ -52,15 +52,23 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Static methods.
    */
 
-  /** 
+  /**
    * @internal
-   * Get basic default options. 
+   * @param config 
+   * @returns 全てのメソッドが必須のロガー
    */
-/*
-  public static getDefaultOptions(): LockBaseOptions {
-    return { ..._defaultBaseOptions };
+  protected static _resolveLogger(config?: LockBaseConfig): Required<LogProvider> {
+    let logger: LogProvider = config?.logger ?? console
+    if (logger === console) {
+      logger = {...console as LogProvider};
+      logger.trace = logger.debug;
+    }
+    // There are cases where 'fatal' is not present; in such instances, use 'error'.
+    if (!logger.fatal) logger.fatal = logger.error;
+    // Make `fatal` mandatory.
+    return logger as Required<LogProvider>;
   }
-*/
+
   /** 
    * Instance fieilds. 
    */
@@ -83,13 +91,6 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   #onExitReject: ((reason?: unknown) => void) | null = null;
 
-  /**
-   * 強制終了
-   */
-  protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
-    this.#onExitReject?.(new LockError("Forced termination.", { code: String(code ?? 'ELOCK'), props: { reason: signal ?? 'ELOCK'}}));
-  }
-
   /** Instance methods. */
 
   /**
@@ -100,15 +101,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   protected constructor(key: string, config?: LockBaseConfig) {
     this._key = key;
-    let logger: LogProvider = config?.logger ?? console
-    if (logger === console) {
-      logger = {...console as LogProvider};
-      logger.trace = logger.debug;
-    }
-    // There are cases where 'fatal' is not present; in such instances, use 'error'.
-    if (!logger.fatal) logger.fatal = logger.error;
-    // Make `fatal` mandatory.
-    this._logger = logger as Required<LogProvider>;
+    this._logger = LockBase._resolveLogger(config);
   }
 
   /**
@@ -160,8 +153,20 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
-  protected _release(options: AllOptions<U, I>) {
+  protected async _release(options: AllOptions<U, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  /**
+   * 終了時処理。
+   * Windows版では、強制終了(process.kill())からは呼び出されることは無いが、本実装は残しておく。
+   */
+  protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    this.#onExitReject && 
+      this.#onExitReject(new LockError("Forced termination.", {
+        code: 'ETERM',
+        props: { exitReason: { code, signal } }
+      }));
   }
 
   #createTtlTimer(options: AllOptions<U, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
@@ -176,19 +181,62 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
     return { id, promise };
   }
 
-  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
-    await this._acquire(options);
+  async #execLockCommon(onLockFn: CallbackOnLock, aquire: () => Promise<void>, 
+    release: () => Promise<void>, errMsg: string, options: AllOptions<U, I>) {
+    // Acquire the lock.
+    await aquire();
 
-    // Create TTL timer
+    // Created promises.
     const ttlTimer = this.#createTtlTimer(options);
+    const onExitPromise = this.#onExitPromise();
+    const cbPromise = this.#execCallback(onLockFn, options);
 
     // A race between callback processing and the TTL timer.
     try {
-      const cbPromise = this.#execCallback(onLockFn, options);
-      return await Promise.race([cbPromise, ttlTimer.promise])
+      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
         .finally(() => { // In any case, turn off the timer.
           // Avoid if statements as a measure against coverage issue
           ttlTimer.id && clearTimeout(ttlTimer.id);
+          onExitPromise.onExitResolve('No forced termination');
+          this.#onExitReject = null;
+        }
+      );
+    }
+    catch (err) {
+      this._onError(err, errMsg, options, 'ECALLBACK');
+      throw err;
+    }
+    finally {
+      await release();
+    }
+  }
+
+
+  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+    return this.#execLockCommon(
+      onLockFn, 
+      () => this._acquire(options), 
+      () => this._release(options), 
+      'Callback or Timer in withLock().',
+      options
+    );
+    /*
+    // Acquire the lock.
+    await this._acquire(options);
+
+    // Created promises.
+    const ttlTimer = this.#createTtlTimer(options);
+    const onExitPromise = this.#onExitPromise();
+    const cbPromise = this.#execCallback(onLockFn, options);
+
+    // A race between callback processing and the TTL timer.
+    try {
+      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
+        .finally(() => { // In any case, turn off the timer.
+          // Avoid if statements as a measure against coverage issue
+          ttlTimer.id && clearTimeout(ttlTimer.id);
+          onExitPromise.onExitResolve('No forced termination');
+          this.#onExitReject = null;
         }
       );
     }
@@ -197,8 +245,9 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
       throw err;
     }
     finally {
-      this._release(options);
+      await this._release(options);
     }
+  */
   }
 
   #onExitPromise() {
@@ -213,13 +262,22 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
   }
 
   async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
-    this._incReantryCount(options);
-    // Create TTL timer
-    const ttlTimer = this.#createTtlTimer(options);
-    try {
-      const cbPromise = this.#execCallback(onLockFn, options);
+    return this.#execLockCommon(
+      onLockFn, 
+      () => this._incReantryCount(options), 
+      () => this._decReantryCount(options), 
+      'Re-entrant locking callback.',
+      options
+    );
+/*
+    // Increment lock counter.
+    await this._incReantryCount(options);
 
-      const onExitPromise = this.#onExitPromise();
+    // Created promises.
+    const ttlTimer = this.#createTtlTimer(options);
+    const cbPromise = this.#execCallback(onLockFn, options);
+    const onExitPromise = this.#onExitPromise();
+    try {
 
       return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
         .finally(() => { // In any case, turn off the timer.
@@ -229,16 +287,17 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
           this.#onExitReject = null;
         }
       );
-      //return await this.#execCallback(onLockFn, options);
     }
     catch (err) {
       this._onError(err, 'Re-entrant locking callback.', options, 'ECALLBACK');
       throw err;
     }
     finally {
-      this._decReantryCount(options);
+      // Decrement lock counter.
+      await this._decReantryCount(options);
     }
-  }
+  */
+ }
 
   /**
    * @internal
@@ -246,7 +305,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected _incReantryCount(options: AllOptions<U, I>) {
+  protected async _incReantryCount(options: AllOptions<U, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -256,7 +315,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected _decReantryCount(options: AllOptions<U, I>) {
+  protected async _decReantryCount(options: AllOptions<U, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 

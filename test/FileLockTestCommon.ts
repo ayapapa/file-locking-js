@@ -99,7 +99,8 @@ export class TestLock extends (FileLock as any) {
   }
 
   static getCacheSize() {
-    return this.getCache().size;
+    const size = this.getCache().size;
+    return size;
   }
 
   getReentrantContext() {

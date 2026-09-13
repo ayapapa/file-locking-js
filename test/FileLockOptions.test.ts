@@ -398,6 +398,7 @@ describe('FileLockOptions test.', () => {
       retryIntervalMs:      -1,
     };
     const exp = {
+      allowReentry:         false,
       timeoutMs:            0,
       ttlMs:                1000,
       pollIntervalMs:       100,
@@ -408,7 +409,7 @@ describe('FileLockOptions test.', () => {
     };
 
     FileLock.withLock('testKey8989', () => {}, opts);
-    expect(TestLock._lastOptions).toMatchObject(exp);
+    expect((opts as any)._resolvedOpts).toMatchObject(exp);
   });
 
 });

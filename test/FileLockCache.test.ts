@@ -51,7 +51,8 @@ describe('FileLock', () => {
   }
 
   it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
-    await testCacheStatus({ cache: true }, async () => expect(TestLock.getCacheSize()).toBe(1));
+    // ****　まだ、未確定  **** There should be two instances: the lock instance and the historical lock instance.
+    await testCacheStatus({ cache: true }, async () => expect(TestLock.getCacheSize()).toBe(1/*2*/));
    });
 
   it("If the cache is reset, then disabled, and subsequently locked, the cache does not exist.", async () => {

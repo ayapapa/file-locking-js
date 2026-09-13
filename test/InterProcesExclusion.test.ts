@@ -6,7 +6,7 @@ import path from 'node:path';
 import { FileLock, FileLockConfig, LockError } from '../src/index.ts';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { spawn } from 'node:child_process';
-import { logger, getLockMetaPath, sleepAsync } from './FileLockTestCommon.ts';
+import { logger, getLockMetaPath, removeLockFiles, sleepAsync } from './FileLockTestCommon.ts';
 
 const commandPath = './subCommand.ts';
 const stdOut: string[] = [];
@@ -101,6 +101,8 @@ describe('別プロセスとの競合テスト', () => {
     expect(childCompeleted()).toBeFalsy();
     // ロック情報ディレクトリおよびファイルは残っている
     expect(fs.existsSync(getLockMetaPath(key))).toBeTruthy();
+    // ロック情報ディレクトリおよびファイルを消す
+    removeLockFiles(key);
   });
 
   it("子プロセスを先に起動し、別のキーでロックすると、干渉されずにいずれも処理が完了する.", async () => {
@@ -180,7 +182,6 @@ describe('別プロセスとの競合テスト', () => {
   // 起動した結果が何らかの形で取得できるような仕掛けにする必要ありだね。
 
 });
-
 
 
 /*
