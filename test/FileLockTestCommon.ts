@@ -46,7 +46,8 @@ const onPrettyLog = ( logEntry: LogEntry ) => {
 export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace' });
 
 export function getLockMetaPath(key: string): string {
-  return path.join(TestLock.getLockDirPath(), key, 'meta.json');
+  return path.join(TestLock.getLockDirPath(), key + '.json');
+  //return path.join(TestLock.getLockDirPath(), key, 'meta.json');
 }
 
 export const getLockMeta = (key: string) => {
@@ -62,8 +63,12 @@ export const setLockMeta = (key: string, meta: any) => {
 };
 
 export function removeLockFiles(key: string) {
+  const lockMetaPath = getLockMetaPath(key);
+  if (fs.existsSync(lockMetaPath)) fs.unlinkSync(lockMetaPath);
+  /*
   const lockMetaPath = path.dirname(getLockMetaPath(key));
   if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath, { recursive: true, force: true });
+  */
 }
 
 export function getHistoryPath() {
@@ -89,11 +94,11 @@ export class TestLock extends (FileLock as any) {
   static getLockDirPath() {
     return super._getLockDirPath();
   }
-
+/*
   static getLockMetaFilePath(key: string) {
     return path.join(TestLock.getLockDirPath(), key, 'meta.json');
   }
-
+*/
   static getCache() {
     return super._getCache();
   }
@@ -107,10 +112,11 @@ export class TestLock extends (FileLock as any) {
     return super._getReentrantContext();
   }
 
+  /*
   static getHistoryPath(): string {
     return path.join(TestLock.getLockDirPath(), 'history.json')
   }
-
+  */
   async testWithLockEmptyOptions(cb: () => any): Promise<any> {
     return super.withLock(cb, {});
   }

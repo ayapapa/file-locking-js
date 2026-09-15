@@ -10,7 +10,9 @@ export class FileLockError extends LockError {
    * @param params  Parameters.
    */
   constructor(msg?: string, params?: {code?: string, props?: LockErrorProps }) {
-    super(msg, params);
+    const p = { ...params };
+    if (p.code == null) p.code = 'EFILELOCK'
+    super(msg, p);
   }
 };
 
@@ -79,7 +81,22 @@ export class LockCompromised extends FileLockError {
       `The lock${key ? '(key: ' + key + ')' : ""} has been compromised${reason ? '(' + reason +')' : ''}.`,
       {code: `ECOMPROMISED`, props }
     );
-    }
+  }
+}
+
+export class LockFileBroken extends FileLockError {
+  /**
+   * Constructor.
+   * @param reason Reason for the error.
+   * @param params  Parameters.
+   */
+  constructor(params: { file: string, props?: LockErrorProps }) {
+    const props = { ...{ file: params.file }, ...params.props };
+    super(
+      `ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。`,
+      {code: `EBROKEN`, props }
+    );
+  }
 }
 
 export { AlreadyLocked, DeadlockDetected, InvalidOptions, LockError , TTLExceeded };

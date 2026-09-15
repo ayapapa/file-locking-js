@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import fs, { PathLike, rmSync } from 'node:fs';
 import path from 'node:path';
-import { logger, sleepAsync, getLockMeta, setLockMeta, removeLockFiles, TestLock, getLockMetaPath  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockError, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index';
+import { getHistoryPath, getLockMeta, getLockMetaPath, removeLockFiles, setLockMeta, sleepAsync  } from './FileLockTestCommon.ts';
+import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, 
+  LockDirectoryStatFailed, LockError, LockFileBroken, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index.ts';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -402,6 +403,8 @@ describe('FileLock', () => {
     }
   });
 
+  // ロックキーディレクトリ方式はやめたので、このテストは不要
+  /*
   it("mkdir error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_mkdir_error'
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { throw Object.assign(new Error("mkdirSync error!"), { code: 'EMKDIR' }); });
@@ -421,7 +424,7 @@ describe('FileLock', () => {
         code: "ELOCKED", 
         key: "testKey_mkdir_error",
         message: "Could not lock because the 'testKey_mkdir_error' is already locked.",
-        file: TestLock.getLockMetaFilePath(key)
+        file: getLockMetaPath(key)
       });
     }
     finally {
@@ -430,6 +433,7 @@ describe('FileLock', () => {
       //removeLockFiles(key);
     }
   });
+  */
 
   it("File read error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
@@ -453,7 +457,7 @@ describe('FileLock', () => {
       expect(err).toMatchObject({
         code: 'ERMOON', 
         message: "Couldn't read the lock information file.(readFileSync error!)",
-        file: TestLock.getLockMetaFilePath(key)
+        file: getLockMetaPath(key)
       });
     }
     finally {
@@ -485,7 +489,7 @@ describe('FileLock', () => {
       expect(err).toMatchObject({
         code:     'EWMOON',
         message:  `Couldn't update the lock information file.(writeFileSync error!)`,
-        file:     TestLock.getLockMetaFilePath(key)
+        file:     getLockMetaPath(key)
       });
     }
   });
@@ -507,7 +511,7 @@ describe('FileLock', () => {
       expect(err).toMatchObject({
         code:     'EWMOON',
         message:  `Couldn't update the lock information file.(writeFileSync error!)`,
-        file:     TestLock.getLockMetaFilePath(key)
+        file:     getLockMetaPath(key)
       });
     }
   });
@@ -515,7 +519,7 @@ describe('FileLock', () => {
   it("existsSync が、特定ファイルが無いにも関わらず、に一度だけtrueを返す.", async () => {
     const key = 'testKey_existsSync_error'
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: PathLike) => {
-      if (name === TestLock.getLockMetaFilePath(key)) {
+      if (name === getLockMetaPath(key)) {
         spy.mockRestore();
         return true;
       }
@@ -578,6 +582,15 @@ describe('FileLock', () => {
     }
   });
 
+  // ★★★　⇒　壊れていても、無効と判断しない。。。ロックリトライの最後の理由が壊れたロックファイルなら、その情報をエラーメッセージに伝えること！！
+  // さて、その方法は、retryの理由も返さないとね、、、、if ((ret = this.#tryLock(...)).locked == false) {...}; 
+  // 最後に、ret.reasonに、理由が書かれている、、文字列でいいんでないかな？ 
+  // 'METABROKEN', 'LOCKED' くらいかな？？　ＬＯＣＫＥＤなら⇒これまでの、エラーでいいかな。
+  // 'METABROKEN'なら、ファイルパスもメッセージにいれたうえで、対処法を記載する。なんなら、エラーメッセージに付け加えるメッセージもありかな、、）
+  // 「ロックファイルのメタデータが破損しており、ロック状態を判定できません。
+  // 対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。」★★これは新エラークラスだな！
+  // 的なメッセージかな？
+
   it("壊れたメタファイルがあっった場合無効と判定し、ロックを正常に実行する。", async () => {
     const key = 'testKey_18465xx'
 
@@ -585,18 +598,29 @@ describe('FileLock', () => {
     fs.mkdirSync(path.dirname(metaPath));
     fs.writeFileSync(metaPath, '');
 
-    await FileLock.withLock(
-      key,
-      async (monitor1: Monitor) => {
-        await sleepAsync(100);
-      }
-    );
+    try {
+      await FileLock.withLock(
+        key,
+        async (monitor1: Monitor) => {
+          await sleepAsync(100);
+        }
+      );
+    }
+    catch (err) {
+      expect(err).instanceOf(LockFileBroken);
+      expect(err).toMatchObject({
+        code: 'EBROKEN',
+        message: 'ロックファイルの内容が破損しており、ロック状態を判定できません。' +
+          '対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。',
+        file: metaPath
+      })
+    }
 
     expect(fs.existsSync(metaPath)).toBeFalsy();
   });
 
   it("history JSON parsing error", async () => {
-    const histPath = TestLock.getHistoryPath();
+    const histPath = getHistoryPath();
     const key = 'testKey_18465xxxx'
     const histBu = histPath + '.bu';
 

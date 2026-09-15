@@ -4,7 +4,7 @@ import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
-import { logger, sleepAsync } from './FileLockTestCommon.ts'
+import { getLockMetaPath, logger, sleepAsync } from './FileLockTestCommon.ts'
 
 type NumberKeys<T> = {
     [K in keyof T]-?: T[K] extends number ? K : never
@@ -146,12 +146,11 @@ describe('FileLock', () => {
   it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
     " a error is throwed.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    let orgConf: FileLockConfig = FileLock.getConfig();
     FileLock.setConfig({ logger });
-    fs.rmSync(dir, { force: true, recursive: true });
-    fs.writeFileSync(dir, "");
     expect.assertions(2);
     try {
+      fs.rmSync(dir, { force: true, recursive: true });
+      fs.writeFileSync(dir, "");
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
         async () => {
@@ -166,7 +165,6 @@ describe('FileLock', () => {
       expect(err.code).toBe('ELOCKDIRCREATE')
     }
     finally {
-      FileLock.setConfig(orgConf);
       fs.rmSync(dir);
     }
   });
@@ -211,7 +209,7 @@ describe('FileLock', () => {
   });
 
   it("An error occurs because the directory path specified in `FileLock.setConfig()` already exists but is not a directory.", async () => {
-    const dir = path.join(process.cwd(), '.lock');
+    const dir = path.join(process.cwd(), '.lock2');
     fs.writeFileSync(dir, "");
     expect.assertions(2);
     const orgConf = FileLock.getConfig();
@@ -345,8 +343,7 @@ describe('FileLock', () => {
   it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
     const orgConf = FileLock.getConfig();
     const key = 'debug_mode_key_009'
-    const dir = path.join(process.cwd(), '.lock');
-    const metaFile = path.join(dir, key, 'meta.json');
+    const metaFile = getLockMetaPath(key);//path.join(dir, key+'.json');
     expect.assertions(4);
     try {
       FileLock.setConfig({ _debug: true });
