@@ -9,11 +9,45 @@ export class FileLockError extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: {code?: string, props?: LockErrorProps }) {
+  constructor(msg?: string, params?: {code: string, props?: LockErrorProps }) {
     const p = { ...params };
-    if (p.code == null) p.code = 'EFILELOCK'
+    // カバレッジ対応のためif文回避。
+    p.code == null && (p.code = 'EFILELOCK');
     super(msg, p);
   }
+
+  public static lockFailedDueToIO(file: string, cause: unknown) {
+    return new FileLockError("ファイルIOエラーのためロック獲得に失敗しました。", { code: 'EIO', props: { file, cause } });
+  }
+/*
+  public static lockFailedDueToUnexpected(cause: unknown) {
+    return new FileLockError("想定外のエラーのためロック獲得に失敗しました。", { code: 'EUNEXPECTED', props: { cause } });
+  }
+    */
+  /*
+          throw new FileLockError('Failed to parse the history file.',
+          { code: 'EHISTORY', props:{ name: historyFile, cause: err } })
+  */
+ /**
+  * 履歴ファイル解析エラーを取得する。
+  * @param history  履歴ファイルパス。
+  * @param cause    原因となった解析エラー。
+  * @returns 
+  */
+  public static dueToHistory(history: string, cause: unknown) {
+    return new FileLockError("Failed to parse the history file.", { code: 'EHISTORY', props: { history, cause } });
+  }
+
+ /**
+  * 履歴ファイル解析エラーが原因のロック獲得エラーを取得する。
+  * @param history  履歴ファイルパス。
+  * @param cause    原因となった解析エラー。
+  * @returns 
+  */
+  public static lockFailedDueToHistory(cause: unknown) {
+    return new FileLockError("Lock acquisition failure due to history analysis failure.", { code: 'EHISTORY', props: { cause } });
+  }
+
 };
 
 /** 

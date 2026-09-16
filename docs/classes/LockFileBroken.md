@@ -2,13 +2,13 @@
 
 ***
 
-[@ayapapa-npm/file-locking-js](../README.md) / LockCompromised
+[@ayapapa-npm/file-locking-js](../README.md) / LockFileBroken
 
-# Class: LockCompromised
+# Class: LockFileBroken
 
-Defined in: [src/lib/FileLockErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L104)
+Defined in: [src/lib/FileLockErrors.ts:121](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L121)
 
-Lock compromised error.
+Basic lock handling error.
 
 ## Extends
 
@@ -18,25 +18,19 @@ Lock compromised error.
 
 ### Constructor
 
-> **new LockCompromised**(`reason`, `params?`): `LockCompromised`
+> **new LockFileBroken**(`params`): `LockFileBroken`
 
-Defined in: [src/lib/FileLockErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L110)
+Defined in: [src/lib/FileLockErrors.ts:127](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L127)
 
 Constructor.
 
 #### Parameters
 
-##### reason
-
-`string` \| `null`
-
-Reason for the error.
-
-##### params?
+##### params
 
 Parameters.
 
-###### key
+###### file
 
 `string`
 
@@ -46,7 +40,7 @@ Parameters.
 
 #### Returns
 
-`LockCompromised`
+`LockFileBroken`
 
 #### Overrides
 

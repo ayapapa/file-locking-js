@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getHistoryPath, getLockMeta, getLockMetaPath, removeLockFiles, setLockMeta, sleepAsync  } from './FileLockTestCommon.ts';
 import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, 
   LockDirectoryStatFailed, LockError, LockFileBroken, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index.ts';
+import { finalization } from 'node:process';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -16,6 +17,13 @@ afterEach(() => {
 });
 
 describe('FileLock', () => {
+
+  it("引数なしでFileLockErrorをnewすると、codeプロパティが'EFILELOCK'となる", () => {
+    const err = new FileLockError();
+    expect(err).toMatchObject({
+      code: 'EFILELOCK'
+    });
+  });
 
   it("An error occurs if `key` is not specified.", async () => {
     let key;
@@ -45,7 +53,7 @@ describe('FileLock', () => {
       await FileLock.withLock(key, async () => {
           await sleepAsync(500);
         },
-        {timeoutSec : 1 }
+        {timeoutSec : 0.1 }
       );
     }
     catch (err: any) {
@@ -63,14 +71,14 @@ describe('FileLock', () => {
     "in the second lock timing out when using `Promise.all()`.", async () => {
     const key = "testKey";
     const a =  FileLock.withLock(key, async () => {
-        await sleepAsync(3000);
+        await sleepAsync(200);
       },
       {timeoutSec : 1 }
     );
     const b =  FileLock.withLock(key, async () => {
-        await sleepAsync(1000);
+        await sleepAsync(100);
       },
-      {timeoutSec : 1 }
+      { timeoutSec : 0.1 }
     );
     expect.assertions(4);
     try {
@@ -189,15 +197,20 @@ describe('FileLock', () => {
         )
       },
       async (monitor: Monitor, callbackCompleted) => {
-        expect(monitor.cancelled).toBeFalsy();
-        // Compromised
-        const meta = getLockMeta(key);
-        meta.ownerId = crypto.randomUUID();
-        setLockMeta(key, meta);
-        await sleepAsync(1200);
-        expect(monitor.cancelled).toBeTruthy();
-        expect(monitor.reason).toBe('ECOMPROMISED');
-        callbackCompleted('Completed');
+        try {
+          expect(monitor.cancelled).toBeFalsy();
+          // Compromised
+          const meta = getLockMeta(key);
+          meta.ownerId = crypto.randomUUID();
+          setLockMeta(key, meta);
+          // ハートビートでエラーになるので、最低でも１秒は待つ。
+          await sleepAsync(1001);
+          expect(monitor.cancelled).toBeTruthy();
+          expect(monitor.reason).toBe('ECOMPROMISED');
+        }
+        finally {
+          callbackCompleted('Completed');
+        }
       },
       (err) => {
         expect(err).instanceOf(LockCompromised);
@@ -503,15 +516,24 @@ describe('FileLock', () => {
         key,
         async (monitor1: Monitor) => {
           await sleepAsync(100);
-        }
+        },
+        { timeoutMs: 200 }
       );
     }
     catch (err) {
       expect(err).instanceOf(FileLockError);
       expect(err).toMatchObject({
-        code:     'EWMOON',
-        message:  `Couldn't update the lock information file.(writeFileSync error!)`,
-        file:     getLockMetaPath(key)
+        code: "EIO",
+        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        cause: {
+          code: "EWMOON",
+          file: getLockMetaPath(key),
+          message: "Couldn't update the lock information file.(writeFileSync error!)",
+          cause: {
+            code: "EWMOON",
+            message: "writeFileSync error!",
+          },
+        },
       });
     }
   });
@@ -540,28 +562,36 @@ describe('FileLock', () => {
   it("existsSync error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_existsSync_error'
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation(() => {
-      throw new FileLockError("existsSync test error!!");
+      throw Object.assign(new Error("existsSync test error!!"),  { code: 'EEXISTSYNC' });
     });
 
     try {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
-          await sleepAsync(200);
+          await sleepAsync(100);
           return 'completed';
         },
+        { timeoutMs: 200 }
       )
     }
     catch (err) {
       expect(err).instanceOf(FileLockError);
-      expect((err as FileLockError).message).contains("existsSync test error!!");
+      expect(err).toMatchObject({
+        code: "EIO",
+        file: getLockMetaPath(key),
+        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        cause: {
+          code: "EEXISTSYNC",
+          message: "existsSync test error!!",
+        },
+      });
     }
-
   });
 
-    it("When a metafile being locked is invalid (i.e., JSON parsing failed)", async () => {
+    it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
     const key = 'testKey_18465xx'
-    expect.assertions(2);
+    expect.assertions(3);
     const metaPath = getLockMetaPath(key);
     try {
       await FileLock.withLock(
@@ -576,9 +606,15 @@ describe('FileLock', () => {
       expect(err).instanceOf(LockCompromised);
       expect(err).toMatchObject( {
         code: 'ECOMPROMISED',
+        contents: "",
+        file: metaPath,
+        key: "testKey_18465xx",
         message: `The lock(key: ${key}) has been compromised(Couldn't parse the lock information file, it is probably broken.).`,
-        file: metaPath
       });
+      expect(fs.existsSync(metaPath)).toBeTruthy();
+    }
+    finally {
+      fs.unlinkSync(metaPath);
     }
   });
 
@@ -591,31 +627,41 @@ describe('FileLock', () => {
   // 対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。」★★これは新エラークラスだな！
   // 的なメッセージかな？
 
-  it("壊れたメタファイルがあっった場合無効と判定し、ロックを正常に実行する。", async () => {
+  it("壊れたメタファイルがあった場合は、作成途中の可能性もあるため、リトライを繰り返し、タイムアウトエラーになるはず。", async () => {
     const key = 'testKey_18465xx'
 
     const metaPath = getLockMetaPath(key);
-    fs.mkdirSync(path.dirname(metaPath));
+    // fs.mkdirSync(path.dirname(metaPath));
     fs.writeFileSync(metaPath, '');
-
+    expect.assertions(3);
     try {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
           await sleepAsync(100);
-        }
+        },
+        { timeoutMs: 200 }
       );
     }
     catch (err) {
       expect(err).instanceOf(LockFileBroken);
       expect(err).toMatchObject({
         code: 'EBROKEN',
-        message: 'ロックファイルの内容が破損しており、ロック状態を判定できません。' +
-          '対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。',
-        file: metaPath
+        message: "ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。",
+        file: metaPath,
+        cause: {
+          code: "ECOMPROMISED",
+          file: metaPath,
+          contents: "",
+          key: "testKey_18465xx",
+          optionsOwnerId: undefined,
+          message: "The lock(key: testKey_18465xx) has been compromised(Couldn't parse the lock information file, it is probably broken.)."
+        }
       })
     }
-
+    finally {
+      removeLockFiles(key);
+    }
     expect(fs.existsSync(metaPath)).toBeFalsy();
   });
 
@@ -637,15 +683,24 @@ describe('FileLock', () => {
       await FileLock.withLock(
         key,
         async (monitor1: Monitor) => {
-          await sleepAsync(500);
+          await sleepAsync(100);
         },
+        { timeoutMs: 200 }
       );
     }
     catch (err) {
       expect(err).instanceOf(FileLockError);
       expect(err).toMatchObject({
-        code:     "EHISTORY",
-        message:  "Failed to parse the history file."
+        code: "EHISTORY",
+        message: "Lock acquisition failure due to history analysis failure.",
+        cause: {
+          code: "EHISTORY",
+          history: histPath,
+          message: "Failed to parse the history file.",
+          cause: {
+            message: "Unexpected token '(', \"()\" is not valid JSON",
+          },
+        },
       });
     }
     finally {
@@ -658,6 +713,7 @@ describe('FileLock', () => {
   it("history JSON parsing error", async () => {
     const key = 'OnExitTest';
     let mon: Monitor = { cancelled: false };
+    expect.assertions(2);
     try {
       await FileLock.withLock(key, async monitor => {
         mon = monitor;
@@ -690,6 +746,111 @@ describe('FileLock', () => {
       })
       console.log(err);
     }
+  });
+
+  async function testSpyIO(key: string, targetFn: string, errCond: (counter: number) => boolean, sucsess: boolean, /*spyOn: () => void, */ErrClass: unknown, matchObj: object) {
+    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 100, heartbeatTimeoutMs: 50, lastHeartbeatAt: Date.now() - 100};
+    setLockMeta(key, meta);
+    let counter = 0;
+    // as any?????
+    const original = (fs as any)[targetFn];
+    // as any?????
+    vi.spyOn(fs, targetFn as any).mockImplementation((...args) => {
+      counter++;
+      if (errCond(counter)) throw Object.assign(new Error("#####"), { code: "EEXIST"});
+      return original(...args);
+    });
+    const asCounts = sucsess ? 1 : 2;
+    expect.assertions(asCounts);
+    const ret = "completed."
+    try {
+      expect(await FileLock.withLock(
+        key, 
+        async () => {
+          await sleepAsync(100);
+          return ret;
+        },
+        { timeoutMs: 200 }
+      )).toBe(ret);
+    }
+    catch (err) {
+      expect(err).instanceOf(ErrClass);
+      expect(err).toMatchObject(matchObj);
+    }
+  }
+
+  it("無効なロック情報ファイルがあるとき、それを削除した後の排他オープンが失敗。その後、ロックリトライ成功。", async () => {
+    const key = "testKey_staleMeta_reopenFailed_lockOK";
+    await testSpyIO(
+      key,
+      'openSync',
+      (counter: number) => counter === 2,
+      true, 
+      null,
+      {}
+    );
+  });
+
+  it("無効なロック情報ファイルがあるとき、それを削除した後の排他オープンが失敗。その後、ロックリトライ失敗。", async () => {
+    const key = "testKey_staleMeta_reopenFailed_lockNg"
+    const original = fs.openSync;
+    await testSpyIO(
+      key,
+      'openSync',
+      (counter: number) => counter >= 2,
+      false, 
+      AlreadyLocked,
+      {
+        code: "ELOCKED",
+        file: getLockMetaPath(key),
+        key: key,
+        message: `Could not lock because the '${key}' is already locked.`
+      }
+    );
+  });
+
+  it("無効なロック情報ファイルがあるとき、それの削除に失敗。その後ロック成功。", async () => {
+    const key = "testKey_staleMeta_unlinkFailed_lockOK";
+    let counter = 0;
+    const original = fs.unlinkSync;
+    await testSpyIO(
+      key,
+      'unlinkSync',
+      (counter: number) => counter === 1,
+      true, 
+      AlreadyLocked,
+      {
+        code: "ELOCKED",
+        file: getLockMetaPath(key),
+        key: key,
+        message: `Could not lock because the '${key}' is already locked.`
+      }
+    );
+  });
+
+  it("無効なロック情報ファイルがあるとき、それの削除に失敗。その後ロック失敗。", async () => {
+    const key = "testKey_staleMeta_unlinkFailed_lockNG";
+    await testSpyIO(
+      key,
+      'unlinkSync',
+      () => true,
+      false, 
+      FileLockError,
+      {
+        code: "EIO",
+        file: getLockMetaPath(key),
+        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        cause: {
+          code: "EEXIST",
+          file: getLockMetaPath(key),
+          message: "Couldn't remove the lock information file.(#####)",
+          cause: {
+            code: "EEXIST",
+            message: "#####",
+          },
+        },
+      }
+    );
   });
 
 });

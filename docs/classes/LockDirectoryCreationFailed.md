@@ -6,7 +6,7 @@
 
 # Class: LockDirectoryCreationFailed
 
-Defined in: [src/lib/FileLockErrors.ts:54](https://github.com/ayapapa/file-lock-js/blob/12d39f106c64c811d3cd9a952cabc5d50e7d7d93/src/lib/FileLockErrors.ts#L54)
+Defined in: [src/lib/FileLockErrors.ts:90](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L90)
 
 Lock directory 'Creaate' error.
 
@@ -20,7 +20,7 @@ Lock directory 'Creaate' error.
 
 > **new LockDirectoryCreationFailed**(`fsErrorMsg`, `params?`): `LockDirectoryCreationFailed`
 
-Defined in: [src/lib/FileLockErrors.ts:60](https://github.com/ayapapa/file-lock-js/blob/12d39f106c64c811d3cd9a952cabc5d50e7d7d93/src/lib/FileLockErrors.ts#L60)
+Defined in: [src/lib/FileLockErrors.ts:96](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L96)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/12d39f106c64c811d3cd9a952cabc5d50e7d7d93/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 
@@ -203,6 +203,90 @@ a();
 #### Inherited from
 
 `LockDirectoryAccessFailed.captureStackTrace`
+
+***
+
+### dueToHistory()
+
+> `static` **dueToHistory**(`history`, `cause`): [`FileLockError`](FileLockError.md)
+
+Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L37)
+
+履歴ファイル解析エラーを取得する。
+
+#### Parameters
+
+##### history
+
+`string`
+
+履歴ファイルパス。
+
+##### cause
+
+`unknown`
+
+原因となった解析エラー。
+
+#### Returns
+
+[`FileLockError`](FileLockError.md)
+
+#### Inherited from
+
+`LockDirectoryAccessFailed.dueToHistory`
+
+***
+
+### lockFailedDueToHistory()
+
+> `static` **lockFailedDueToHistory**(`cause`): [`FileLockError`](FileLockError.md)
+
+Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L47)
+
+履歴ファイル解析エラーが原因のロック獲得エラーを取得する。
+
+#### Parameters
+
+##### cause
+
+`unknown`
+
+原因となった解析エラー。
+
+#### Returns
+
+[`FileLockError`](FileLockError.md)
+
+#### Inherited from
+
+`LockDirectoryAccessFailed.lockFailedDueToHistory`
+
+***
+
+### lockFailedDueToIO()
+
+> `static` **lockFailedDueToIO**(`file`, `cause`): [`FileLockError`](FileLockError.md)
+
+Defined in: [src/lib/FileLockErrors.ts:19](https://github.com/ayapapa/file-lock-js/blob/7e450f48d9940b5cfc8461cbb4ec8e0261274ec0/src/lib/FileLockErrors.ts#L19)
+
+#### Parameters
+
+##### file
+
+`string`
+
+##### cause
+
+`unknown`
+
+#### Returns
+
+[`FileLockError`](FileLockError.md)
+
+#### Inherited from
+
+`LockDirectoryAccessFailed.lockFailedDueToIO`
 
 ***
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { FileLock, FileLockConfig, LockCompromised } from '../src/index';
+import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles, getLockMetaPath  } from './FileLockTestCommon.ts';
+import { FileLock, FileLockConfig, FileLockError, } from '../src/index';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('FileLock', () => {
 
-  async function testIinvalidLocknformationFile(target: string, v?: any ) {
+  async function testInvalidLockInformationFile(target: string, v?: any ) {
     const key = "testKey";
     const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 10*1000, heartbeatTimeoutMs:5000, lastHeartbeatAt: Date.now()};
     const mt = {...meta} as any;
@@ -27,13 +27,23 @@ describe('FileLock', () => {
     try {
       await FileLock.withLock(
         key,
-        async () => await sleepAsync(500),
-        {ttlMs: 1000}
+        async () => await sleepAsync(100),
+        { timeoutMs: 200 }// ttlMs: 1000 }
       );
     } catch (err: any) {
-      expect(err instanceof LockCompromised).toBeTruthy();
-      expect(err.code).toBe('ECOMPROMISED');
-      expect(err.message.includes('has been compromised')).toBeTruthy();
+      expect(err instanceof FileLockError).toBeTruthy();
+      expect(err).toMatchObject({
+        code: "EBROKEN",
+        file: getLockMetaPath(key),
+        message: "ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。",
+        cause: {
+          code: "ECOMPROMISED",
+          invalidProps: [{ key: target, value: v }],
+          file: getLockMetaPath(key),
+          key: key,
+          message: `The lock(key: ${key}) has been compromised(The lock information format is invalid).`
+        },
+      });
     }
     finally {
       removeLockFiles(key);
@@ -41,35 +51,35 @@ describe('FileLock', () => {
   }
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No ownerId)", async () => {
-    await testIinvalidLocknformationFile("ownerId");
+    await testInvalidLockInformationFile("ownerId");
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
-    await testIinvalidLocknformationFile("counter");
+    await testInvalidLockInformationFile("counter");
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
-    await testIinvalidLocknformationFile("expirationTime");
+    await testInvalidLockInformationFile("expirationTime");
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No heartbeatTimeoutMs)", async () => {
-    await testIinvalidLocknformationFile("heartbeatTimeoutMs");
+    await testInvalidLockInformationFile("heartbeatTimeoutMs");
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(Invalid ownerId)", async () => {
-    await testIinvalidLocknformationFile("ownerId", 12345);
+    await testInvalidLockInformationFile("ownerId", 12345);
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
-    await testIinvalidLocknformationFile("counter", 'hogehogehoge');
+    await testInvalidLockInformationFile("counter", 'hogehogehoge');
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
-    await testIinvalidLocknformationFile("expirationTime", "nyannnyann");
+    await testInvalidLockInformationFile("expirationTime", "nyannnyann");
   });
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No heartbeatTimeoutMs)", async () => {
-    await testIinvalidLocknformationFile("heartbeatTimeoutMs", "miimii");
+    await testInvalidLockInformationFile("heartbeatTimeoutMs", "miimii");
   });
 
   it("Verify that the heartbeat is functioning correctly.", async () => {
