@@ -4,7 +4,7 @@ import { LockError, DeadlockDetected, TTLExceeded } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
-import { type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
+import { defaultLockBaseConfig, type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -51,6 +51,38 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
   /**
    * Static methods.
    */
+
+  protected static _copyConfig<T extends LockBaseConfig>(config: T): T {
+    const ret = { ...config };
+    //if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
+    // If specified undefined, delete it.
+    for (let key in ret) {
+      if (ret[key] === undefined) delete ret[key];
+    }
+    return ret;
+  }
+/*
+  protected static getDefaultConfig() {
+    return LockBase._copyConfig(defaultLockBaseConfig);
+  }
+*/
+  protected static _config: Required<LockBaseConfig> = { ...defaultLockBaseConfig };//LockBase.getDefaultConfig();
+
+  protected static _logger =  LockBase._resolveLogger(LockBase._config);
+
+  protected static setConfig(config: LockBaseConfig): void {
+    //const dConf = LockBase._copyConfig(config);
+    //LockBase._config = { ...LockBase._config, ...dConf };
+    if ('_debug' in config) LockBase._config['_debug'] = config['_debug'];
+    if ('logger' in config) LockBase._config['logger'] = config['logger'];
+
+    // logger
+    LockBase._logger = LockBase._resolveLogger(LockBase._config);
+
+    // debug
+    Contracts.setConfig({ debug: LockBase._config._debug, logger: LockBase._logger });
+  }
+  
 
   /**
    * @internal

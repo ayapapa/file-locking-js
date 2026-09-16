@@ -17,7 +17,6 @@ import { type AllOptions as AllOptionsT } from './AllOptions.ts';
 import { defaultFileLockConfig, type FileLockConfig } from './FileLockConfig.ts';
 import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
 import { type FileLockMeta } from './FileLockMeta.ts'
-import type { LogProvider } from './LockBaseConfig.ts';
 
 /** 
  * @ internal
@@ -69,7 +68,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @internal
    * Logger.
    */
-  static #logger: Required<LogProvider> = FileLock._resolveLogger(FileLock.#config);
+  //static #logger: Required<LogProvider> = FileLock._resolveLogger(FileLock.#config);
 
   /** 
    * Static methods
@@ -90,8 +89,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * At the same time, the cache is cleared.
    * @param config 
    */
-  public static setConfig(config: FileLockConfig): void {
-    const dConf = FileLock.#copyConfig(config);
+  public static override setConfig(config: FileLockConfig): void {
+    super.setConfig(config);
+
+    const dConf = Object.assign(FileLock._copyConfig(config), LockBase._config);
     if (dConf.cacheTtlMs != null) dConf.cacheTtlMs = Math.max(dConf.cacheTtlMs, defaultFileLockConfig.cacheTtlMs);
     if (dConf.cacheMaxNum != null) dConf.cacheMaxNum  = Math.max(dConf.cacheMaxNum, 0);
     if (dConf.maxHistoryEntries != null) dConf.maxHistoryEntries = Math.max(dConf.maxHistoryEntries, 0);
@@ -122,9 +123,6 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       FileLock.#cache = null;
     }
 
-    // logger
-    FileLock.#logger = FileLock._resolveLogger(FileLock.#config);
-
   }
 
   /** Reset current configurations. */
@@ -134,12 +132,12 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /** Get current configurations. */
   public static getConfig(): Required<FileLockConfig> {
-    return FileLock.#copyConfig(FileLock.#config);// || FileLock.getDefaultConfig());
+    return FileLock._copyConfig(FileLock.#config);// || FileLock.getDefaultConfig());
   }
 
   /** Get default `Config`. */
   public static getDefaultConfig(): Required<FileLockConfig> {
-    return FileLock.#copyConfig(defaultFileLockConfig);
+    return FileLock._copyConfig(defaultFileLockConfig);
   }
 
   /**
@@ -189,7 +187,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param signal 
    */
   public static onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
-    FileLock.#logger.trace("Exited by", { code, signal });
+    FileLock._logger.trace("Exited by", { code, signal });
     
     FileLock.#cache?.forEach( lock => {
       lock.#onExit(code, signal);
@@ -319,13 +317,9 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @internal
    * Copy config. 
    */
-  static #copyConfig<T extends FileLockConfig>(config: T): T {
-    const ret = { ...config };
+  protected static override _copyConfig<T extends FileLockConfig>(config: T): T {
+    const ret = super._copyConfig(config);
     if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
-    // If specified undefined, delete it.
-    for (let key in ret) {
-      if (ret[key] === undefined) delete ret[key];
-    }
     return ret;
   }
 

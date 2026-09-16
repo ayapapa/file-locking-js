@@ -33,7 +33,8 @@ describe('FileLock', () => {
       const lockDirectory = 'hogehoge';
       let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
       FileLock.setConfig(config);
-      expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
+      const newConf = FileLock.getConfig();
+      expect(JSON.stringify(newConf)).toBe(JSON.stringify(config));
       config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
       FileLock.setConfig(config);
       expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));

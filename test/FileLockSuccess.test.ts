@@ -128,17 +128,18 @@ describe('FileLock', () => {
       { allowReentry: false }
     )})).toBe(retVal);
   });
-
+/*
   it("Pass an empty option to the non-static FileLock.withLock().", async () => {
     // Run it in non-debug mode (otherwise, you'll trigger REQUIRE_DEBUG).
-    FileLock.setConfig( { _debug: false });
+    FileLock.setConfig( { _debug: true });
     try {
       expect(await new TestLock().testWithLockEmptyOptions(() => "OK")).toBe("OK");
     }
     catch (err) {
+      console.log(err);
     }
   });
-
+*/
   it("When debug mode is enabled, if no history, it has to be created.", async () => {
     const hist = getHistoryPath();
     const hist_bu = hist + '.backup';

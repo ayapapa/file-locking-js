@@ -57,16 +57,6 @@ export interface FileLockConfig extends LockBaseConfig {
    */
   maxHistoryEntries?: number;
 
-  /**
-   * @internal
-   * Indicates whether to execute in debug mode.
-   * If `true`, process-related information is added to the lock information file, 
-   * and history tracking is enabled.
-   * This is a debug flag for this class and is intended for use only during development.
-   * However, if an external logger is injected, it cannot be controlled; 
-   * please adjust the log level yourself as necessary.
-   */
-  _debug?: boolean;
 }
 
 // ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
@@ -75,7 +65,6 @@ export interface FileLockConfig extends LockBaseConfig {
  */
 export const defaultFileLockConfig: Readonly<Required<FileLockConfig>> = {
   ...defaultLockBaseConfig,
-  _debug:             false,
   cache:              true,
   cacheMaxNum:        100,
   cacheTtlMs:         10000,
