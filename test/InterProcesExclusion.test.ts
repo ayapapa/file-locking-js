@@ -31,7 +31,9 @@ describe('別プロセスとの競合テスト', () => {
     const cmodPath = path.isAbsolute(commandPath) ? commandPath : path.resolve(__dirname, commandPath);
     const args: string[] = [cmodPath, command, key, String(sleep)];
     
-    const child = spawn(process.execPath, args);
+    // tnode 20.xのバグで、パスに空白が入っていると、spawnそのものが失敗し、子プロセス起動ができない。
+    // このため、process.execPathの代わりに、'node'とする
+    const child = spawn('node', args);
 
     let locked = false;
 
