@@ -33,7 +33,8 @@ describe('別プロセスとの競合テスト', () => {
     
     // tnode 20.xのバグで、パスに空白が入っていると、spawnそのものが失敗し、子プロセス起動ができない。
     // このため、process.execPathの代わりに、'node'とする
-    const child = spawn('node', args);
+    //const child = spawn('node', args/*, { shell: true }*/);
+    const child = spawn('node', args/*, { shell: true }*/);
 
     let locked = false;
 

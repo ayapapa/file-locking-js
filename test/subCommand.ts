@@ -21,7 +21,8 @@ for (let i = 2; i < process.argv.length; i++) {
   args.push(process.argv[i]);
 }
 
-console.log(args);
+console.log('process.argv:', process.argv);
+console.log('sub-command args:', args);
 
 const instruction = {
   'sleep': async () => {
