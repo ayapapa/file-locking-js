@@ -6,7 +6,7 @@
 
 # Interface: Monitor
 
-Defined in: [src/lib/LockBaseInternalState.ts:2](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L2)
+Defined in: [src/lib/LockBaseInternalState.ts:2](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L2)
 
 Monitoring object passed to the callback function executed after acquiring the lock.
 
@@ -16,7 +16,7 @@ Monitoring object passed to the callback function executed after acquiring the l
 
 > **cancelled**: `boolean`
 
-Defined in: [src/lib/LockBaseInternalState.ts:4](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L4)
+Defined in: [src/lib/LockBaseInternalState.ts:4](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L4)
 
 Whether the operation was cancelled.
 
@@ -26,7 +26,7 @@ Whether the operation was cancelled.
 
 > `optional` **cause?**: `unknown`
 
-Defined in: [src/lib/LockBaseInternalState.ts:10](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L10)
+Defined in: [src/lib/LockBaseInternalState.ts:10](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L10)
 
 The object actually caught by the try-catch block.
 
@@ -36,7 +36,7 @@ The object actually caught by the try-catch block.
 
 > `optional` **id?**: `string`
 
-Defined in: [src/lib/LockBaseInternalState.ts:16](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L16)
+Defined in: [src/lib/LockBaseInternalState.ts:16](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L16)
 
 Monitor ID.
 
@@ -46,7 +46,7 @@ Monitor ID.
 
 > `optional` **operation?**: `string`
 
-Defined in: [src/lib/LockBaseInternalState.ts:13](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L13)
+Defined in: [src/lib/LockBaseInternalState.ts:13](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L13)
 
 Operation cancelled.
 
@@ -56,6 +56,6 @@ Operation cancelled.
 
 > `optional` **reason?**: `string`
 
-Defined in: [src/lib/LockBaseInternalState.ts:7](https://github.com/ayapapa/file-lock-js/blob/7a94f6696ecbacf1dfde4833438efb44ea7678e6/src/lib/LockBaseInternalState.ts#L7)
+Defined in: [src/lib/LockBaseInternalState.ts:7](https://github.com/ayapapa/file-lock-js/blob/b869ce917882c81840c72b265a1554db6a94fede/src/lib/LockBaseInternalState.ts#L7)
 
 The reason for cancellation determined by FileLock.
