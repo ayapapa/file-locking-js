@@ -1,5 +1,5 @@
-import { stderr } from "node:process";
-import { onExit } from 'signal-exit';
+//import { stderr } from "node:process";
+//import { onExit } from 'signal-exit';
 import { FileLock, type Monitor } from "../src/index.ts";
 import { sleepAsync } from "./FileLockTestCommon.ts";
 
@@ -8,10 +8,15 @@ onExit((code, signal) => {
   console.log("Child process exited by", code, signal);
 });
 */
-const config = FileLock.getConfig();
 
 // extract command args
 const args: string[] = [];
+
+
+const config = FileLock.getConfig();
+
+// extract command args
+//const args: string[] = [];
 
 for (let i = 2; i < process.argv.length; i++) {
   args.push(process.argv[i]);
