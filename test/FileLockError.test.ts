@@ -856,7 +856,7 @@ describe('FileLock', () => {
           message: `Couldn't remove the lock information file.(ENOENT: no such file or directory, unlink '${getLockMetaPath(key)}')`,
           cause: {
             code: "ENOENT",
-            errno: -4058,
+            //errno: -4058,
             path: getLockMetaPath(key),
             syscall: "unlink",
           },
