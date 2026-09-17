@@ -566,7 +566,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       // REQUIRE_DEBUG(....)
       try {
         // 既に、ロックファイルは作成済みのはずなので、削除する。
-        if (fs.existsSync(options._filePath)) fs.unlinkSync(options._filePath);
+        /*if (fs.existsSync(options._filePath)) */fs.unlinkSync(options._filePath);
       }
       catch (err2) {
         // ここでのIOエラーは、あきらめる。
@@ -760,7 +760,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   #removeAndReopenFile(options: AllOptions): boolean {
     // カバレージ対応のためif文回避
-    fs.existsSync(options._filePath) && this.#removeFile___(options);
+    /*this.#existsSync(options) && */this.#removeFile___(options);
     /*
     const file = options._filePath;
     this.#accessInfo(
@@ -795,13 +795,22 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   /**
    * @internal
    * Remove the lock information file.
+   * ★★★★メタファイルのお掃除確認！！！！！！　
+   * 　＊　途中で変更があり、浸食された　⇒　削除しない
+   * 　＊　メタ情報が読めなかった　⇒　削除しない
+   * 　＊　IOエラー（存在確認も、unlinkも、readも）で読めなかった　⇒　しかたないので削除しない
+   * 	
+   * 	=>　これらのエラーは、ちゃんとエラーとして報告する。エラーのため、ロック情報ファイルの削除が出来なかったと！！
+   * 
+   * つまり、最後に削除するのは、存在し、データを読むことができて、オーナー確認ができたら、削除してよろしいい！！
+   * 
    * @param options 
    * @param errMsg 
    */
   #removeFile(meta: FileLockMeta | null, options: AllOptions, force: boolean = false): void {
     meta = meta || this.#getInfoIfExists(options);
 
-    // 自前のファイルでない場合は、削除しない
+    // 自前のファイルでない場合は、メタデータが読めなかった場合は、削除しない
     if (force === false && (meta === null || meta.ownerId !== options._ownerId)) return; // It's compromised, so do not remove it.
 
     // 自前作成のファイルを削除する
@@ -886,14 +895,23 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @returns null if not exist, or the contents as object.
    */
   #getInfoIfExists(options: AllOptions, throwErr: boolean = false): FileLockMeta | null {
-    if (!fs.existsSync(options._filePath)) return null;
     try {
+      if (!this.#existsSync(options)) return null;
       return this.#getInfo(options, false);
     }
     catch (err) {
       if (throwErr) throw err;
       return null; 
     }
+  }
+
+  #existsSync(options: AllOptions): boolean {
+    return this.#accessInfo(
+      options._filePath,
+      () => fs.existsSync(options._filePath), 
+      options, 
+      `Couldn't read the lock information file.`
+    );
   }
 
   /**
@@ -906,10 +924,9 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @returns Lock information object.
    */
   #getInfo(options: AllOptions, checkOwner: boolean = true): FileLockMeta {
-    REQUIRE(fs.existsSync(options._filePath), 
-      'The lock information file does not exist.', 
-      LockCompromised, 
-      {key: this._key, props: { file: options._filePath } });
+    // ロック情報ファイルは存在するはず
+    REQUIRE(this.#existsSync(options), 'The lock information file does not exist.', 
+      LockCompromised, {key: this._key, props: { file: options._filePath } });
 
     const contents = this.#accessInfo(
       options._filePath,
@@ -1092,12 +1109,18 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     const _add = () => {
       const historyFile = options._historyFile;
-      const contents = this.#accessInfo(
+      let contents;
+      try {
+        contents = this.#accessInfo(
         historyFile, 
-        () => fs.existsSync(historyFile) ? fs.readFileSync(historyFile, 'utf8') : null,
+        () => fs.readFileSync(historyFile, 'utf8'),
         options,
         "Couldn't read the history file."
-      );
+        );
+      }
+      catch (err) {
+        contents = null;
+      }
 
       let history: Record<string, { meta: FileLockMeta, options: AllOptions }> = {};
       try {

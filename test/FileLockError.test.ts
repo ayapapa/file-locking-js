@@ -538,8 +538,40 @@ describe('FileLock', () => {
     }
   });
 
+  it("前段ロックが無い状態でロック情報ファイル生成（書き込み）に失敗し、かつ、そのファイルの削除にも失敗する.", async () => {
+    const key = 'testKey_18465xx_unlink'
+    expect.assertions(2);
+    const orgUnlink = fs.unlinkSync;
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { throw Object.assign(new Error("unlinkSync error!"), { code: 'EUNLINK' }); });
+    try {
+      await FileLock.withLock(
+        key,
+        async (monitor1: Monitor) => {
+          await sleepAsync(100);
+        },
+        { timeoutMs: 200 }
+      );
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code: "EIO",
+        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        file: getLockMetaPath(key),
+        cause: {
+          code: "EUNLINK",
+          message: "unlinkSync error!",
+        },
+      });
+    }
+    finally {
+      orgUnlink(getLockMetaPath(key));
+    }
+  });
+
   it("existsSync が、特定ファイルが無いにも関わらず、に一度だけtrueを返す.", async () => {
-    const key = 'testKey_existsSync_error'
+    const key = 'testKey_existsSync_error_once'
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: PathLike) => {
       if (name === getLockMetaPath(key)) {
         spy.mockRestore();
@@ -548,7 +580,6 @@ describe('FileLock', () => {
       return false;
     });
 
-    //expect.assertions(2);
     expect(await FileLock.withLock(
       key,
       async (monitor1: Monitor) => {
@@ -557,9 +588,10 @@ describe('FileLock', () => {
       },
     )).toBe('completed');
 
+    expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
   });
 
-  it("existsSync error occurred during reentrant lock processing.", async () => {
+  it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation(() => {
       throw Object.assign(new Error("existsSync test error!!"),  { code: 'EEXISTSYNC' });
@@ -578,18 +610,33 @@ describe('FileLock', () => {
     catch (err) {
       expect(err).instanceOf(FileLockError);
       expect(err).toMatchObject({
-        code: "EIO",
+        code: "EEXISTSYNC",
         file: getLockMetaPath(key),
-        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        message: "Couldn't read the lock information file.(existsSync test error!!)",
         cause: {
           code: "EEXISTSYNC",
           message: "existsSync test error!!",
         },
       });
     }
+    finally {
+      // ロック解除処理中は読めないので、ここで削除する。
+      fs.unlinkSync(getLockMetaPath(key));
+    }
   });
 
-    it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
+  /**
+   * ★★★★メタファイルのお掃除確認！！！！！！　
+   * 　＊　途中で変更があり、浸食された　⇒　削除しない
+   * 　＊　メタ情報が読めなかった　⇒　削除しない
+   * 　＊　IOエラー（存在確認も、unlinkも、readも）で読めなかった　⇒　しかたないので削除しない
+   * 	
+   * 	=>　これらのエラーは、ちゃんとエラーとして報告する。エラーのため、ロック情報ファイルの削除が出来なかったと！！
+   * 
+   * つまり、最後に削除するのは、存在し、データを読むことができて、オーナー確認ができたら、削除してよろしいい！！
+   * 
+   */
+  it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
     const key = 'testKey_18465xx'
     expect.assertions(3);
     const metaPath = getLockMetaPath(key);
@@ -793,18 +840,27 @@ describe('FileLock', () => {
 
   it("無効なロック情報ファイルがあるとき、それを削除した後の排他オープンが失敗。その後、ロックリトライ失敗。", async () => {
     const key = "testKey_staleMeta_reopenFailed_lockNg"
-    const original = fs.openSync;
     await testSpyIO(
       key,
       'openSync',
       (counter: number) => counter >= 2,
       false, 
-      AlreadyLocked,
+      FileLockError,
       {
-        code: "ELOCKED",
+        code: "EIO",
         file: getLockMetaPath(key),
-        key: key,
-        message: `Could not lock because the '${key}' is already locked.`
+        message: "ファイルIOエラーのためロック獲得に失敗しました。",
+        cause: {
+          code: "ENOENT",
+          file: getLockMetaPath(key),
+          message: `Couldn't remove the lock information file.(ENOENT: no such file or directory, unlink '${getLockMetaPath(key)}')`,
+          cause: {
+            code: "ENOENT",
+            errno: -4058,
+            path: getLockMetaPath(key),
+            syscall: "unlink",
+          },
+        },
       }
     );
   });

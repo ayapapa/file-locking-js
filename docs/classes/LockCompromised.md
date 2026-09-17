@@ -6,7 +6,7 @@
 
 # Class: LockCompromised
 
-Defined in: [src/lib/FileLockErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/FileLockErrors.ts#L104)
+Defined in: [src/lib/FileLockErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/FileLockErrors.ts#L104)
 
 Lock compromised error.
 
@@ -20,7 +20,7 @@ Lock compromised error.
 
 > **new LockCompromised**(`reason`, `params?`): `LockCompromised`
 
-Defined in: [src/lib/FileLockErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/FileLockErrors.ts#L110)
+Defined in: [src/lib/FileLockErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/FileLockErrors.ts#L110)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 
@@ -210,7 +210,7 @@ a();
 
 > `static` **dueToHistory**(`history`, `cause`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/FileLockErrors.ts#L37)
+Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/FileLockErrors.ts#L37)
 
 履歴ファイル解析エラーを取得する。
 
@@ -242,7 +242,7 @@ Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-
 
 > `static` **lockFailedDueToHistory**(`cause`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/FileLockErrors.ts#L47)
+Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/FileLockErrors.ts#L47)
 
 履歴ファイル解析エラーが原因のロック獲得エラーを取得する。
 
@@ -268,7 +268,7 @@ Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-
 
 > `static` **lockFailedDueToIO**(`file`, `cause`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:19](https://github.com/ayapapa/file-lock-js/blob/20bba882daae6c4bbf5ce396a325ea44f5b5fc8e/src/lib/FileLockErrors.ts#L19)
+Defined in: [src/lib/FileLockErrors.ts:19](https://github.com/ayapapa/file-lock-js/blob/35e1f377fc62e86c986cb64e87c21dad6744fe6e/src/lib/FileLockErrors.ts#L19)
 
 #### Parameters
 

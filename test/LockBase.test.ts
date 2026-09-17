@@ -6,7 +6,7 @@ import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
-import { getCallStack, sleepAsync, sleepSync } from '../src/lib/Util.ts'
+import { getCallStack, isEqualObject, sleepAsync, sleepSync } from '../src/lib/Util.ts'
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -135,6 +135,14 @@ describe('LockBase and Util', () => {
 
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);
   });
+
+  it("isEqualObject　エラー", () => {
+    expect(isEqualObject({ a: 123, b: "hello"}, { b: "hello", a: 123 })).toBeTruthy();
+    expect(isEqualObject({ a: 123, b: "hello"}, { a: 123, b: "hello", c: new Error() })).toBeFalsy();
+    expect(isEqualObject({ a: "goodbye", b: "hello"}, { a: 123, b: "hello" })).toBeFalsy();
+  });
+
+  //isEqualObject
 
 });
 

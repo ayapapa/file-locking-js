@@ -5,6 +5,7 @@ import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
 import { defaultLockBaseConfig, type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
+import { isEqualObject } from './Util.ts';
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -33,7 +34,7 @@ export interface ReentrantContext  {
  * from within that context.
  * @abstract
  */
-export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
+export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptions, I extends LockBaseInternalState = LockBaseInternalState>  {
 
   /** 
    * Static fieilds. 
@@ -71,11 +72,20 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
   protected static _logger =  LockBase._resolveLogger(LockBase._config);
 
   protected static setConfig(config: LockBaseConfig): void {
+    REQUIRE_DEBUG(isEqualObject(LockBase._config, defaultLockBaseConfig),
+      '現在のコンフィグが不正です。（不具合）', LockError, { code: 'EINVAL' });
+    // 型の検証済みのため、型キャストする
+    const curConf = LockBase._config as Record<string, unknown>;
+    const newConf = config as Record<string, unknown>;
+    Object.keys(curConf).forEach(key => {
+      if (key in newConf) curConf[key] = newConf[key];
+    });
     //const dConf = LockBase._copyConfig(config);
     //LockBase._config = { ...LockBase._config, ...dConf };
+    /*
     if ('_debug' in config) LockBase._config['_debug'] = config['_debug'];
     if ('logger' in config) LockBase._config['logger'] = config['logger'];
-
+    */
     // logger
     LockBase._logger = LockBase._resolveLogger(LockBase._config);
 
@@ -147,7 +157,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
 
     const whithLockInContext = async () => {
@@ -181,11 +191,11 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
     }
   }
 
-  protected async _acquire(options: AllOptions<U, I>) {
+  protected async _acquire(options: AllOptions<O, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
-  protected async _release(options: AllOptions<U, I>) {
+  protected async _release(options: AllOptions<O, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -201,7 +211,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
       }));
   }
 
-  #createTtlTimer(options: AllOptions<U, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
+  #createTtlTimer(options: AllOptions<O, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
     let id: NodeJS.Timeout | null = null;
     const ttlMs = options.ttlMs;
     const promise = new Promise((_, reject) => {
@@ -214,7 +224,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
   }
 
   async #execLockCommon(onLockFn: CallbackOnLock, aquire: () => Promise<void>, 
-    release: () => Promise<void>, errMsg: string, options: AllOptions<U, I>) {
+    release: () => Promise<void>, errMsg: string, options: AllOptions<O, I>) {
     // Acquire the lock.
     await aquire();
 
@@ -244,7 +254,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
   }
 
 
-  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     return this.#execLockCommon(
       onLockFn, 
       () => this._acquire(options), 
@@ -293,7 +303,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
     };
   }
 
-  async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+  async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     return this.#execLockCommon(
       onLockFn, 
       () => this._incReantryCount(options), 
@@ -337,7 +347,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected async _incReantryCount(options: AllOptions<U, I>): Promise<void> {
+  protected async _incReantryCount(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -347,7 +357,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected async _decReantryCount(options: AllOptions<U, I>): Promise<void> {
+  protected async _decReantryCount(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -357,7 +367,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected _prepare(options: AllOptions<U, I>): void {
+  protected _prepare(options: AllOptions<O, I>): void {
     this.#newMonitor(options);
   }
   
@@ -369,7 +379,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @abstract
    */
-  protected _onError(err: unknown, operation: string, options: AllOptions<U, I>, codeIfNon: string = 'ELOCK') {
+  protected _onError(err: unknown, operation: string, options: AllOptions<O, I>, codeIfNon: string = 'ELOCK') {
     if (this.#isAlreadyCancelled(options)) return;
     const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
     this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
@@ -381,7 +391,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options 
    * @returns 
    */
-  #isAlreadyCancelled(options: AllOptions<U, I>): boolean {
+  #isAlreadyCancelled(options: AllOptions<O, I>): boolean {
     return options._monitor?.cancelled as boolean;
   }
 
@@ -400,7 +410,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param onLockFn  A user-specified function called during the lock.
    * @returns A `Promise` that resolves to the return value of onLockFn.
    */
-  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<U, I>) {
+  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
     const parent = this._getReentrantContext() as any;
     let child: ReentrantContext;
@@ -423,7 +433,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @internal
    * Check whether re-entrant locking is used.
    */
-  #isReentry(options: AllOptions<U, I>): boolean {
+  #isReentry(options: AllOptions<O, I>): boolean {
     return Boolean(this._getReentrantContext()?.heldLocks.has(options._contextId));
   }
 
@@ -446,7 +456,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options
    * @returns A new monitor.
    */
-  #newMonitor(options: AllOptions<U, I>): Monitor {
+  #newMonitor(options: AllOptions<O, I>): Monitor {
     //this.#deleteMonitor(options);
     return options._monitor = {cancelled:false, id: Math.random().toString(36).slice(2)};
   }
@@ -468,7 +478,7 @@ export class LockBase <U extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options
    * @returns Monitor reflecting the values.
    */
-  #setMonitor(mon: Monitor, options: AllOptions<U, I>): void {
+  #setMonitor(mon: Monitor, options: AllOptions<O, I>): void {
     options._monitor = options._monitor || this.#newMonitor(options);
     Object.assign(options._monitor, mon);
     //const curMon: Monitor = options._monitor ? options._monitor : this.#newMonitor(options);
