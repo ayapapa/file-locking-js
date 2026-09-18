@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { onExit } from 'signal-exit';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { LockError, DeadlockDetected, TTLExceeded } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
@@ -70,6 +71,20 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   protected static _config: Required<LockBaseConfig> = { ...defaultLockBaseConfig };//LockBase.getDefaultConfig();
 
   protected static _logger =  LockBase._resolveLogger(LockBase._config);
+  
+  private static _onExitFns = [] as ((code: number | null | undefined, signal: NodeJS.Signals | null) => void)[];
+
+  /**
+   * @internal
+   * Termination processing. 
+   * On Windows, this is not called upon forced termination (process.kill()), but the implementation is retained.
+   * @param code 
+   * @param signal 
+   */
+  public static onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    LockBase._logger.trace("Exited by", { code, signal });
+    LockBase._onExitFns.forEach(fn => fn(code, signal));
+  }
 
   protected static setConfig(config: LockBaseConfig): void {
     REQUIRE_DEBUG(isEqualObject(LockBase._config, defaultLockBaseConfig),
@@ -93,6 +108,10 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     Contracts.setConfig({ debug: LockBase._config._debug, logger: LockBase._logger });
   }
   
+  protected static _addOnExit(fn: (code: number | null | undefined, signal: NodeJS.Signals | null) => void): void {
+    if (LockBase._onExitFns.find(f => f === fn)) return;
+    LockBase._onExitFns.push(fn);
+  }
 
   /**
    * @internal
@@ -485,5 +504,13 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     //return options._monitor = Object.assign(curMon, mon);
   }
 }
+
+/**
+ * 終了（通常時およびkill()等による強制時）処理を登録。
+ * Windows版では、強制終了(kill())からは呼び出されることは無いが、本実装は残しておく。
+ * @param code 
+ * @param signal 
+ */
+onExit(LockBase.onExit);
 
 export { type Monitor };

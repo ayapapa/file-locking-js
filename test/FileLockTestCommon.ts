@@ -5,6 +5,7 @@ import * as Pino from 'pino'
 import { pino } from 'pino'
 
 import { FileLock } from '../src/index.ts';
+import { LockBase } from '../src/lib/LockBase.ts';
 
 export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -119,6 +120,10 @@ export class TestLock extends (FileLock as any) {
   */
   async testWithLockEmptyOptions(cb: () => any): Promise<any> {
     return super.withLock(cb, {});
+  }
+
+  static testAddOnExit(fn: (code: unknown, signal: unknown)=>void): void {
+    TestLock._addOnExit(fn);
   }
 
 }

@@ -136,13 +136,27 @@ describe('LockBase and Util', () => {
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);
   });
 
-  it("isEqualObject　エラー", () => {
+  it("isEqualObjectエラー", () => {
     expect(isEqualObject({ a: 123, b: "hello"}, { b: "hello", a: 123 })).toBeTruthy();
     expect(isEqualObject({ a: 123, b: "hello"}, { a: 123, b: "hello", c: new Error() })).toBeFalsy();
     expect(isEqualObject({ a: "goodbye", b: "hello"}, { a: 123, b: "hello" })).toBeFalsy();
   });
 
-  //isEqualObject
+  it("重複終了関数登録", () => {
+    expect.assertions(4);
+    let count = 0;
+    function onExit(code: unknown, signal: unknown): void {
+      expect(code).toBe(0);
+      expect(signal).toBe(null);
+      count++;
+    };
+    const before = TestLock._onExitFns.length;
+    TestLock.testAddOnExit(onExit);
+    TestLock.testAddOnExit(onExit);
+    expect(TestLock._onExitFns.length).toBe(before + 1);
+    LockBase.onExit(0, null);
+    expect(count).toBe(1);
+  });
 
 });
 
