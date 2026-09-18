@@ -6,7 +6,7 @@
 ![Statements](https://raw.githubusercontent.com/ayapapa/file-locking-js/main/badges/coverage-statements.svg)
 
 ## Table of contents
-[Overview](#overview) | [API Reference](#api-reference) | [Installation](#installation) | [Usage](#usage)
+[Overview](#overview) | [API Reference](#api-reference) | [Installation](#installation) | [Usage](#usage) | [Configurations](#configurations) | [Options](#options) | [Errors](#errors) | [Examples](#examples)
 
 # file-locking-js
 
@@ -17,6 +17,16 @@ Inspired by existing Node.js file-locking implementations and developed to explo
 
 It enables the exclusive execution of operations—such as "resource access"—that require serialization across multiple processes.<br>
 Examples include limiting access to a specific service to a single process or thread at a time, or updating a document without interference from other processes.
+
+## Definitions of Terms
+|        Term     |  Explanation  |  See also  |
+| --------------- | ------------- | -------------|
+| `lock key`        | A key used to apply a lock. When multiple operations use the same key, they are executed sequentially.　| [API Reference](#api-reference) | 
+| `lock directory`  | The directory where `lock file`s are stored. | `lock file`, [Configurations](#configurations) |
+| `lock file`       | It is associated with the specified `lock key` and stores information related to the lock owner, the actual expiration time, and so forth.<br>For example, if the `lock key` is "key001", a file named "key001.json" is created under the `lock directory` and deleted when the lock is released. | `lock key`, `lock directory` |
+| `re-entrant lock` | A lock that allows the same owner to acquire it multiple times without blocking itself. Enable this behavior with `{ allowReentry: true }`.<br>It prevents `self-deadlock` when the same owner acquires the same lock again.<br>It does not prevent `circular deadlocks` between different owners. | `deadlock`, [Options](#options) |
+| `deadlock` | It is a state where operations cannot proceed because they keep waiting.<br>A `self-deadlock` is caused by reacquiring the same lock, while `circular deadlock` is caused by different owners waiting on each other.<br>Due to the timeout setting, it will not wait indefinitely; however, this results in a lock acquisition error. | `re-entrant lock`, [Options](#options) |
+
 
 ## API Reference
 [API document](https://github.com/ayapapa/file-locking-js/blob/main/docs/api.md)
@@ -36,7 +46,7 @@ Users simply call it like this:
   // Of course, you can retrieve return values ​​from the callback function.
   ```
   This eliminates the risk of forgetting to release the lock—a design choice that prioritizes user convenience.
-* **Prevents deadlocks within the same process.**<br>
+* **Prevents self-deadlocks within the same process.**<br>
 It uses `AsyncLocalStorage` to detect re-entrant locks on the same key. Consequently, the default configuration (`{allowReentry: false}`) triggers an error upon deadlock detection.<br>
 Naturally, re-entrant locking can be enabled via options (`{allowReentry: true}`). In this mode, the operation proceeds without acquiring a new lock for the re-entrant call; however, the user is responsible for ensuring there is no interference with the ongoing operation protected by the initial lock.
 * **Stricter lock validity check** <br>
@@ -58,7 +68,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
     }, 
     options
   );
-  console.log(ret); // "The operation is completed.";
+  console.log(ret); // "The operation is completed."
   ```
   Note1: It is not mandatory to interrupt the process when monitor.cancelled is true.<br>
   Note2: If `options.allowReentry` is true and a reentrant lock is acquired, the `monitor` passed to the initial lock operation (callback) is shared with the subsequent one.
@@ -90,11 +100,11 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   console.log(ret); // "Specify the results if any.";
   ```
 
-## Examples
-(under construction)
+## Configurations
 
+## Optionss
 
-## 主なエラー
+## Errors
 | エラークラス名 | エラー内容  | エラーメッセージ | その他プロパティ | 対処方法など |
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
 | LockFileBroken | ロックファイル内容の破損 | ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。 | { code: 'EBROKEN', file: '(ロックファイルパス)' } | ロックファイル(pathは、`file`)の確認と削除。削除する場合は、そのファイルをつかんでいるプロセスが無いことを確認すること。[^1]
@@ -107,7 +117,10 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 というわけで、話を戻して、FileLockだけど、まずは、壊れたファイルは、リトライしまくって、ロックできなかったという実装までを目指すよ。そして、テストもそのように書く。そして、次の段階で、オプションでそのようなファイルの対処法指定しるために、「invalidLockFileTimeoutMs」なるものを導入した実装にすすもうと思う。
 
 
-破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。
+[^2]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。
 
 invalidLockFileTimeoutMs は、heartbeatTimeoutMs を主な参考値として、利用環境に応じて設定してください　⇒　最小値は、heartbeatTimeoutMsだろうなぁ。
+
+## Examples
+(under construction)
 
