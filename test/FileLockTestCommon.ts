@@ -82,17 +82,26 @@ export function getHistoryPath() {
  * テスト用ロック。
  * プライベートも利用するため、as anyを使用。
  */
-export class TestLock extends (FileLock as any) {
+// @ts-ignore
+export class TestLock extends FileLock {
   constructor(lock?: FileLock) {
     super("TestLock_Key");
     Object.assign(this, lock);
   }
 
   static getLock(key: string): TestLock {
+    // @ts-ignore
     return new TestLock(super._getLock(key));
   }
 
+  static isReleasedState(key: string): boolean {
+    const lock = this.getLock(key);
+    // @ts-ignore
+    return lock._acquired === false && lock._heartbeatTimer === null && fs.existsSync(getLockMetaPath(key)) === false;
+  }
+
   static getLockDirPath() {
+    // @ts-ignore
     return super._getLockDirPath();
   }
 /*
@@ -101,15 +110,23 @@ export class TestLock extends (FileLock as any) {
   }
 */
   static getCache() {
+    // @ts-ignore
     return super._getCache();
   }
 
+  static clearCache() {
+    const cache = this.getCache();
+    if (cache) cache.clear();
+  }
+
   static getCacheSize() {
+    // @ts-ignore
     const size = this.getCache().size;
     return size;
   }
 
   getReentrantContext() {
+    // @ts-ignore
     return super._getReentrantContext();
   }
 
@@ -119,11 +136,12 @@ export class TestLock extends (FileLock as any) {
   }
   */
   async testWithLockEmptyOptions(cb: () => any): Promise<any> {
+    // @ts-ignore
     return super.withLock(cb, {});
   }
 
   static testAddOnExit(fn: (code: unknown, signal: unknown)=>void): void {
-    TestLock._addOnExit(fn);
+    super._addOnExit(fn);
   }
 
 }

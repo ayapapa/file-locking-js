@@ -31,7 +31,7 @@ export function getCallStack(): string {
  * @internal
  * Check same type objects. 
  */
-export function isEqualObject(o1: Record<string, unknown>, o2: Record<string, unknown>): boolean {
+export function isEqualObjectType(o1: Record<string, unknown>, o2: Record<string, unknown>): boolean {
   if (Object.keys(o1).length !== Object.keys(o2).length) return false;
   for (const key in o1) {
     if (key in o2 === false || typeof o1[key] !== typeof o2[key]) return false;

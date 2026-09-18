@@ -26,6 +26,7 @@ describe('FileLock', () => {
       },
       opts
     )).toBe(retVal);
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("The process completes without interference between the two locks using different keys.", async () => {
@@ -56,6 +57,8 @@ describe('FileLock', () => {
     expect(res).toHaveLength(2);
     expect(res[0]).toBe(retVal1);
     expect(res[1]).toBe(retVal2);
+    expect(TestLock.isReleasedState(key1)).toBeTruthy();
+    expect(TestLock.isReleasedState(key2)).toBeTruthy();
   });
 
   it("If reentrant locking is enabled, calling `withLock` with the same key from within " +
@@ -76,6 +79,7 @@ describe('FileLock', () => {
         );
       }
     )).toBe(retVal);
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("With three-level lock nesting, if `options.allowReentry` is set to `true`, " +
@@ -96,6 +100,8 @@ describe('FileLock', () => {
         );
       });
     })).toBe(ret);
+    expect(TestLock.isReleasedState(key1)).toBeTruthy();
+    expect(TestLock.isReleasedState(key2)).toBeTruthy();
   });
  
   it("When reentrant locking is enabled, if `withLock` is called from within " +
@@ -105,7 +111,7 @@ describe('FileLock', () => {
     const key = "testKey", retVal = "Reentrant-lock is enabled.";
     expect (await FileLock.withLock(key, async () => {
       // Clear the cache to create a new lock instance.
-      FileLock.clearCache();
+      TestLock.clearCache();
 
       return await FileLock.withLock(
         key, 
@@ -116,6 +122,7 @@ describe('FileLock', () => {
         { allowReentry: true }
       );
     })).toBe(retVal);
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("Since a different key is used, it completes successfully even if re-entry locking is disabled.", async () => {
@@ -127,19 +134,10 @@ describe('FileLock', () => {
       },
       { allowReentry: false }
     )})).toBe(retVal);
+    expect(TestLock.isReleasedState(key1)).toBeTruthy();
+    expect(TestLock.isReleasedState(key2)).toBeTruthy();
   });
-/*
-  it("Pass an empty option to the non-static FileLock.withLock().", async () => {
-    // Run it in non-debug mode (otherwise, you'll trigger REQUIRE_DEBUG).
-    FileLock.setConfig( { _debug: true });
-    try {
-      expect(await new TestLock().testWithLockEmptyOptions(() => "OK")).toBe("OK");
-    }
-    catch (err) {
-      console.log(err);
-    }
-  });
-*/
+
   it("When debug mode is enabled, if no history, it has to be created.", async () => {
     const hist = getHistoryPath();
     const hist_bu = hist + '.backup';
@@ -197,29 +195,5 @@ describe('FileLock', () => {
     const h = JSON.parse(c);
     expect(Object.keys(h).length).toBe(0);
   });
-/*
-  it("A case where only the lock information directory remains.", async () => {
-    const key = 'Key_HogeHoge'
-    const metaDir = path.dirname(getLockMetaPath(key));
-    expect.assertions(1);
-    // Generate a state containing only the lock information directory (without meta-information).
-    if (fs.existsSync(metaDir) === false) fs.mkdirSync(metaDir);
-    try {
-      await FileLock.withLock(key, 
-        async () => {
-          await sleepAsync(100);
-        },
-      );
-      // After waiting for a certain period, the lock is determined to be invalid, 
-      // and processing completes successfully.
-      // Therefore, the directory created above should have been deleted.
-      expect(fs.existsSync(metaDir)).toBeFalsy();
-    }
-    finally {
-      // To handle cases where execution does not complete successfully, 
-      // delete the directory created above if it still exists.      
-      if (fs.existsSync(metaDir)) fs.rmSync(metaDir, { recursive: true, force: true });
-    }
-  });
-*/
+
 });

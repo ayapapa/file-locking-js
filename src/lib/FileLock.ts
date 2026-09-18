@@ -58,15 +58,14 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * Static methods
    */
 
-  /** Initialize. */
-  public static initialize() {
+  /** 
+   * @internal
+   * Initialize.
+   */
+  public static _initialize() {
     FileLock.resetConfig();
     FileLock._addOnExit(FileLock.#onExitFn);
   }
-
-  /**
-   * Static methods.
-   */
 
   /**
    * Set configurations.<br>
@@ -89,7 +88,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     FileLock.#config = { ...FileLock.getConfig(), ...dConf };
 
     // Clear chache
-    FileLock.clearCache();
+    FileLock.#clearCache();
 
     if (FileLock.#config.cacheMaxNum === 0) FileLock.#config.cache = false;
 
@@ -107,20 +106,19 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     else {
       FileLock.#cache = null;
     }
-
   }
 
-  /** Reset current configurations. */
+  /** Resets the current settings to their default values. */
   public static resetConfig(): void {
     FileLock.setConfig(FileLock.getDefaultConfig());
   }
 
   /** Get current configurations. */
   public static getConfig(): Required<FileLockConfig> {
-    return FileLock._copyConfig(FileLock.#config);// || FileLock.getDefaultConfig());
+    return FileLock._copyConfig(FileLock.#config);
   }
 
-  /** Get default `Config`. */
+  /** Get default configurations. */
   public static getDefaultConfig(): Required<FileLockConfig> {
     return FileLock._copyConfig(defaultFileLockConfig);
   }
@@ -156,12 +154,6 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    */
   public static getDefaultOptions(): FileLockRequiredOptions {
     return { ...defaultFileLockOptions };
-  }
-
-  /** Clear `lock` instance cache. */
-  public static clearCache() {
-    const cache = FileLock._getCache();
-    if (cache) cache.clear();
   }
 
   /**
@@ -219,19 +211,16 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         stat = fs.statSync(name);
       }
       catch (err) {
-        REQUIRE_DEBUG(err instanceof Error, '想定外のキャッチオブジェクト', FileLockError, { code: 'EUNKNOWN', props: { cause: err } });
-        const e = err as Error; // 検証済
+        REQUIRE(err instanceof Error, 'The caught object was not an Error instance.', FileLockError, { code: 'EUNEXPECTED', props: { cause: err } });
+        const e = err as Error; // Type-cast because it has been verified.
         const code = 'code' in e && String(e.code);
         if (code === 'ENOENT') return false;
         throw new LockDirectoryStatFailed(e.message, { path: name, props: { fsErrCode: code } } );
       }
       
-      if (stat.isDirectory()) {
-        return true
-      }
-      else {
-        throw new FileLockError(`'${name}' is not a directory.`, { code: 'ENOTDIR' });
-      }
+      if (stat.isDirectory()) return true
+
+      throw new FileLockError(`'${name}' is not a directory.`, { code: 'ENOTDIR', props: { path: name } });
     }
 
     const mkdir = (name: string): void => {
@@ -248,8 +237,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       'process.cwd()': path.join(process.cwd(), '.lock'),
     };
 
+    // Check whether the directory is one specified by the user.
     const isSpecified = (i: number) => i === 0;
 
+    // Create a lock directory.
     let candidates: string = '';
     const keys = typedKeys(candies);
     for(let i = 0; i < keys.length; i++) {
@@ -257,8 +248,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       if (!dir) continue;
       candidates += "\n" + `- ${dir}`;
       try {
-        if (existsDir(dir)) return dir;
-        mkdir(dir);
+        if (existsDir(dir) === false) mkdir(dir);
         return dir;
       }
       catch (err) {
@@ -266,6 +256,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         continue;
       }
     };
+    // Failed to create lock directory.
     throw new LockDirectoryCreationFailed(
       "Failed to create the lock information directory." +
       "\nAttempted to locate and create it in the following order:" +
@@ -286,6 +277,15 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
+   *  Clear `lock` instance cache. 
+   */
+  static #clearCache() {
+    const cache = FileLock._getCache();
+    if (cache) cache.clear();
+  }
+
+  /**
+   * @internal
    * Whether the instance corresponding to `key` is cached. 
    * @param key   Lock key. 
    * @param lock  Lock instance. 
@@ -295,17 +295,6 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     if (cache) cache.set(key, lock);
   }
 
-  /**
-   * @internal
-   * Copy config. 
-   */
-  protected static override _copyConfig<T extends FileLockConfig>(config: T): T {
-    const ret = super._copyConfig(config);
-    if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
-    return ret;
-  }
-
-
   /** 
    * Instance fields.
    */
@@ -314,14 +303,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @internal
    * Heartbeat timer id 
    */
-  #heartbeatTimer?: NodeJS.Timeout | null = null;
-
-  /**
-   * @internal
-   * Whether or not it is released
-   */
-  #released: boolean = true;
-
+  private _heartbeatTimer: NodeJS.Timeout | null = null;
 
   /** 
    * Instance methods.
@@ -346,7 +328,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     options._ownerId =  options._ownerId || meta.ownerId;
     meta.counter = meta.counter;
     meta.counter++;
-    return await this.#updateInfo(meta, options);
+    return this.#updateInfo(meta, options);
   }
 
   /**
@@ -361,7 +343,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       meta = this.#getInfo(options);
       if (options._ownerId === meta.ownerId && meta.counter > 0) {
         meta.counter--;
-        await this.#updateInfo(meta, options);
+        this.#updateInfo(meta, options);
       }
     }
     catch (err) {
@@ -454,38 +436,12 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   }
 
   /**
-   * @internal
-   * Create the lock information file.
-   * @param options Options.
-   */
-  async #createFile(options: AllOptions): Promise<boolean> {
-    try {
-      // Create the lock information file.
-      await this.#updateInfo(
-        {
-          ownerId: options._ownerId = crypto.randomUUID(),
-          expirationTime: Date.now() + options.ttlMs,
-          heartbeatTimeoutMs: options.heartbeatTimeoutMs,
-          lastHeartbeatAt: Date.now(),
-          counter: 1
-        },
-        options
-      );
-    }
-    catch (err) {
-      throw err;
-    }
-
-    return true;
-  }
-
-  /**
    * Attempt to acquire the lock; that is, create the lock information file.
    * @param options Options
    * @returns `true` if acquired lock. 
    */
   async #tryLock(options: AllOptions): Promise<{ locked: boolean, reason: string, cause?: unknown }> {
-    if (this.#released === false) return {locked: false, reason: 'ELOCKED'};
+    if (this._acquired) return {locked: false, reason: 'ELOCKED'};
 
     let ret = null;
     // Check lockable, and if lockable, create lock key directry
@@ -495,17 +451,15 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     // Create the lock information file. 
     try {
-      await this.#createFile(options);
+      await this.#createLockFile(options);
     }
-    catch (err) { // 'EIO' または、'EHISTORY'
-      // エラー検証
-      // REQUIRE_DEBUG(....)
+    catch (err) {
       try {
-        // 既に、ロックファイルは作成済みのはずなので、削除する。
-        /*if (fs.existsSync(options._filePath)) */fs.unlinkSync(options._filePath);
+        // An empty lock file should already have been created, so delete it.
+        fs.unlinkSync(options._filePath);
       }
       catch (err2) {
-        // ここでのIOエラーは、あきらめる。
+        // Give up on the I/O error here.
         err = err2;
       }
       const reason =  err instanceof FileLockError && err.code === 'EHISTORY' ? 'EHISTORY' : 'EIO';
@@ -515,22 +469,9 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     // Start the heartbeat.
     this.#startHeartbeat(options);
 
-    this.#released = false;
+    this._acquired = true;
 
     return { locked: true, reason: 'ACQUIRED' };
-  }
-
-  #exclusiveOpenFile(options: AllOptions): boolean {
-    try {
-      // Can be locked when opened.
-      const fd = fs.openSync(options._filePath, 'wx');
-      // The file descriptor is not reused, so it is closed.
-      fs.closeSync(fd);
-      return true;
-    }
-    catch (err) {
-      return false;
-    }
   }
 
   /**
@@ -543,7 +484,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     let ret = false;
 
     try {
-      ret = this.#exclusiveOpenFile(options);
+      ret = this.#exclusiveOpenLockFile(options);
       if (ret) return { lockable: true, reason: 'LOCKFILEOPENED' }; // lockable
 
       // Could not open with exclusive access, so reading metadata.
@@ -564,7 +505,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     }
     catch (err) {
       // Set lockable=false for data corruption and I/O errors, as these are subject to lock retries.
-      REQUIRE_DEBUG(err instanceof FileLockError, 'An unexpected error was caught.', FileLockError, { code: 'EUNKNOWN', props: { cause: err} });
+      REQUIRE_DEBUG(err instanceof FileLockError, 'An unexpected error was caught.', FileLockError, { code: 'EUNEXPECTED', props: { cause: err} });
       if (err instanceof LockCompromised) {
         return { lockable: false, reason: 'EBROKEN', cause: err };
       }
@@ -592,20 +533,20 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options Options.
    */
   async #startHeartbeat(options: AllOptions): Promise<void> {
-    REQUIRE_DEBUG(this.#heartbeatTimer === null, 
+    REQUIRE_DEBUG(this._heartbeatTimer === null, 
       'Heartbeat multiple startup error. Possible bug.', 
       FileLockError, { code: 'EFILELOCK', props: { options } });
 
-    this._logger.trace(`start heartbeat at ${DateFormatter.format(new Date())}`);
+    this._logger.trace(`Start heartbeat at ${DateFormatter.format(new Date())}`);
 
-    this.#heartbeatTimer = setInterval(
+    this._heartbeatTimer = setInterval(
       async () => {
         try {
           // Avoid `if` statements to ensure code coverage.
-          this.#released == false && await this.#updateHeartbeat(options);
+          this._acquired && await this.#updateHeartbeat(options);
         }
         catch (err) {
-          this._logger.trace(`heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
+          this._logger.trace(`Heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
           this.#stopHeartbeat();
           this._onError(err, 'updateHeartbeat', options);
           // To maintain the lock, the heartbeat is not stopped here.
@@ -620,10 +561,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * Stop heartbeat.
    */
   #stopHeartbeat(): void {
-    if (this.#heartbeatTimer) {
-      this._logger.trace(`stop heartbeat at ${DateFormatter.format(new Date())}`);
-      clearInterval(this.#heartbeatTimer);
-      this.#heartbeatTimer = null;
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+      this._logger.trace(`Stop heartbeat at ${DateFormatter.format(new Date())}`);
     }
   }
 
@@ -634,20 +575,137 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   async #updateHeartbeat(options: AllOptions): Promise<void> {
     const meta = this.#getInfo(options);
     meta.lastHeartbeatAt = Date.now();
-    await this.#updateInfo(meta, options);
-    this._logger.trace(`update heartbeat at ${DateFormatter.format(new Date(meta.lastHeartbeatAt))}`);
+    this.#updateInfo(meta, options);
+    this._logger.trace(`Update heartbeat at ${DateFormatter.format(new Date(meta.lastHeartbeatAt))}`);
   }
 
+  /**
+   * @internal
+   * Open the lock file exclusively.
+   * @param options Options.
+   */
+  #exclusiveOpenLockFile(options: AllOptions): boolean {
+    try {
+      // Can be locked when opened.
+      const fd = fs.openSync(options._filePath, 'wx');
+      // The file descriptor is not reused, so it is closed.
+      fs.closeSync(fd);
+      return true;
+    }
+    catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * @internal
+   * Create the lock file.
+   * @param options Options.
+   */
+  async #createLockFile(options: AllOptions): Promise<boolean> {
+    try {
+      // Create the lock information file.
+      this.#updateInfo(
+        {
+          ownerId: options._ownerId = this._ownerId,
+          expirationTime: Date.now() + options.ttlMs,
+          heartbeatTimeoutMs: options.heartbeatTimeoutMs,
+          lastHeartbeatAt: Date.now(),
+          counter: 1
+        },
+        options
+      );
+    }
+    catch (err) {
+      throw err;
+    }
+
+    return true;
+  }
+
+  /**
+   * @internal
+   * Remove the lock information file.<br>
+   *  - Modified during the process or corrupted ⇒ Do not delete<br>
+   *  - Unable to read meta-information ⇒ Do not delete<br>
+   *  - Unable to read due to an I/O error (during existence check, unlink, or read) ⇒ Do not delete<br>
+   *  - Report the above errors properly—specifically, that the lock information file could not be deleted due to the error!!<br>
+   *
+   * In other words: delete only if the lock file exists, the metadata can be read, and the owner information matches expectations.
+   * 
+   * @param options 
+   * @param errMsg 
+   */
+  #removeLockFile(meta: FileLockMeta | null, options: AllOptions, force: boolean = false): void {
+    meta = meta || this.#getInfoIfExists(options);
+
+    // Unless a forced deletion is specified, the file will not be deleted 
+    // if the metadata cannot be read, or—even if it can be read—if the file is not one's own.
+    if (force === false && (meta === null || meta.ownerId !== options._ownerId)) return;
+
+    // Remove it, bacause it is my own file.
+    this.#unlinkSync(options._filePath, options);
+  }
+
+  /**
+   * @internal
+   * Remove the lock file and open it again with exclusive access.
+   */
   #removeAndReopenFile(options: AllOptions): boolean {
-    this.#actuallyRemove(options);
-    return this.#exclusiveOpenFile(options);
+    this.#unlinkSync(options._filePath, options);
+    return this.#exclusiveOpenLockFile(options);
   }
 
-  #actuallyRemove(options: AllOptions): void {
-    const file = options._filePath;
+  /**
+   * @internal
+   * Read the file.
+   */
+  #readFileSync(path: string, options: AllOptions, msg: string = "Couldn't read the lock file."): string {
+    return this.#accessInfo(
+      path,
+      () => fs.readFileSync(path, 'utf8'), 
+      options, 
+      msg
+    );
+  }
+
+  /**
+   * @internal
+   * Write the file.
+   */
+  #writeFileSync(path: string, data: unknown, options: AllOptions, msg: string = "Couldn't write the lock file."): void {
+    const str = JSON.stringify(data, null , "  ");
     this.#accessInfo(
-      file,
-      () => fs.unlinkSync(file),
+      path,
+      () => {
+        fs.writeFileSync(path, str, 'utf8');
+      },
+      options,
+      msg
+    );
+  }
+
+  /**
+   * @internal
+   * Check if the file exists.
+   */
+  #existsSync(path: string, options: AllOptions): boolean {
+    return this.#accessInfo(
+      path,
+      () => fs.existsSync(path), 
+      options, 
+      `Couldn't read the lock information file.`
+    );
+  }
+
+  /**
+   * @internal
+   * Remove the file.
+   */
+  #unlinkSync(path: string, options: AllOptions): void {
+    this.#accessInfo(
+      path,
+      () => fs.unlinkSync(path),
       options,
       `Couldn't remove the lock information file.`
     );
@@ -655,41 +713,17 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
-   * Remove the lock information file.
-   * ★★★★メタファイルのお掃除確認！！！！！！　
-   * 　＊　途中で変更があり、浸食された　⇒　削除しない
-   * 　＊　メタ情報が読めなかった　⇒　削除しない
-   * 　＊　IOエラー（存在確認も、unlinkも、readも）で読めなかった　⇒　しかたないので削除しない
-   * 	
-   * 	=>　これらのエラーは、ちゃんとエラーとして報告する。エラーのため、ロック情報ファイルの削除が出来なかったと！！
-   * 
-   * つまり、最後に削除するのは、存在し、データを読むことができて、オーナー確認ができたら、削除してよろしいい！！
-   * 
-   * @param options 
-   * @param errMsg 
-   */
-  #removeFile(meta: FileLockMeta | null, options: AllOptions, force: boolean = false): void {
-    meta = meta || this.#getInfoIfExists(options);
-
-    // 自前のファイルでない場合は、メタデータが読めなかった場合は、削除しない
-    if (force === false && (meta === null || meta.ownerId !== options._ownerId)) return; // It's compromised, so do not remove it.
-
-    // 自前作成のファイルを削除する
-    this.#actuallyRemove(options);
-  };
-
-  /**
-   * @internal
    * Final unlock processing.
    * @param options Options.
    */
   #actuallyRelease(options: AllOptions) {
-    this.#released = true;
-    // ハートビート止める（これをしてからでないと、削除はしてはならない）
+    this._acquired = false;
+    // Stop the heartbeat (must be stopped before deletion)
     this.#stopHeartbeat()
-    this.#removeFile(null, options);
+    this.#removeLockFile(null, options);
     options._ownerId = null;
-    //this.ownerId = null;
+
+    this._logger.trace(`Released the lock at ${DateFormatter.format(new Date())}`);
   }
 
   /**
@@ -726,15 +760,17 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
-   * Get the lock information.
-   * 本関数は、正しいロック情報が取れた時だけそれをそのまま返す（オーナーチェックは行わない）
-   * 不正ファイル時は、`throwErr`が`true`なら、エラー。さもなくば、`null`を返す。
+   * Get the lock information.<br>
+   * This function returns the lock information as-is only when valid information 
+   * is successfully retrieved (it does not perform an owner check).<br>
+   * In the case of an invalid file, it throws an error if `throwErr` is `true`; 
+   * otherwise, it returns `null`.
    * @param options Options.
    * @returns null if not exist, or the contents as object.
    */
   #getInfoIfExists(options: AllOptions, throwErr: boolean = false): FileLockMeta | null {
     try {
-      if (!this.#existsSync(options)) return null;
+      if (!this.#existsSync(options._filePath, options)) return null;
       return this.#getInfo(options, false);
     }
     catch (err) {
@@ -743,35 +779,21 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     }
   }
 
-  #existsSync(options: AllOptions): boolean {
-    return this.#accessInfo(
-      options._filePath,
-      () => fs.existsSync(options._filePath), 
-      options, 
-      `Couldn't read the lock information file.`
-    );
-  }
-
   /**
    * @internal
-   * Get the lock information.
-   * 本関数は、正当なロック情報ファイルがあることを前提としている。
-   * そのため、存在しない、あるいは、壊れている、あるいは、オーナーが異なるなどすれば、エラー（例外）を投げる。
-   * オーナーチェックをするか否かは引数で制御可能。
+   * Get the lock information.<br>
+   * This function assumes the existence of a valid lock information file. <br>
+   * Consequently, it throws an error (exception) if the file is missing, corrupted, or has a different owner. <br>
+   * Whether or not to perform an ownership check can be controlled via an argument.   
    * @param  options          Options.
    * @returns Lock information object.
    */
   #getInfo(options: AllOptions, checkOwner: boolean = true): FileLockMeta {
-    // ロック情報ファイルは存在するはず
-    REQUIRE(this.#existsSync(options), 'The lock information file does not exist.', 
+    // Lock information file should exist.
+    REQUIRE(this.#existsSync(options._filePath, options), 'The lock information file does not exist.', 
       LockCompromised, {key: this._key, props: { file: options._filePath } });
 
-    const contents = this.#accessInfo(
-      options._filePath,
-      () => fs.readFileSync(options._filePath, 'utf8'), 
-      options, 
-      `Couldn't read the lock information file.`
-    );
+    const contents = this.#readFileSync(options._filePath, options);
 
     let meta: FileLockMeta;
     try {
@@ -791,20 +813,20 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     // Check contents.
     const check = (key: keyof FileLockMeta, type: string | ((v: unknown) => boolean), optional: boolean = false) => {
-      // キーが存在し、かつ、型チェック成功なら真
+      // True if the key exists and the type check is successful.
       if (key in meta) {
         if (
           (typeof type === 'string' &&  typeof meta[key] === type) ||
           (typeof type === 'function' && type(meta[key])         )
         ) return true;
       }
-      // さもなくば、オプショナルなら真
+      // If optional, then true.
       else if (optional) return true;
-   
+      // Otherwise false.
       return false;
     };
 
-    const checkArr = [
+    const checkItems = [
       { key: "ownerId", type: "string" }, 
       { key: "processId",         type: "number", optional: true }, 
       { key: "parentProcessId",   type: "number", optional: true }, 
@@ -820,7 +842,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
     const checkAll = () => {
       const invalidProps = [] as { key: string, value: unknown}[];
-      checkArr.forEach(v => {
+      checkItems.forEach(v => {
         if (check(v.key, v.type, v.optional ?? false) === false) {
           invalidProps.push({ key: v.key, value: meta[v.key] });
         }
@@ -839,11 +861,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   /**
    * @internal
    * Update the lock information.
-   * @param options   Options.
    * @param meta      Lock information.
-   * @param withLock  ロックするか否か。。。たぶん、今後不要！
+   * @param options   Options.
    */
-  async #updateInfo(meta: FileLockMeta, options: AllOptions): Promise<void> {
+  #updateInfo(meta: FileLockMeta, options: AllOptions): void {
     // For debug
     if (this.#isDebug()) {
       Object.assign(
@@ -857,25 +878,11 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       );
     }
 
-    this.#writeFile(meta, options);
+    this.#writeFileSync(options._filePath, meta, options);
 
     if (FileLock.#config.history === true || this.#isDebug() === true) {
       this.#addHistory(meta, options);
     }
-
-    return;
-  }
-
-  #writeFile(meta: FileLockMeta, options: AllOptions): void {
-    const metaStr = JSON.stringify(meta, null , "  ");
-    this.#accessInfo(
-      options._filePath,
-      () => {
-        fs.writeFileSync(options._filePath, metaStr, 'utf8');
-      },
-      options,
-      `Couldn't update the lock information file.`
-    );
   }
 
   /**
@@ -891,12 +898,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       const historyFile = options._historyFile;
       let contents;
       try {
-        contents = this.#accessInfo(
-        historyFile, 
-        () => fs.readFileSync(historyFile, 'utf8'),
-        options,
-        "Couldn't read the history file."
-        );
+        contents = this.#readFileSync(historyFile, options, "Couldn't read the history file.");
       }
       catch (err) {
         contents = null;
@@ -912,25 +914,24 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
       history[dateTimeStr] = { meta, options };
 
-      // 最大数へ調整する
+      // Adjust to the maximum number.
       const keys = Object.keys(history);
       for ( let i = 0; i < keys.length - maxEntries; i++) {
         delete history[keys[i]];
       }
 
       //  出力
-      this.#accessInfo(
-        historyFile, 
-        () => fs.writeFileSync(historyFile, JSON.stringify(history, null , "  "), 'utf-8'),
-        options,
-        "Couldn't update the history file."
-      );
+      this.#writeFileSync(historyFile, history, options, "Couldn't update the history file.");
     };
 
     _add();
   }
 
-  #isDebug(): boolean {
+  /**
+   * @internal
+   * Check if debug mode.
+   */
+   #isDebug(): boolean {
     return FileLock.#config._debug;
   }
 
@@ -946,5 +947,5 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 }
 
 // Initialize
-FileLock.initialize();
+FileLock._initialize();
 

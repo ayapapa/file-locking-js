@@ -6,7 +6,7 @@ import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
 import { defaultLockBaseConfig, type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
-import { isEqualObject } from './Util.ts';
+import { isEqualObjectType } from './Util.ts';
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -41,6 +41,24 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Static fieilds. 
    */
   
+  /** 
+   * @internal
+   * Current basic configurations.
+   */
+  protected static _config: Required<LockBaseConfig> = { ...defaultLockBaseConfig };
+
+  /** 
+   * @internal
+   * Logger.
+   */
+  protected static _logger =  LockBase._resolveLogger(LockBase._config);
+  
+  /** 
+   * @internal
+   * Array of termination handler functions.
+   */
+  private static _onExitFns = [] as ((code: number | null | undefined, signal: NodeJS.Signals | null) => void)[];
+
   /**
    * @internal
    * AsyncLocalStorage. 
@@ -54,26 +72,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Static methods.
    */
 
-  protected static _copyConfig<T extends LockBaseConfig>(config: T): T {
-    const ret = { ...config };
-    //if (config.defaultOptions) ret.defaultOptions = { ...config.defaultOptions };
-    // If specified undefined, delete it.
-    for (let key in ret) {
-      if (ret[key] === undefined) delete ret[key];
-    }
-    return ret;
-  }
-/*
-  protected static getDefaultConfig() {
-    return LockBase._copyConfig(defaultLockBaseConfig);
-  }
-*/
-  protected static _config: Required<LockBaseConfig> = { ...defaultLockBaseConfig };//LockBase.getDefaultConfig();
-
-  protected static _logger =  LockBase._resolveLogger(LockBase._config);
-  
-  private static _onExitFns = [] as ((code: number | null | undefined, signal: NodeJS.Signals | null) => void)[];
-
   /**
    * @internal
    * Termination processing. 
@@ -82,25 +80,24 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param signal 
    */
   public static onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
-    LockBase._logger.trace("Exited by", { code, signal });
     LockBase._onExitFns.forEach(fn => fn(code, signal));
   }
 
+  /**
+   * @internal
+   * @param config  Configurations. 
+   */
   protected static setConfig(config: LockBaseConfig): void {
-    REQUIRE_DEBUG(isEqualObject(LockBase._config, defaultLockBaseConfig),
-      '現在のコンフィグが不正です。（不具合）', LockError, { code: 'EINVAL' });
-    // 型の検証済みのため、型キャストする
+    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
+      'The current configuration is invalid.', LockError, { code: 'EINVAL' });
+
+    // Since the type has been verified, perform a type cast.
     const curConf = LockBase._config as Record<string, unknown>;
     const newConf = config as Record<string, unknown>;
     Object.keys(curConf).forEach(key => {
       if (key in newConf) curConf[key] = newConf[key];
     });
-    //const dConf = LockBase._copyConfig(config);
-    //LockBase._config = { ...LockBase._config, ...dConf };
-    /*
-    if ('_debug' in config) LockBase._config['_debug'] = config['_debug'];
-    if ('logger' in config) LockBase._config['logger'] = config['logger'];
-    */
+
     // logger
     LockBase._logger = LockBase._resolveLogger(LockBase._config);
 
@@ -108,6 +105,28 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     Contracts.setConfig({ debug: LockBase._config._debug, logger: LockBase._logger });
   }
   
+  /**
+   * @internal
+   * Copy config. 
+   * @param config Configurations.
+   */
+  protected static _copyConfig<T extends LockBaseConfig>(config: T): T {
+    const withourLogger  = { ...config };
+    // Since function objects cannot be copied, they are excluded for the time being.
+    const logger = withourLogger.logger;
+    delete withourLogger.logger;
+    // Properties with `undefined` values ​​are removed for design reasons.
+    for (const key in withourLogger) {
+      if (withourLogger[key] === undefined) delete withourLogger[key];
+    }
+    return Object.assign(structuredClone(withourLogger), { logger });
+  }
+
+  /**
+   * @internal
+   * @param fn  The termination callback function to register.
+   * @returns 
+   */
   protected static _addOnExit(fn: (code: number | null | undefined, signal: NodeJS.Signals | null) => void): void {
     if (LockBase._onExitFns.find(f => f === fn)) return;
     LockBase._onExitFns.push(fn);
@@ -115,8 +134,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * Get a logger where all methods are mandatory.
    * @param config 
-   * @returns 全てのメソッドが必須のロガー
+   * @returns A logger where all methods are mandatory.
    */
   protected static _resolveLogger(config?: LockBaseConfig): Required<LogProvider> {
     let logger: LogProvider = config?.logger ?? console
@@ -148,11 +168,25 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * Whether or not a lock is acquired.
+   */
+  protected _acquired: boolean = false;
+
+  /**
+   * @internal
+   * Lock owner ID to be stored in the lock file.
+   */
+  protected _ownerId: string;
+
+  /**
+   * @internal
    * Function that signals a forced termination.
    */
   #onExitReject: ((reason?: unknown) => void) | null = null;
 
-  /** Instance methods. */
+  /**
+   *  Instance methods. 
+   */
 
   /**
    * @internal
@@ -163,6 +197,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   protected constructor(key: string, config?: LockBaseConfig) {
     this._key = key;
     this._logger = LockBase._resolveLogger(config);
+    this._ownerId = crypto.randomUUID();
   }
 
   /**
@@ -210,17 +245,28 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     }
   }
 
+  /**
+   * @internal
+   * Acquire the lock.
+   * @param options 
+   */
   protected async _acquire(options: AllOptions<O, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
+  /**
+   * @internal
+   * Release the lock.
+   * @param options 
+   */
   protected async _release(options: AllOptions<O, I>) {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
   /**
-   * 終了時処理。
-   * Windows版では、強制終了(process.kill())からは呼び出されることは無いが、本実装は残しておく。
+   * @internal
+   * Execute termination processing.<br>
+   * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
    */
   protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
     this.#onExitReject && 
@@ -230,6 +276,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       }));
   }
 
+  /**
+   * 
+   * @param options 
+   * @returns 
+   */
   #createTtlTimer(options: AllOptions<O, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
     let id: NodeJS.Timeout | null = null;
     const ttlMs = options.ttlMs;
@@ -242,6 +293,15 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     return { id, promise };
   }
 
+  /**
+   * @internal
+   * @param onLockFn 
+   * @param aquire 
+   * @param release 
+   * @param errMsg 
+   * @param options 
+   * @returns 
+   */
   async #execLockCommon(onLockFn: CallbackOnLock, aquire: () => Promise<void>, 
     release: () => Promise<void>, errMsg: string, options: AllOptions<O, I>) {
     // Acquire the lock.
@@ -272,7 +332,12 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     }
   }
 
-
+  /**
+   * @internal
+   * @param onLockFn 
+   * @param options 
+   * @returns 
+   */
   async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     return this.#execLockCommon(
       onLockFn, 
@@ -281,36 +346,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       'Callback or Timer in withLock().',
       options
     );
-    /*
-    // Acquire the lock.
-    await this._acquire(options);
-
-    // Created promises.
-    const ttlTimer = this.#createTtlTimer(options);
-    const onExitPromise = this.#onExitPromise();
-    const cbPromise = this.#execCallback(onLockFn, options);
-
-    // A race between callback processing and the TTL timer.
-    try {
-      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
-        .finally(() => { // In any case, turn off the timer.
-          // Avoid if statements as a measure against coverage issue
-          ttlTimer.id && clearTimeout(ttlTimer.id);
-          onExitPromise.onExitResolve('No forced termination');
-          this.#onExitReject = null;
-        }
-      );
-    }
-    catch (err) {
-      this._onError(err, 'Callback or Timer in withLock()', options, 'ECALLBACK');
-      throw err;
-    }
-    finally {
-      await this._release(options);
-    }
-  */
   }
 
+  /**
+   * @internal
+   */
   #onExitPromise() {
     let onExitResolve!: ((v: unknown) => void);
     return {
@@ -322,6 +362,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     };
   }
 
+  /**
+   * @internal
+   * @param onLockFn 
+   * @param options 
+   */
   async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     return this.#execLockCommon(
       onLockFn, 
@@ -330,34 +375,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       'Re-entrant locking callback.',
       options
     );
-/*
-    // Increment lock counter.
-    await this._incReantryCount(options);
-
-    // Created promises.
-    const ttlTimer = this.#createTtlTimer(options);
-    const cbPromise = this.#execCallback(onLockFn, options);
-    const onExitPromise = this.#onExitPromise();
-    try {
-
-      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
-        .finally(() => { // In any case, turn off the timer.
-          // Avoid if statements as a measure against coverage issue
-          ttlTimer.id && clearTimeout(ttlTimer.id);
-          onExitPromise.onExitResolve('No forced termination');
-          this.#onExitReject = null;
-        }
-      );
-    }
-    catch (err) {
-      this._onError(err, 'Re-entrant locking callback.', options, 'ECALLBACK');
-      throw err;
-    }
-    finally {
-      // Decrement lock counter.
-      await this._decReantryCount(options);
-    }
-  */
  }
 
   /**
@@ -406,7 +423,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * 
+   * Check whether it has been cancelled.
    * @param options 
    * @returns 
    */
@@ -419,25 +436,27 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Retrieve the current context. <br>
    * It is set to `private` for testing purposes.
    */
-  private _getReentrantContext() : ReentrantContext | null {
-    return LockBase._als.getStore() ?? null;
+  private _getReentrantContext() : ReentrantContext | undefined {
+    return LockBase._als.getStore();
   }
 
   /**
    * @internal
    * Execute callback function in child context (for reentrant lock detection).
    * @param onLockFn  A user-specified function called during the lock.
+   * @param options
    * @returns A `Promise` that resolves to the return value of onLockFn.
    */
   #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
-    const parent = this._getReentrantContext() as any;
+    const parent = this._getReentrantContext();
+    REQUIRE_DEBUG(parent !== undefined, 're-entrant context is undefined!', LockError, { code: 'EINVAL' });
     let child: ReentrantContext;
-    let monitor: Monitor = options._monitor as Monitor; // 事前条件でチェック済
+    let monitor: Monitor = options._monitor as Monitor; // Type-cast it, as it has already been checked via a precondition.
     const contextId: string = options._contextId;
-    if (parent.heldLocks.has(contextId)) {
-      // 互いの処理中断情報を共有するため親のmonitorを共有
-      options._monitor = monitor = parent.heldLocks.get(contextId).monitor;;
+    if (parent?.heldLocks.has(contextId)) {
+      // Share the parent's monitor to share process interruption information between them.
+      options._monitor = monitor = parent.heldLocks.get(contextId)!.monitor;
       child = parent;
     }
     else {
@@ -464,9 +483,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   #runInNewContext(fn: () => any) {
     const initialContext: ReentrantContext = { heldLocks: new Map() };
-    return LockBase._als.run(initialContext, () => {
-      return fn();
-    });
+    return LockBase._als.run(initialContext, () => fn());
   }
 
   /**
@@ -476,40 +493,28 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @returns A new monitor.
    */
   #newMonitor(options: AllOptions<O, I>): Monitor {
-    //this.#deleteMonitor(options);
-    return options._monitor = {cancelled:false, id: Math.random().toString(36).slice(2)};
+    return options._monitor = {
+      cancelled:false, 
+      id: Math.random().toString(36).slice(2)
+    };
   }
-
-  /**
-   * @internal
-   * Delete the monitor.
-   * @param options
-   */
-  /*
-  #deleteMonitor(options: AllOptions): void {
-    delete options._monitor;
-  }
-  */
 
   /**
    * @internal
    * Set the value on the monitor.
+   * @param monitor 
    * @param options
    * @returns Monitor reflecting the values.
    */
   #setMonitor(mon: Monitor, options: AllOptions<O, I>): void {
     options._monitor = options._monitor || this.#newMonitor(options);
     Object.assign(options._monitor, mon);
-    //const curMon: Monitor = options._monitor ? options._monitor : this.#newMonitor(options);
-    //return options._monitor = Object.assign(curMon, mon);
   }
 }
 
 /**
- * 終了（通常時およびkill()等による強制時）処理を登録。
- * Windows版では、強制終了(kill())からは呼び出されることは無いが、本実装は残しておく。
- * @param code 
- * @param signal 
+ * Register termination processing (for both normal termination and forced termination via `kill()` or similar).
+ * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
  */
 onExit(LockBase.onExit);
 

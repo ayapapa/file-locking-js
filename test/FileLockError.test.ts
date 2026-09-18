@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import fs, { PathLike, rmSync } from 'node:fs';
 import path from 'node:path';
-import { getHistoryPath, getLockMeta, getLockMetaPath, removeLockFiles, setLockMeta, sleepAsync  } from './FileLockTestCommon.ts';
+import { getHistoryPath, getLockMeta, getLockMetaPath, removeLockFiles, setLockMeta, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
 import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, 
   LockDirectoryStatFailed, LockError, LockFileBroken, InvalidOptions, LockCompromised, TTLExceeded, type Monitor } from '../src/index.ts';
 import { finalization } from 'node:process';
@@ -142,7 +142,7 @@ describe('FileLock', () => {
     try {
       await FileLock.withLock(key, async () => {
         // Clear the cache to create a new lock instance.
-        FileLock.clearCache();
+        TestLock.clearCache();
 
         await FileLock.withLock(key, async () => {
           await sleepAsync(500);
@@ -469,7 +469,7 @@ describe('FileLock', () => {
       expect(err).instanceOf(FileLockError);
       expect(err).toMatchObject({
         code: 'ERMOON', 
-        message: "Couldn't read the lock information file.(readFileSync error!)",
+        message: "Couldn't read the lock file.(readFileSync error!)",
         file: getLockMetaPath(key)
       });
     }
@@ -501,7 +501,7 @@ describe('FileLock', () => {
       expect(err).instanceOf(FileLockError);
       expect(err).toMatchObject({
         code:     'EWMOON',
-        message:  `Couldn't update the lock information file.(writeFileSync error!)`,
+        message:  `Couldn't write the lock file.(writeFileSync error!)`,
         file:     getLockMetaPath(key)
       });
     }
@@ -528,7 +528,7 @@ describe('FileLock', () => {
         cause: {
           code: "EWMOON",
           file: getLockMetaPath(key),
-          message: "Couldn't update the lock information file.(writeFileSync error!)",
+          message: "Couldn't write the lock file.(writeFileSync error!)",
           cause: {
             code: "EWMOON",
             message: "writeFileSync error!",
@@ -909,4 +909,29 @@ describe('FileLock', () => {
     );
   });
 
+  it("循環デッドロック", async () => {
+    const key1 = "testKey_circular_deadlock_001";
+    const key2 = "testKey_circular_deadlock_002";
+    const p1 = FileLock.withLock(key1, async () => {
+      await FileLock.withLock(key2, async () => {
+        },
+        { timeoutMs: 100 }
+      );
+      return 'completed.'
+    })
+    const p2 = FileLock.withLock(key2, async () => {
+      await FileLock.withLock(key1, () => {}, { timeoutMs: 100 });
+      return 'completed.'
+    })
+
+    // 全ての終了を待つ。
+    const results = await Promise.allSettled([p1, p2]);
+    // いずれかがタイムアウトエラー（AlreadyLocked）となっている
+    expect(results[0].status === 'rejected' || results[1].status === 'rejected').toBeTruthy();
+    for(const r of results) {
+      if (r.status === 'fulfilled') expect(r.value).toBe('completed.');
+      else                          expect(r.reason).instanceOf(AlreadyLocked);
+    }
+
+  });
 });

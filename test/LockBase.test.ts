@@ -6,7 +6,7 @@ import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
-import { getCallStack, isEqualObject, sleepAsync, sleepSync } from '../src/lib/Util.ts'
+import { getCallStack, isEqualObjectType, sleepAsync, sleepSync } from '../src/lib/Util.ts'
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -136,10 +136,10 @@ describe('LockBase and Util', () => {
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);
   });
 
-  it("isEqualObjectエラー", () => {
-    expect(isEqualObject({ a: 123, b: "hello"}, { b: "hello", a: 123 })).toBeTruthy();
-    expect(isEqualObject({ a: 123, b: "hello"}, { a: 123, b: "hello", c: new Error() })).toBeFalsy();
-    expect(isEqualObject({ a: "goodbye", b: "hello"}, { a: 123, b: "hello" })).toBeFalsy();
+  it("isEqualObjectTypeエラー", () => {
+    expect(isEqualObjectType({ a: 123, b: "hello"}, { b: "hello", a: 123 })).toBeTruthy();
+    expect(isEqualObjectType({ a: 123, b: "hello"}, { a: 123, b: "hello", c: new Error() })).toBeFalsy();
+    expect(isEqualObjectType({ a: "goodbye", b: "hello"}, { a: 123, b: "hello" })).toBeFalsy();
   });
 
   it("重複終了関数登録", () => {
@@ -150,9 +150,11 @@ describe('LockBase and Util', () => {
       expect(signal).toBe(null);
       count++;
     };
+    // @ts-ignore
     const before = TestLock._onExitFns.length;
     TestLock.testAddOnExit(onExit);
     TestLock.testAddOnExit(onExit);
+    // @ts-ignore
     expect(TestLock._onExitFns.length).toBe(before + 1);
     LockBase.onExit(0, null);
     expect(count).toBe(1);

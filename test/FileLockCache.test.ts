@@ -29,12 +29,12 @@ describe('FileLock', () => {
       logger.error(err);
     }
     expect(TestLock.getCacheSize() > 0).toBe(true);  
-    FileLock.clearCache();
+    TestLock.clearCache();
     expect(TestLock.getCacheSize()).toBe(0);  
   });
 
   async function testCacheStatus(config: FileLockConfig, checkStatus: () => Promise<void>): Promise<void> {
-    FileLock.clearCache();
+    TestLock.clearCache();
     const orgConf = FileLock.getConfig();
     FileLock.setConfig({ ...config, logger });
     const retVal = "test_001", key = retVal;
