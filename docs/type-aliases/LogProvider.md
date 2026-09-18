@@ -8,7 +8,7 @@
 
 > **LogProvider** = `Pick`\<`Console`, `"log"` \| `"trace"` \| `"debug"` \| `"info"` \| `"warn"` \| `"error"`\> & `object`
 
-Defined in: [src/lib/LockBaseConfig.ts:2](https://github.com/ayapapa/file-lock-js/blob/48bad3c4c8ac737b1d5141ea161a41ea5d8b6432/src/lib/LockBaseConfig.ts#L2)
+Defined in: [src/lib/LockBaseConfig.ts:2](https://github.com/ayapapa/file-lock-js/blob/fda35314dcb87177d497c34f663e1a461170eda8/src/lib/LockBaseConfig.ts#L2)
 
 Type of the log output object.
 

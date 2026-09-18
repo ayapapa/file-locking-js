@@ -1,6 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { onExit } from 'signal-exit';
 
 import { LRUCache } from 'lru-cache';
 import { DateFormatter } from '@ayapapa-npm/date-formatter-js';
@@ -62,6 +61,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   /** Initialize. */
   public static initialize() {
     FileLock.resetConfig();
+    FileLock._addOnExit(FileLock.#onExitFn);
   }
 
   /**
@@ -171,12 +171,9 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param code 
    * @param signal 
    */
-  public static onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+  static #onExitFn(code: number | null | undefined, signal: NodeJS.Signals | null) {
     FileLock._logger.trace("Exited by", { code, signal });
-    
-    FileLock.#cache?.forEach( lock => {
-      lock.#onExit(code, signal);
-    });
+    FileLock.#cache?.forEach( lock => lock.#onExit(code, signal));
   }
 
   /**
@@ -951,14 +948,3 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 // Initialize
 FileLock.initialize();
 
-/* v8 ignore start */
-/**
- * 終了（通常時およびkill()等による強制時）処理を登録。
- * Windows版では、強制終了(kill())からは呼び出されることは無いが、本実装は残しておく。
- * @param code 
- * @param signal 
- * @note 登録された終了関数は、vitestでは、実行されない問題があり、これがv5.xで対応している模様。
- * このため、カバレッジ100％達成は出来ていないが、とりあえず放置する。2026/9/13
- */
-onExit((code, signal) => FileLock.onExit(code, signal));
-/* v8 ignore stop */
