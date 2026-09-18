@@ -951,6 +951,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 // Initialize
 FileLock.initialize();
 
+/* v8 ignore start */
 /**
  * 終了（通常時およびkill()等による強制時）処理を登録。
  * Windows版では、強制終了(kill())からは呼び出されることは無いが、本実装は残しておく。
@@ -960,3 +961,4 @@ FileLock.initialize();
  * このため、カバレッジ100％達成は出来ていないが、とりあえず放置する。2026/9/13
  */
 onExit((code, signal) => FileLock.onExit(code, signal));
+/* v8 ignore stop */
