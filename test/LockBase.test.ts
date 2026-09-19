@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLock, FileLockConfig, LockError } from '../src/index';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
@@ -136,13 +135,13 @@ describe('LockBase and Util', () => {
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);
   });
 
-  it("isEqualObjectTypeエラー", () => {
+  it("isEqualObjectType error", () => {
     expect(isEqualObjectType({ a: 123, b: "hello"}, { b: "hello", a: 123 })).toBeTruthy();
     expect(isEqualObjectType({ a: 123, b: "hello"}, { a: 123, b: "hello", c: new Error() })).toBeFalsy();
     expect(isEqualObjectType({ a: "goodbye", b: "hello"}, { a: 123, b: "hello" })).toBeFalsy();
   });
 
-  it("重複終了関数登録", () => {
+  it("Register Duplicate Termination Function", () => {
     expect.assertions(4);
     let count = 0;
     function onExit(code: unknown, signal: unknown): void {

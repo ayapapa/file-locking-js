@@ -11,46 +11,40 @@ export class FileLockError extends LockError {
    */
   constructor(msg?: string, params?: {code: string, props?: LockErrorProps }) {
     const p = { ...params };
-    // カバレッジ対応のためif文回避。
+    // Avoided using `if` statements to ensure code coverage.
     p.code == null && (p.code = 'EFILELOCK');
     super(msg, p);
   }
 
-  public static lockFailedDueToIO(file: string, cause: unknown) {
-    return new FileLockError("ファイルIOエラーのためロック獲得に失敗しました。", { code: 'EIO', props: { file, cause } });
+  public static lockFailedDueToIO(path: string, cause: unknown) {
+    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { path, cause } });
   }
-/*
-  public static lockFailedDueToUnexpected(cause: unknown) {
-    return new FileLockError("想定外のエラーのためロック獲得に失敗しました。", { code: 'EUNEXPECTED', props: { cause } });
-  }
-    */
-  /*
-          throw new FileLockError('Failed to parse the history file.',
-          { code: 'EHISTORY', props:{ name: historyFile, cause: err } })
-  */
- /**
-  * 履歴ファイル解析エラーを取得する。
-  * @param history  履歴ファイルパス。
-  * @param cause    原因となった解析エラー。
-  * @returns 
-  */
-  public static dueToHistory(history: string, cause: unknown) {
+
+  /**
+   * @internal
+   * Create a history file analysis error instance.
+   * @param history  Path to the history file. 
+   * @param cause    The parsing error that caused the issue.
+   * @returns An instance of FileLockError.
+   */
+  public static dueToHistory(history: string, cause: unknown): FileLockError {
     return new FileLockError("Failed to parse the history file.", { code: 'EHISTORY', props: { history, cause } });
   }
 
  /**
-  * 履歴ファイル解析エラーが原因のロック獲得エラーを取得する。
-  * @param history  履歴ファイルパス。
-  * @param cause    原因となった解析エラー。
-  * @returns 
+  * Create a lock acquisition errors caused by history file analysis errors.
+   * @param history  Path to the history file. 
+   * @param cause    The parsing error that caused the issue.
+   * @returns An instance of FileLockError.
   */
-  public static lockFailedDueToHistory(cause: unknown) {
-    return new FileLockError("Lock acquisition failure due to history analysis failure.", { code: 'EHISTORY', props: { cause } });
+  public static lockFailedDueToHistory(history: string, cause: unknown): FileLockError {
+    return new FileLockError("Lock acquisition failure due to history analysis failure.", { code: 'EHISTORY', props: { history, cause } });
   }
 
 };
 
 /** 
+ * @internal
  * Lock directory access error.
  */
 class LockDirectoryAccessFailed extends FileLockError {
@@ -76,8 +70,8 @@ class LockDirectoryAccessFailed extends FileLockError {
 export class LockDirectoryStatFailed extends LockDirectoryAccessFailed {
   /**
    * Constructor.
-   * @param fsErrMsg   fs's error message.
-   * @param params  Parameters.
+   * @param fsErrMsg  fs's error message.
+   * @param params    Parameters.
    */
   constructor(fsErrMsg: string | null, params?: {path?: string, props?: LockErrorProps }) {
     super(fsErrMsg, 'check the status of', 'ELOCKDIRSTAT', params);
@@ -118,16 +112,20 @@ export class LockCompromised extends FileLockError {
   }
 }
 
+/**
+ * Lock file broken error.
+ */
 export class LockFileBroken extends FileLockError {
   /**
    * Constructor.
    * @param reason Reason for the error.
    * @param params  Parameters.
    */
-  constructor(params: { file: string, props?: LockErrorProps }) {
-    const props = { ...{ file: params.file }, ...params.props };
+  constructor(params: { path: string, props?: LockErrorProps }) {
+    const props = { ...{ path: params.path }, ...params.props };
     super(
-      `ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。`,
+      `The contents of the lock file are corrupted, making it impossible to determine the lock status. ` +
+      `Please verify that the target process does not exist and, if necessary, manually delete the lock file.`,
       {code: `EBROKEN`, props }
     );
   }

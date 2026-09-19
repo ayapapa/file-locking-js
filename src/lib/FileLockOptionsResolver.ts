@@ -1,20 +1,12 @@
-import { LockBaseOptionsResolver, typedKeys, type KeyTypeMap, type TimeBasedKey } from './LockBaseOptionsResolver.ts';
-import { type FileLockMinimumOptions, type FileLockOptions, type FileLockRequiredOptions } from './FileLockOptions.ts';
-//import { FileLockInternalState } from './FileLockInternalState.ts';
-//import { NumberArray } from 'lru-cache/raw';
-
+import { LockBaseOptionsResolver } from './LockBaseOptionsResolver.ts';
+import { type FileLockRequiredNumericOptions, type FileLockOptions, type FileLockRequiredOptions } from './FileLockOptions.ts';
+import { typedKeys, type KeyTypeMap, type TimeBasedKey } from './Util.ts'
 /**
  * @internal
  * A class that resolves Options for FileLock.
  */
-export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockMinimumOptions, FileLockRequiredOptions> {
+export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOptions, FileLockRequiredNumericOptions, FileLockRequiredOptions> {
   
-  /**
-   * Static fields.
-   */
-
-  static readonly minHeartBeatTimeoutMs: number = 2000;
-
   /**
    * Instance methods.
    */
@@ -23,7 +15,7 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
    * Constructor.
    * @param options User options.
    */
-  constructor(options: FileLockOptions, minimumOptions: FileLockMinimumOptions, defaultOptions?: FileLockRequiredOptions ) {
+  constructor(options: FileLockOptions, minimumOptions: FileLockRequiredNumericOptions, defaultOptions?: FileLockRequiredOptions ) {
     super(options, minimumOptions, defaultOptions);
   };
 

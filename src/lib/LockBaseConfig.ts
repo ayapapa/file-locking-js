@@ -22,6 +22,10 @@ export interface LockBaseConfig {
   _debug?: boolean;
 }
 
+/**
+ * @internal
+ * Default values of LockBaseConfig.
+ */
  export const defaultLockBaseConfig: Readonly<Required<LockBaseConfig>> = {
   logger: console,
   _debug: false,

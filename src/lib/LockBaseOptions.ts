@@ -67,17 +67,15 @@ export interface LockBaseOptions {
    allowReentry?: boolean;
 }
 
-// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
-
 /**
  * @internal
- * 必須プロパティのみからなる内部用のオプション型。
+ * An internal options type consisting only of the required properties of LockBaseOptions.
  */
 export type LockBaseRequiredOptions = Required<Pick<LockBaseOptions, 'timeoutMs' | 'ttlMs' | 'allowReentry'>>;
 
 /**
  * @internal
- * 
+ * Default values of LockBaseRequiredOptions.
  */
 export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
   timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
@@ -85,9 +83,17 @@ export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
   allowReentry:   false,  // Default to disallowing re-entrant locks
 };
 
-export type LockBaseMinimumOptions = Pick<LockBaseRequiredOptions, 'timeoutMs' | 'ttlMs'>;
+/**
+ * @internal
+ * Definition of an options type consisting solely of the required numeric properties of LockBaseOptions.
+ */
+export type LockBaseRequiredNumericOptions = Pick<LockBaseRequiredOptions, 'timeoutMs' | 'ttlMs'>;
 
-export const minimumLockBaseOptions: Readonly<LockBaseMinimumOptions> = {
+/**
+ * @internal
+ * Definition of the minimum value for the numeric properties of LockBaseOptions. 
+ */
+export const minimumLockBaseOptions: Readonly<LockBaseRequiredNumericOptions> = {
   timeoutMs:      0,    // Not wait for the release of the preceding-stage lock.
   ttlMs:          1000, // The minimum lifetime for the callback processing after acquiring the lock is 1 second.
 }

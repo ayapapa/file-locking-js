@@ -344,7 +344,7 @@ describe('FileLock', () => {
   it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
     const orgConf = FileLock.getConfig();
     const key = 'debug_mode_key_009'
-    const metaFile = getLockMetaPath(key);//path.join(dir, key+'.json');
+    const metaFile = getLockMetaPath(key);
     expect.assertions(4);
     try {
       FileLock.setConfig({ _debug: true });

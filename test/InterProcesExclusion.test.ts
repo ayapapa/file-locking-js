@@ -92,6 +92,7 @@ describe('別プロセスとの競合テスト', () => {
     try {
       await sleepAsync(500);
       child.cid.kill(); // 何を指定しても強制終了となるようだ。
+      child.cid
       await child.promise;
     }
     catch(err) {

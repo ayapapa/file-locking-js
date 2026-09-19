@@ -1,94 +1,68 @@
-// 利用モジュールの読み込み
 import { Contracts } from '@ayapapa-npm/contracts-js';
-import { type LockBaseOptions, type LockBaseMinimumOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
+import { type LockBaseOptions, type LockBaseRequiredNumericOptions, type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { InvalidOptions } from './LockBaseErrors.ts';
+import { includesAllKeysOf, typedKeys, type KeyTypeMap, type TimeBasedKey } from './Util.ts'
 
 const {REQUIRE, REQUIRE_DEBUG, VERIFY_DEBUG} = Contracts;
 
-/** Types of time-based key. */
-export type TimeBasedKey<T> = {
-  [K in keyof T]:
-    K extends `${infer Base}Sec`
-      ? `${Base}Ms` extends keyof T
-        ? Base
-        : never
-      : never
-}[keyof T];
-
-/** Type of Key-Type map. */
-export type KeyTypeMap<T> = Record<keyof T, any>;
+/**
+ * @internal
+ * Types of seconds-time-based key.
+ */
+type SecKey<T> = `${TimeBasedKey<T>}Sec`;
 
 /**
  * @internal
+ * Types of millisecond-time-based key.
  */
-
-/** Types of seconds-time-based key. */
-type SecKey<T> = `${TimeBasedKey<T>}Sec`;
-
-/** Types of millisecond-time-based key. */
 type MsKey<T> = `${TimeBasedKey<T>}Ms`;
-
-//export type CompetingKeysType<TOption, T extends TimeBasedKey<TOption> = TimeBasedKey<TOption>> = T[];
 
 /**
  * @internal
  * A class that resolves options.
- * Base class: Accepts a generic type U
- * U must inherit from LockBaseOptions (constraint) 
+ * Base class: Accepts a generic type O
  */
 export class LockBaseOptionsResolver <
   O extends LockBaseOptions = LockBaseOptions,
-  M extends LockBaseMinimumOptions = LockBaseMinimumOptions,
+  M extends LockBaseRequiredNumericOptions = LockBaseRequiredNumericOptions,
   R extends LockBaseRequiredOptions = LockBaseRequiredOptions,
   > {
 
-  /** Static methods. */
-
-  public static isRequiredOptions<O extends object, D extends object>(options: O, defaults: D, missings: string[] = []): boolean {
-    const keys = Object.keys(defaults) as (keyof O)[];
-    let ret = true;
-    for (const key of keys) {
-      if (options[key] == null) {
-        ret = false;
-        missings.push(String(key));
-      }
-    }
-    return ret;
-  }
-  
-
   /** Instance fields. */
 
-  /** Current options. */
-  protected options: O; //AllOptions<O, I>;
+  /** Options. */
+  protected options: O;
 
-  protected defaultOptions?: R | null;//AllOptions<O, I>;
+  /** Default options. */
+  protected defaultOptions?: R | null;
 
+  /** Minimum option values. */
   protected minimumOptions: M;
 
   /** Instance methods. */
 
   /**
    * Constructor
-   * @param opts        User options.
-   * @param defaultOptions Default options.
+   * @param userOpts        User options.
+   * @param minimumOptions  Minimum option values.
+   * @param defaultOptions  Default options.
    */
   constructor(userOpts: O, minimumOptions: M, defaultOptions?: R) {
+    // Delete _resolvedOpts for tests, if exists.
     if ('_resolvedOpts' in userOpts) delete userOpts._resolvedOpts;
 
-    this.options = { ...userOpts };// as AllOptions<O, I>;
+    this.options = { ...userOpts };
     this.minimumOptions = { ...minimumOptions };
-    // Avoid using an if-statement to address a coverage issue.
     this.defaultOptions = defaultOptions ? { ...defaultOptions } : null;
 
     this.#resolveOptions();
 
-    Object.assign(userOpts, { _resolvedOpts: this.options })
-
+    // Add _resolvedOpts for tests.
+    Object.assign(userOpts, { _resolvedOpts: this.options });
   }
 
   /** Get options. */
-  public getOptions(): O/*AllOptions<O, I>*/ {
+  public getOptions(): O {
     return this.options;
   }
 
@@ -96,16 +70,18 @@ export class LockBaseOptionsResolver <
    * Get an option consisting of required properties. Error if any properties are missing. 
    */
   public getRequiredOptions(): R {
-    if (!this.defaultOptions) {
-      throw new InvalidOptions("To generate required options, specify `defaultOptions` in the constructor.", { name: 'this.defaultOptions' });
-    }
+    REQUIRE(this.defaultOptions != null, 
+      "To generate required options, specify `defaultOptions` in the constructor.", 
+      InvalidOptions, { name: 'this.defaultOptions' });
     
     const missings: string[] = [];
-    if (LockBaseOptionsResolver.isRequiredOptions(this.options, this.defaultOptions, missings)) {
-      // 必須キー構成のオプションであることを確認済みのため、型キャストして返す。
+    // It has been verified that this.defaultOptions is non-null.
+    // Verify whether `this.options` contains the required keys.
+    if (includesAllKeysOf(this.options, this.defaultOptions!, missings)) {
+      // Ok, so type-cast and return it.
       return this.options as unknown as R;
     }
-    else {
+    else { // Error
       throw new InvalidOptions(`Missing required option: ${missings}`, { name: 'this.options', props: { options: this.options } })
     }
   }
@@ -150,12 +126,17 @@ export class LockBaseOptionsResolver <
     this.#applyDefaults();
   } 
 
+  /**
+   * Apply the minimum value.
+   */
   #applyMinimum() {
     // Since property type inference does not work as expected, cast the object to Record<string, number>
     // and validate to ensure type safety.
     const min = this.minimumOptions as Record<string, number>;
     const opt = this.options as unknown as Record<string, number>;
 
+    // To be certain, verify that all properties in the minor procedure set are numerical.
+    // Since this function is not accessed directly from the outside, `_DEBUG` is used.
     REQUIRE_DEBUG(
       Object.values(min).every(value => typeof value === 'number'),
       'The minimum options set (minimumOptions) contains properties that are not numbers.',
@@ -167,6 +148,8 @@ export class LockBaseOptionsResolver <
     keys.forEach(key => {
       if (key in this.options) {
 
+        // To be certain, verify that typeof options[key] is numerical.
+        // Since this function is not accessed directly from the outside, `_DEBUG` is used.
         VERIFY_DEBUG(
           typeof opt[key] === 'number',
           `The value of the option property (${key}) must be a number.`,
@@ -179,6 +162,9 @@ export class LockBaseOptionsResolver <
     });
   }
 
+  /**
+   * Apply the default values.
+   */
   #applyDefaults() {
     Object.assign(this.options, { ...this.defaultOptions,  ...this.options});
   }
@@ -274,9 +260,4 @@ export class LockBaseOptionsResolver <
       }
     });
   }
-}
-
-/** Enumerate typed object keys. */
-export function typedKeys<O extends object>(obj: O): Array<keyof O> {
-  return Object.keys(obj) as Array<keyof O>;
 }

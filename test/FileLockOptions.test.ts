@@ -1,13 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
-
-import { FileLock, FileLockConfig, FileLockError, FileLockOptions, InvalidOptions } from '../src/index';
-import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver';
-import { AnyCnameRecord } from 'node:dns';
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { LockError } from '../src/lib/LockBaseErrors';
-import { FileLockRequiredOptions, minimumFileLockOptions } from '../src/lib/FileLockOptions';
-import { TestLock } from './FileLockTestCommon';
+import { FileLock, FileLockConfig, FileLockError, FileLockOptions, InvalidOptions } from '../src/index.ts';
+import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver.ts';
+import { FileLockRequiredOptions, minimumFileLockOptions } from '../src/lib/FileLockOptions.ts';
+import { OptionsForTesting } from '../src/lib/AllOptions.ts'
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -23,9 +18,7 @@ async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-interface TestOpts {
-  _resolvedOpts?: FileLockOptions
-};
+type TestOpts = OptionsForTesting<FileLockOptions>;
 
 describe('FileLockOptions test.', () => {
 
@@ -69,7 +62,9 @@ describe('FileLockOptions test.', () => {
 
   it("When the lock with xxxSec options only,  internally resolved options have valid calculated xxxMs properties.", async () => {
     const retVal = "test_001", key = retVal;
-    const opts: FileLockOptions & TestOpts =  {timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213};
+    const opts: FileLockOptions & TestOpts =  {
+      timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, 
+      heartbeatIntervalSec: 1.1, heartbeatTimeoutSec: 10.002555, retryIntervalSec: 0.213};
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -382,7 +377,8 @@ describe('FileLockOptions test.', () => {
       expect(err).instanceOf(InvalidOptions);
       expect(err).toMatchObject( {
         code: 'EINVAL', 
-        message: "To generate required options, specify `defaultOptions` in the constructor."
+        name: "this.defaultOptions",
+        message: "[REQUIRE] To generate required options, specify `defaultOptions` in the constructor."
       })
     }
   });

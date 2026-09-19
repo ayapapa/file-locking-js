@@ -59,9 +59,9 @@ export interface FileLockConfig extends LockBaseConfig {
 
 }
 
-// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
 /**
  * @internal
+ * Default values ​​for FileLockConfig. 
  */
 export const defaultFileLockConfig: Readonly<Required<FileLockConfig>> = {
   ...defaultLockBaseConfig,

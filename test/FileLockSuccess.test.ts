@@ -96,7 +96,7 @@ describe('FileLock', () => {
             await sleepAsync(500);
             return ret;
           },
-          options // { allowReentry: true }
+          options
         );
       });
     })).toBe(ret);

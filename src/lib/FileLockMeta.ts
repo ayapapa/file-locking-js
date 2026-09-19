@@ -1,9 +1,9 @@
 /**
  * @internal 
- * Lock-related information
+ * Lock-related information stored in a lock file.
  */
 export interface FileLockMeta {
-  /** Lock execution owner ID. */
+  /** ID of the owner who acquired the lock. */
   ownerId: string,
 
   /** ID of the process executing the lock. */

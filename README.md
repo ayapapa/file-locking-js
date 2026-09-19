@@ -21,11 +21,11 @@ Examples include limiting access to a specific service to a single process or th
 ## Definitions of Terms
 |        Term     |  Explanation  |  See also  |
 | --------------- | ------------- | -------------|
-| `lock key`        | A key used to apply a lock. When multiple operations use the same key, they are executed sequentially.　| [API Reference](#api-reference) | 
+| `lock key`        | A key used to apply a lock. When multiple operations use the same key, they are executed sequentially.　|  | 
 | `lock directory`  | The directory where `lock file`s are stored. | `lock file`, [Configurations](#configurations) |
 | `lock file`       | It is associated with the specified `lock key` and stores information related to the lock owner, the actual expiration time, and so forth.<br>For example, if the `lock key` is "key001", a file named "key001.json" is created under the `lock directory` and deleted when the lock is released.<br>As long as this file exists, the key is considered to be locked. | `lock key`, `lock directory` |
-| `re-entrant lock` | A lock that allows the same owner to acquire it multiple times without blocking itself. Enable this behavior with `{ allowReentry: true }`.<br>It prevents `self-deadlock` when the same owner acquires the same lock again.<br>It does not prevent `circular deadlocks` between different owners. | `deadlock`, [Options](#options) |
-| `deadlock` | It is a state where operations cannot proceed because they keep waiting.<br>A `self-deadlock` is caused by reacquiring the same lock, while `circular deadlock` is caused by different owners waiting on each other.<br>Due to the timeout setting, it will not wait indefinitely; however, this results in a lock acquisition error. | `re-entrant lock`, [Options](#options) |
+| `re-entrant lock` | A lock that allows the same owner to acquire it multiple times without blocking itself. Enable this behavior with `{ allowReentry: true }`.<br>It prevents `self-deadlock` when the same owner acquires the same lock again.<br>It does not prevent `circular deadlocks` between different owners. | `deadlock`, `allowReentry` in [Options](#options) |
+| `deadlock` | It is a state where operations cannot proceed because they keep waiting.<br>A `self-deadlock` is caused by reacquiring the same lock, while `circular deadlock` is caused by different owners waiting on each other.<br>Due to the timeout setting, it will not wait indefinitely; however, this results in a lock acquisition error. | `re-entrant lock`, `timeourMs` or `timeoutSec` in [Options](#options) |
 
 
 ## API Reference
@@ -105,11 +105,11 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 ## Optionss
 
 ## Errors
-| エラークラス名 | エラー内容  | エラーメッセージ | その他プロパティ | 対処方法など |
+| Class name | Overview  | Message | Other properties | How to handle the situation, etc.|
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
-| LockFileBroken | ロックファイル内容の破損 | ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。 | { code: 'EBROKEN', file: '(ロックファイルパス)' } | ロックファイル(pathは、`file`)の確認と削除。削除する場合は、そのファイルをつかんでいるプロセスが無いことを確認すること。[^1]
+| LockFileBroken | Corruption of lock file contents | The contents of the lock file are corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and, if necessary, manually delete the lock file. | { code: 'EBROKEN', path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `file`). Before deletion, ensure that no process is holding the file.[^1]
 
-[^1]: FileLockは通常の利用において一貫したロックファイルを維持するよう設計しているが、プロセスの強制終了等により破損したロックファイルが残る可能性があるため、他のロックプロセスが生きていないことを確認してから削除することを推奨する。
+[^1]: Although FileLock is designed to maintain a consistent lock file during normal operation, a corrupted lock file may remain due to events such as the forced termination of a process; therefore, it is recommended to delete the file only after confirming that no other locking processes are active.
 
 
 

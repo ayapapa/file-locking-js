@@ -1,4 +1,4 @@
-import { defaultLockBaseOptions, minimumLockBaseOptions, type LockBaseMinimumOptions, type LockBaseRequiredOptions, type LockBaseOptions } from './LockBaseOptions.ts';
+import { defaultLockBaseOptions, minimumLockBaseOptions, type LockBaseRequiredNumericOptions, type LockBaseRequiredOptions, type LockBaseOptions } from './LockBaseOptions.ts';
 
 // User options for FileLock (inherits from LockBaseOptions)
 export interface FileLockOptions extends LockBaseOptions {
@@ -73,12 +73,15 @@ export interface FileLockOptions extends LockBaseOptions {
 
 }
 
-// ★★★デフォルトや、ミニマムを定義すること、、minは、定義されたものだけ！
-
+/**
+ * @internal
+ * Definition of required properties for the FileLockOtions.
+ */
 export type FileLockRequiredOptions = Required<Pick<FileLockOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'>> & LockBaseRequiredOptions;
 
 /**
  * @internal
+ * Definition of default values ​​for FileLockOtions.
  */
 export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
   ...defaultLockBaseOptions,
@@ -89,12 +92,17 @@ export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
   retryIntervalMs:      100,
 };
 
-export type FileLockMinimumOptions = Pick<FileLockRequiredOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'> & LockBaseMinimumOptions;
 /**
  * @internal
- * 数値系プロパティの最小値。本値未満の数値は最小値に置き換えられる。
+ * Definition of required numeric properties of the FileLockOtions.
  */
-export const minimumFileLockOptions: Readonly<FileLockMinimumOptions> = {
+export type FileLockRequiredNumericOptions = Pick<FileLockRequiredOptions, 'pollIntervalMs' | 'heartbeatIntervalMs' | 'heartbeatTimeoutMs' | 'retriesOnIOErr' | 'retryIntervalMs'> & LockBaseRequiredNumericOptions;
+
+/**
+ * @internal
+ * Definition of the minimum value for required numeric properties of the FileLockOtions.
+ */
+export const minimumFileLockOptions: Readonly<FileLockRequiredNumericOptions> = {
   ...minimumLockBaseOptions,
   pollIntervalMs:       100,
   heartbeatIntervalMs:  1000,

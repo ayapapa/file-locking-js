@@ -9,11 +9,11 @@ const { ENSURE_DEBUG, REQUIRE, REQUIRE_DEBUG, VERIFY } = Contracts;
 import { LockBase, type CallbackOnLock } from "./LockBase.ts";
 import { defaultFileLockOptions, minimumFileLockOptions, type FileLockRequiredOptions, type FileLockOptions } from './FileLockOptions.ts';
 import { type FileLockInternalState } from './FileLockInternalState.ts';
-import { FileLockOptionsResolver, typedKeys } from "./FileLockOptionsResolver.ts";
+import { FileLockOptionsResolver } from "./FileLockOptionsResolver.ts";
 import {  AlreadyLocked, FileLockError, InvalidOptions, LockCompromised, LockDirectoryCreationFailed, LockDirectoryStatFailed, LockFileBroken } from './FileLockErrors.ts';
 import { type AllOptions as AllOptionsT } from './AllOptions.ts';
 import { defaultFileLockConfig, type FileLockConfig } from './FileLockConfig.ts';
-import { getCallStack, sleepAsync, sleepSync } from './Util.ts'
+import { getCallStack, includesAllKeysOf, sleepAsync, sleepSync, typedKeys } from './Util.ts'
 import { type FileLockMeta } from './FileLockMeta.ts'
 
 /** 
@@ -372,7 +372,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
                                                 // to the lock directory configuration.
     //const historyName = 'history_' + String(process.pid) + '.json';
     const historyName = 'history.json';
-    options._historyFile = path.join(dirPath, historyName);
+    options._historyFilePath = path.join(dirPath, historyName);
   }
 
   /**
@@ -385,7 +385,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @return A Promise that resolves with the return value of onLockFn.
    */
   private async withLock(onLockFn: CallbackOnLock, userOpts: FileLockRequiredOptions): Promise<any> {
-    REQUIRE_DEBUG(FileLockOptionsResolver.isRequiredOptions(userOpts, FileLock.getDefaultOptions()), 
+    REQUIRE_DEBUG(includesAllKeysOf(userOpts, FileLock.getDefaultOptions()), 
       "The option remains unresolved.", InvalidOptions, { name: 'userOpts', props: { options: userOpts } } );
 
     // Reconstructs the options by combining the specified options with the internal state.
@@ -410,10 +410,10 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     while ((tryRes = await this.#tryLock(options)).locked === false) {
       if (Date.now() >= timeoutTime) {
         const errIns = {
-          'ELOCKED'  : new AlreadyLocked('', {key: this._key, props: { file: options._filePath } }),
-          'EBROKEN'  : new LockFileBroken({ file: options._filePath, props: { cause: tryRes.cause} }),
+          'ELOCKED'  : new AlreadyLocked('', {key: this._key, props: { path: options._filePath } }),
+          'EBROKEN'  : new LockFileBroken({ path: options._filePath, props: { cause: tryRes.cause} }),
           'EIO'      : LockFileBroken.lockFailedDueToIO(options._filePath, tryRes.cause),
-          'EHISTORY' : LockFileBroken.lockFailedDueToHistory(tryRes.cause),
+          'EHISTORY' : LockFileBroken.lockFailedDueToHistory(options._historyFilePath, tryRes.cause),
         } as const as Record<string, unknown>;
         const err = errIns[tryRes.reason];
         ENSURE_DEBUG(err != null, 'Unexpected lock failure reason. This may be a malfunction.',
@@ -753,7 +753,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         (detailMsg = `(${err.message})`) && 
         (code = ('code' in err && err.code) as string);
 
-        throw new FileLockError(`${errMsg}${detailMsg}`, {code, props: { file: name, cause: err } });
+        throw new FileLockError(`${errMsg}${detailMsg}`, {code, props: { path: name, cause: err } });
       }
     }
   }
@@ -791,7 +791,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
   #getInfo(options: AllOptions, checkOwner: boolean = true): FileLockMeta {
     // Lock information file should exist.
     REQUIRE(this.#existsSync(options._filePath, options), 'The lock information file does not exist.', 
-      LockCompromised, {key: this._key, props: { file: options._filePath } });
+      LockCompromised, {key: this._key, props: { path: options._filePath } });
 
     const contents = this.#readFileSync(options._filePath, options);
 
@@ -802,13 +802,13 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     catch (err) {
       throw new LockCompromised(
         `Couldn't parse the lock information file, it is probably broken.`,
-        {key: this._key, props: { file: options._filePath, contents, key: this._key, optionsOwnerId: options._ownerId } });
+        {key: this._key, props: { path: options._filePath, contents, key: this._key, optionsOwnerId: options._ownerId } });
     }
 
     VERIFY(checkOwner === false || options._ownerId == null || options._ownerId === meta.ownerId,
       'The lock information file was overwritten by another lock.',
       LockCompromised,
-      { key: this._key, props: { file: options._filePath, key: this._key, optionsOwnerId: options._ownerId, lockFileOwnerId: meta.ownerId } }
+      { key: this._key, props: { path: options._filePath, key: this._key, optionsOwnerId: options._ownerId, lockFileOwnerId: meta.ownerId } }
     );
 
     // Check contents.
@@ -849,7 +849,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       });
       if (invalidProps.length > 0) {
               throw new LockCompromised(`The lock information format is invalid`,
-                {key: this._key, props: { invalidProps, file: options._filePath } });
+                {key: this._key, props: { invalidProps, path: options._filePath } });
       }
     }
 
@@ -895,7 +895,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     const maxEntries = FileLock.#config.maxHistoryEntries;
     const dateTimeStr = DateFormatter.format(new Date());
     const _add = () => {
-      const historyFile = options._historyFile;
+      const historyFile = options._historyFilePath;
       let contents;
       try {
         contents = this.#readFileSync(historyFile, options, "Couldn't read the history file.");
@@ -920,7 +920,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         delete history[keys[i]];
       }
 
-      //  出力
+      //  Update history.
       this.#writeFileSync(historyFile, history, options, "Couldn't update the history file.");
     };
 
@@ -937,8 +937,8 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
   /**
    * @internal
-   * 終了時処理。
-   * Windows版では、強制終了(process.kill())からは呼び出されることは無いが、本実装は残しておく。
+   * Execute termination processing.<br>
+   * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
    */
   #onExit(code: number | null | undefined, signal: NodeJS.Signals | null): void {
     this._onExit(code, signal);

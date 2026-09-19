@@ -34,12 +34,13 @@ describe('FileLock', () => {
       expect(err instanceof FileLockError).toBeTruthy();
       expect(err).toMatchObject({
         code: "EBROKEN",
-        file: getLockMetaPath(key),
-        message: "ロックファイルの内容が破損しており、ロック状態を判定できません。対象プロセスが存在しないことを確認したうえで、必要ならロックファイルを手動で削除してください。",
+        path: getLockMetaPath(key),
+        message: `The contents of the lock file are corrupted, making it impossible to determine the lock status. ` +
+                 `Please verify that the target process does not exist and, if necessary, manually delete the lock file.`,
         cause: {
           code: "ECOMPROMISED",
           invalidProps: [{ key: target, value: v }],
-          file: getLockMetaPath(key),
+          path: getLockMetaPath(key),
           key: key,
           message: `The lock(key: ${key}) has been compromised(The lock information format is invalid).`
         },
