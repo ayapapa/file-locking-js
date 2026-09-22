@@ -20,10 +20,6 @@ for (let i = 2; i < process.argv.length; i++) {
 console.log('process.argv:', process.argv);
 console.log('sub-command args:', args);
 
-// デバッグのため一時的に以下を追加して実験中
-//if (args.length == 0) args.push(...['lock', 'key_hogehoge', '3000']); // #1
-//if (args.length == 0) args.push(...['sleep', '3000']); // #2
-
 const instruction = {
   'sleep': async () => {
     await sleepAsync(Number(args[1]))
@@ -32,6 +28,8 @@ const instruction = {
   'lock': async () => {
     const key = args[1];
     let sleepTime = Number(args[2]);
+    const timeoutMs = args[3] ? Number(args[3]) : 5000;
+    const ttlMs = args[4] ? Number(args[4]) : 2000;
     let monitor!: Monitor;
     await FileLock.withLock(
       key, async (mon) => {
@@ -40,11 +38,13 @@ const instruction = {
         for (; sleepTime > 0; sleepTime -= sleep) {
           await sleepAsync(sleep);
           if (mon.cancelled) {
-            console.error('lock interrupted.')
+            const hoge = 0;
+            console.info('###lock interrupted.###')
+            //console.error('lock interrupted.')
           }
         }
       },
-      {}
+      { timeoutMs, ttlMs }
     );
     console.log('lock completed.')
   },
@@ -52,8 +52,12 @@ const instruction = {
 
 const ins = instruction[args[0]];
 console.log('do it.')
-if (ins) await ins();
+try {
+  if (ins) await ins();
+}
+catch (err) {
+  // @ts-ignore
+  console.error(err.message);
+  process.exit(1);
+}
 console.log('finished it.')
-
-// #1のケースでは、以下を実行しないとプロセスが終了しない ⇒　タイマーが止まっていなかった。
-//process.exit(0);

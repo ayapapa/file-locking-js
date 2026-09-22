@@ -16,8 +16,8 @@ export class FileLockError extends LockError {
     super(msg, p);
   }
 
-  public static lockFailedDueToIO(path: string, cause: unknown) {
-    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { path, cause } });
+  public static lockFailedDueToIO(path: string, causes: unknown[]) {
+    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { path, causes } });
   }
 
   /**
@@ -27,8 +27,8 @@ export class FileLockError extends LockError {
    * @param cause    The parsing error that caused the issue.
    * @returns An instance of FileLockError.
    */
-  public static dueToHistory(history: string, cause: unknown): FileLockError {
-    return new FileLockError("Failed to parse the history file.", { code: 'EHISTORY', props: { history, cause } });
+  public static dueToHistory(history: string, causes: unknown[]): FileLockError {
+    return new FileLockError("Failed to parse the history file.", { code: 'EHISTORY', props: { history, causes } });
   }
 
  /**
@@ -37,8 +37,8 @@ export class FileLockError extends LockError {
    * @param cause    The parsing error that caused the issue.
    * @returns An instance of FileLockError.
   */
-  public static lockFailedDueToHistory(history: string, cause: unknown): FileLockError {
-    return new FileLockError("Lock acquisition failure due to history analysis failure.", { code: 'EHISTORY', props: { history, cause } });
+  public static lockFailedDueToHistory(history: string, causes: unknown[]): FileLockError {
+    return new FileLockError("Failed to acquire the lock due to history parsing failure.", { code: 'EHISTORY', props: { history, causes } });
   }
 
 };
@@ -51,7 +51,7 @@ class LockDirectoryAccessFailed extends FileLockError {
   /**
    * Constructor.
    * @param fsErrorMsg   fs's error message.
-   * @param operation   Operation on the lock information directory.
+   * @param operation   Operation on the lock directory.
    * @param code  Error code string.
    * @param params  Parameters.
    */
@@ -60,7 +60,7 @@ class LockDirectoryAccessFailed extends FileLockError {
     const props = { ...params?.props };
     if (path != null) props.path = path;
     if (fsErrMsg != null) props.fsErrMsg = fsErrMsg;
-    super(`Failed to ${operation} the lock information directory${path ? '('+path+')' : ""}.`, { code , props });
+    super(`Failed to ${operation} the lock directory${path ? '('+path+')' : ""}.`, { code , props });
   }
 }
 

@@ -80,7 +80,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
   defaultOptions.timeoutMs  = 2000;
   defaultOptions.ttlMs      = 2000;
   heartbeatIntervalMs       = 500;
-  heartbeatTimeoutMs        = 5000;
+  heartbeatTtlMs        = 5000;
   
   FileLock.setConfig({ 
     lockDirectory: "Specify the directory path where the file containing lock information is stored.",
@@ -114,12 +114,30 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 
 
 
-というわけで、話を戻して、FileLockだけど、まずは、壊れたファイルは、リトライしまくって、ロックできなかったという実装までを目指すよ。そして、テストもそのように書く。そして、次の段階で、オプションでそのようなファイルの対処法指定しるために、「invalidLockFileTimeoutMs」なるものを導入した実装にすすもうと思う。
+というわけで、話を戻して、FileLockだけど、まずは、壊れたファイルは、リトライしまくって、ロックできなかったという実装までを目指すよ。そして、テストもそのように書く。そして、次の段階で、オプションでそのようなファイルの対処法指定しるために、「invalidLockFileTimeoutMs」なるものを導入した実装にすすもうと思う。[^2]
 
 
-[^2]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。
+[^2]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。（参考：invalidLockFileTimeoutMs は、heartbeatTtlMs を主な参考値として、利用環境に応じて設定してください）　⇒　最小値は、heartbeatTtlMsだろうなぁ。
 
-invalidLockFileTimeoutMs は、heartbeatTimeoutMs を主な参考値として、利用環境に応じて設定してください　⇒　最小値は、heartbeatTimeoutMsだろうなぁ。
+## ストレステスト
+テストでは、100プロセス同実行（全同キー、全別キー）にて正常、または、想定通りのエラーですべて終了することを確認していますが、これを保証するものではありません。
+### ストレステスト実行環境： 
+#### オペレーティングシステム
+```
+エディション	Windows 11 Home
+バージョン	25H2
+インストール日	‎2024/‎12/‎16
+OS ビルド	26200.9457
+エクスペリエンス	Windows 機能エクスペリエンス パック 1000.26100.360.0
+```
+#### デバイス情報
+```
+プロセッサ	Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz (3.00 GHz)
+実装 RAM	16.0 GB
+グラフィックス カード	NVIDIA GeForce GTX 1080 (8 GB)
+ストレージ	使用領域 1.15 TB / 2.34 TB
+システムの種類	64 ビット オペレーティング システム、x64 ベース プロセッサ
+```
 
 ## Examples
 (under construction)

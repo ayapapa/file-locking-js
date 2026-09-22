@@ -4,12 +4,13 @@ import { logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
+  vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
 });
 
 afterEach(() => {
-  FileLock.setConfig(orgConfig);
   vi.restoreAllMocks();
+  FileLock.setConfig(orgConfig);
 });
 
 describe('FileLock', () => {

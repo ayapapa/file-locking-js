@@ -22,13 +22,14 @@ export interface FileLockMeta {
    * The valid duration since the last heartbeat.
    * Exceeding this limit is one of the factors used to determine that the lock is invalid.
    */
-  heartbeatTimeoutMs: number,
+  heartbeatTtlMs: number,
 
   /** The last heartbeat time. */
   lastHeartbeatAt: number,
 
   /** Lock counter.
    * A value that increments or decrements when re-entrant locking is permitted. 
+   * ★★オーナー以外も書き換える可能性があるので、分離せよ★★
    */
   counter: number
 }

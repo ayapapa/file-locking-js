@@ -79,7 +79,7 @@ export type LockBaseRequiredOptions = Required<Pick<LockBaseOptions, 'timeoutMs'
  */
 export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
   timeoutMs:      5000,   // Default maximum wait time for lock release is 5 seconds
-  ttlMs:          10000,  // Default lock validity period (time to live) is 10 seconds
+  ttlMs:          5000,   // Default lock validity period (time to live) is 5 seconds
   allowReentry:   false,  // Default to disallowing re-entrant locks
 };
 

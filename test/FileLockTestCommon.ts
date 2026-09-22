@@ -3,6 +3,7 @@ import path from 'node:path';
 import { PrettyConsole, type LogEntry } from '@ayapapa-npm/pretty-console-js';
 import * as Pino from 'pino'
 import { pino } from 'pino'
+import { createStream } from 'rotating-file-stream'
 
 import { FileLock } from '../src/index.ts';
 import { LockBase } from '../src/lib/LockBase.ts';
@@ -11,7 +12,11 @@ export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const transport = Pino.transport({
+const logDir = path.resolve('./logs')
+fs.mkdirSync(logDir, { recursive: true })
+
+/*
+const stream = Pino.transport({
   target: 'pino/file',
   options: {
     destination: './logs/file-lock.log',
@@ -19,6 +24,22 @@ const transport = Pino.transport({
     size: '5m',
     mkdir: true,
   },
+});
+*/
+
+const stream = createStream((time: Date | number) => {
+  if (!time) return 'file-lock.log'
+  const date = new Date(time);
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `file-lock-${yyyy}-${mm}-${dd}.log`
+}, {
+  path: logDir,
+  interval: '1d',
+  intervalBoundary: true,
+  initialRotation: true,
+  maxFiles: 14
 });
 
 const pinoLogger = pino(
@@ -29,7 +50,7 @@ const pinoLogger = pino(
       level: label => ({ level: label.toUpperCase() }),
     },
   },
-  transport,
+  stream,
 );
 
 const onPrettyLog = ( logEntry: LogEntry ) => {
@@ -73,9 +94,9 @@ export function removeLockFiles(key: string) {
 }
 
 export function getHistoryPath() {
-  const orgConf = FileLock.getConfig();
-  const dir = path.join(process.cwd(), '.lock');
-  return path.join(dir, 'history.json');
+  //const orgConf = FileLock.getConfig();
+  //const dir = path.join(process.cwd(), '.lock');
+  return FileLock.getHistoryInfo().historyPath;//path.join(dir, 'history.json');
 }
 
 /**

@@ -6,12 +6,13 @@ import path from 'node:path';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
+  vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
 });
 
 afterEach(() => {
-  FileLock.setConfig(orgConfig);
   vi.restoreAllMocks();
+  FileLock.setConfig(orgConfig);
 });
 
 describe('FileLock', () => {
@@ -165,7 +166,7 @@ describe('FileLock', () => {
   });
 
   it("maxHistoryEntries: 1", async () => {
-    const hist = getHistoryPath();
+    const histInfo = FileLock.getHistoryInfo();
     FileLock.setConfig({ _debug: true, maxHistoryEntries: 1 });
     expect.assertions(2);
     try {
@@ -174,8 +175,8 @@ describe('FileLock', () => {
           await sleepAsync(100);
         },
       );
-      expect(fs.existsSync(hist)).toBeTruthy();
-      const h = JSON.parse(fs.readFileSync(hist, 'utf-8'));
+      expect(fs.existsSync(histInfo.historyPath)).toBeTruthy();
+      const h = JSON.parse(fs.readFileSync(histInfo.historyPath, 'utf-8'));
       expect(Object.keys(h).length).toBe(1);
     }
     finally {

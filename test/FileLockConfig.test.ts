@@ -12,36 +12,31 @@ type NumberKeys<T> = {
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
+  vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
 });
 
 afterEach(() => {
-  FileLock.setConfig(orgConfig);
   vi.restoreAllMocks();
+  FileLock.setConfig(orgConfig);
 });
 
 describe('FileLock', () => {
 
   it("`FileLock.setConfig()` works correctly.", async () => {
-    const orgConf = FileLock.getConfig();
     expect.assertions(3);
-    try {
-      FileLock.setConfig(FileLock.getDefaultConfig());
-      const def = FileLock.getDefaultConfig();
-      const cur = FileLock.getConfig();
-      expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
-      const lockDirectory = 'hogehoge';
-      let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
-      FileLock.setConfig(config);
-      const newConf = FileLock.getConfig();
-      expect(JSON.stringify(newConf)).toBe(JSON.stringify(config));
-      config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
-      FileLock.setConfig(config);
-      expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+    FileLock.setConfig(FileLock.getDefaultConfig());
+    const def = FileLock.getDefaultConfig();
+    const cur = FileLock.getConfig();
+    expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
+    const lockDirectory = 'hogehoge';
+    let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
+    FileLock.setConfig(config);
+    const newConf = FileLock.getConfig();
+    expect(JSON.stringify(newConf)).toBe(JSON.stringify(config));
+    config = {...FileLock.getDefaultConfig(), defaultOptions: { ...FileLock.getDefaultOptions(), allowReentry: true } };
+    FileLock.setConfig(config);
+    expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
   });
 
   class TestLock extends (FileLock as any) {};
@@ -54,7 +49,7 @@ describe('FileLock', () => {
       ttlMs:                -1,
       pollIntervalMs:       -1,
       heartbeatIntervalMs:  -1,
-      heartbeatTimeoutMs:   -1,
+      heartbeatTtlMs:       -1,
       retriesOnIOErr:       -1,
       retryIntervalMs:      -1,
     };
@@ -63,7 +58,7 @@ describe('FileLock', () => {
       ttlMs:                1000,
       pollIntervalMs:       100,
       heartbeatIntervalMs:  1000,
-      heartbeatTimeoutMs:   2000,
+      heartbeatTtlMs:       2000,
       retriesOnIOErr:       0,
       retryIntervalMs:      100,
     };
@@ -77,26 +72,20 @@ describe('FileLock', () => {
     "and the `fatal` function has been replaced by the `error` function, " +
     "while the `trace` function has been replaced by the `debug` function..", async () => {
 
-    const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
     expect.assertions(3);
-    try {
-      FileLock.setConfig({ logger: console });
+    FileLock.setConfig({ logger: console });
 
-      expect(await FileLock.withLock(key, 
-        async () => {
-          await sleepAsync(500);
-          return retVal;
-        },
-        {}
-      )).toBe(retVal);
-      const lock = (FileLock as any)._getLock(key) as any;
-      expect(lock._logger.trace === lock._logger.debug).toBe(true);
-      expect(lock._logger.fatal === lock._logger.error).toBe(true);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+    expect(await FileLock.withLock(key, 
+      async () => {
+        await sleepAsync(500);
+        return retVal;
+      },
+      {}
+    )).toBe(retVal);
+    const lock = (FileLock as any)._getLock(key) as any;
+    expect(lock._logger.trace === lock._logger.debug).toBe(true);
+    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
@@ -133,33 +122,23 @@ describe('FileLock', () => {
 
   it("The directory specified in `FileLock.setCondig()` is created.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    let orgConf: FileLockConfig;
-    await testLockDirectoryCreation(
-      dir,
-      () => {
-        orgConf = FileLock.getConfig();
-        FileLock.setConfig({ lockDirectory: dir, logger });
-      },
-      () => FileLock.setConfig(orgConf),
-    );
+    fs.rmSync(dir, { force: true, recursive: true });
+    expect(fs.existsSync(dir)).toBeFalsy();
+
+    FileLock.setConfig({ lockDirectory: dir });
+
+    expect(fs.existsSync(dir)).toBeTruthy();
+    expect(fs.statSync(dir).isDirectory()).toBeTruthy();
   });
 
   it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
     " a error is throwed.", async () => {
     const dir = path.join(process.cwd(), '.lock');
-    FileLock.setConfig({ logger });
     expect.assertions(2);
     try {
       fs.rmSync(dir, { force: true, recursive: true });
       fs.writeFileSync(dir, "");
-      const retVal = "test_001", key = retVal;
-      await FileLock.withLock(key, 
-        async () => {
-          await sleepAsync(500);
-          return retVal;
-        },
-        {}
-      );
+      FileLock.setConfig({ logger });
     }
     catch (err: any) {
       expect(err instanceof LockDirectoryCreationFailed).toBe(true);
@@ -179,9 +158,8 @@ describe('FileLock', () => {
       throw err;
     });
     expect.assertions(3);
-    const orgConf = FileLock.getConfig();
-    FileLock.setConfig({ ...config, logger });
     try {
+      FileLock.setConfig({ ...config, logger });
       const retVal = "test_001", key = retVal;
       await FileLock.withLock(key, 
         async () => {
@@ -195,10 +173,6 @@ describe('FileLock', () => {
       expect(err.fsErrCode).toBe(eCode);
       expect(err.fsErrMsg).toBe(eMsg);
     }
-    finally {
-      spy.mockRestore();
-      FileLock.setConfig(orgConf);
-    }
   }
 
   it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {
@@ -206,14 +180,17 @@ describe('FileLock', () => {
  });
 
   it("The lock directory path does not exist, so an attempt is made to create it, but an error occurs.", async () => {
-    await testFsErrorBySpyOn('mkdirSync', { lockDirectory: path.join(process.cwd(), '.lock') }, LockDirectoryCreationFailed);
+    const lockDirectory = path.join(process.cwd(), '.lock1234');
+    await testFsErrorBySpyOn('mkdirSync', { lockDirectory }, LockDirectoryCreationFailed);
+    if (fs.existsSync(lockDirectory)) {
+      fs.rmSync(lockDirectory, { force: true, recursive: true });
+    }
   });
 
   it("An error occurs because the directory path specified in `FileLock.setConfig()` already exists but is not a directory.", async () => {
     const dir = path.join(process.cwd(), '.lock2');
     fs.writeFileSync(dir, "");
     expect.assertions(2);
-    const orgConf = FileLock.getConfig();
     try {
       FileLock.setConfig({ lockDirectory: dir, logger });
       const retVal = "test_001", key = retVal;
@@ -230,138 +207,102 @@ describe('FileLock', () => {
     }
     finally {
       fs.rmSync(dir, { force: true, recursive: true });
-      FileLock.setConfig(orgConf);
     }
   });
 
   it("Changing the directory path while a lock is held does not result in an error.", async () => {
-
-    const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
     expect.assertions(3);
-    try {
-      FileLock.setConfig({ logger: console });
-      expect(await FileLock.withLock(key, 
-        async () => {
-          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
-          await sleepAsync(500);
-          return retVal;
-        },
-        {}
-      )).toBe(retVal);
-      const lock = (FileLock as any)._getLock(key) as any;
-      expect(lock._logger.trace === lock._logger.debug).toBe(true);
-      expect(lock._logger.fatal === lock._logger.error).toBe(true);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
-
+    FileLock.setConfig({ logger: console });
+    expect(await FileLock.withLock(key, 
+      async () => {
+        FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+        await sleepAsync(500);
+        return retVal;
+      },
+      {}
+    )).toBe(retVal);
+    const lock = (FileLock as any)._getLock(key) as any;
+    expect(lock._logger.trace === lock._logger.debug).toBe(true);
+    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("Changing the directory path while a lock is held and then locking again using the same key does not result in an error.", async () => {
-
-    const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
     expect.assertions(3);
-    try {
-      FileLock.setConfig({ logger: console });
-      expect(await FileLock.withLock(key, 
-        async () => {
-          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
-          await FileLock.withLock(key, 
-            () => {
-              return;
-            }
-          );
-          await sleepAsync(500);
-          return retVal;
-        },
-        {}
-      )).toBe(retVal);
-      const lock = (FileLock as any)._getLock(key) as any;
-      expect(lock._logger.trace === lock._logger.debug).toBe(true);
-      expect(lock._logger.fatal === lock._logger.error).toBe(true);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
-
+    FileLock.setConfig({ logger: console });
+    expect(await FileLock.withLock(key, 
+      async () => {
+        FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+        await FileLock.withLock(key, 
+          () => {
+            return;
+          }
+        );
+        await sleepAsync(500);
+        return retVal;
+      },
+      {}
+    )).toBe(retVal);
+    const lock = (FileLock as any)._getLock(key) as any;
+    expect(lock._logger.trace === lock._logger.debug).toBe(true);
+    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("Changing the directory path while a lock is held and subsequently acquiring another lock " +
     "using the same key—while in reentrant lock permission mode—does not result in an error.", async () => {
-
-    const orgConf = FileLock.getConfig();
     const retVal = "test_001", key = retVal;
     expect.assertions(3);
-    try {
-      FileLock.setConfig({ logger: console });
-      expect(await FileLock.withLock(key, 
-        async () => {
-          FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
-          await FileLock.withLock(key, 
-            () => {
-              return;
-            },
-            { allowReentry: true }
-          );
-          await sleepAsync(500);
-          return retVal;
-        },
-      )).toBe(retVal);
-      const lock = (FileLock as any)._getLock(key) as any;
-      expect(lock._logger.trace === lock._logger.debug).toBe(true);
-      expect(lock._logger.fatal === lock._logger.error).toBe(true);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+    FileLock.setConfig({ logger: console });
+    expect(await FileLock.withLock(key, 
+      async () => {
+        FileLock.setConfig({ lockDirectory: path.join(process.cwd(), 'test/tmp') });
+        await FileLock.withLock(key, 
+          () => {
+            return;
+          },
+          { allowReentry: true }
+        );
+        await sleepAsync(500);
+        return retVal;
+      },
+    )).toBe(retVal);
+    const lock = (FileLock as any)._getLock(key) as any;
+    expect(lock._logger.trace === lock._logger.debug).toBe(true);
+    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("When debug mode is enabled, the history is updated.", async () => {
-    const orgConf = FileLock.getConfig();
     const dir = path.join(process.cwd(), '.lock');
-    const hist = path.join(dir, 'history.json');
+    const hist = FileLock.getHistoryInfo().historyPath;//path.join(dir, 'history.json');
     if (fs.existsSync(hist) === false) fs.writeFileSync(hist, '');
     const stat_before = fs.statSync(hist);
     expect.assertions(1);
-    try {
-      FileLock.setConfig({ _debug: true, history: false });
-      await FileLock.withLock('debug_mode_key', 
-        async () => {
-          await sleepAsync(500);
-        },
-      );
-      const stat_after = fs.statSync(hist);
-      expect(stat_before.mtimeMs).lessThan(stat_after.mtimeMs);
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+    FileLock.setConfig({ _debug: true, history: false });
+    await FileLock.withLock('debug_mode_key', 
+      async () => {
+        await sleepAsync(500);
+      },
+    );
+    const stat_after = fs.statSync(hist);
+    expect(stat_before.mtimeMs).lessThan(stat_after.mtimeMs);
   });
 
   it("When debug mode is enabled, process-related information is appended to the meta-information.", async () => {
-    const orgConf = FileLock.getConfig();
     const key = 'debug_mode_key_009'
     const metaFile = getLockMetaPath(key);
     expect.assertions(4);
-    try {
-      FileLock.setConfig({ _debug: true });
-      await FileLock.withLock(key, 
-        async () => {
-          const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
-          expect(meta.processId).toBeTypeOf('number');
-          expect(meta.parentProcessId).toBeTypeOf('number');
-          expect(Array.isArray(meta.processArgv) && (meta.processArgv as unknown[]).every(v => typeof v === "string")).toBeTruthy();
-          expect(meta.callStack).toBeTypeOf('string');
-          await sleepAsync(500);
-        },
-      );
-    }
-    finally {
-      FileLock.setConfig(orgConf);
-    }
+    FileLock.setConfig({ _debug: true });
+    await FileLock.withLock(key, 
+      async () => {
+        const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
+        expect(meta.processId).toBeTypeOf('number');
+        expect(meta.parentProcessId).toBeTypeOf('number');
+        expect(Array.isArray(meta.processArgv) && (meta.processArgv as unknown[]).every(v => typeof v === "string")).toBeTruthy();
+        expect(meta.callStack).toBeTypeOf('string');
+        await sleepAsync(500);
+      },
+    );
   });
 
   function testConfigMinVal(key: keyof FileLockConfig, exp: number, val?: number, additinalExp?: () => void) {
@@ -418,11 +359,33 @@ describe('FileLock', () => {
     testConfigMinVal('maxHistoryEntries', 0, -1);
   });
 
-  it("maxHistoryEntries: 101", async () => {
+  it("maxHistoryEntries: 99", async () => {
     testConfigMinVal('maxHistoryEntries', 99, 99);
   });
 
   it("maxHistoryEntries: 101", async () => {
     testConfigMinVal('maxHistoryEntries', 101, 101);
   });
+
+  it("maxHistoryFiles: undefined", async () => {
+    testConfigMinVal('maxHistoryFiles', 100, undefined);
+  });
+
+  it("maxHistoryFiles: 0", async () => {
+    testConfigMinVal('maxHistoryFiles', 0, 0);
+  });
+
+  it("maxHistoryFiles: -1", async () => {
+    testConfigMinVal('maxHistoryFiles', 0, -1);
+  });
+
+  it("maxHistoryFiles: 99", async () => {
+    testConfigMinVal('maxHistoryFiles', 99, 99);
+  });
+
+  it("maxHistoryFiles: 101", async () => {
+    testConfigMinVal('maxHistoryFiles', 101, 101);
+  });
+
+
 });

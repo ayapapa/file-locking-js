@@ -9,12 +9,13 @@ import { getCallStack, isEqualObjectType, sleepAsync, sleepSync } from '../src/l
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
+  vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
 });
 
 afterEach(() => {
-  FileLock.setConfig(orgConfig);
   vi.restoreAllMocks();
+  FileLock.setConfig(orgConfig);
 });
 
 describe('LockBase and Util', () => {

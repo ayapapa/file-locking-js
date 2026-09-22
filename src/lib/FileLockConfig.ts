@@ -43,20 +43,31 @@ export interface FileLockConfig extends LockBaseConfig {
   defaultOptions?: FileLockOptions;
 
   /**
-   * Whether to keep a history of lock information.
-   * If `true`, a history of lock information will be appended into a file named `history.json` in the lock directory.
+   * @internal
+   * Whether to keep a history of lock information. 
+   * This is for debugging.
+   * If `true`, a history of lock information will be appended into a file named `xxxx.json` in the `lock directory`/history/.
    * Default is `false`.
    */
   history?: boolean;
 
   /**
-   * Maximum number of history entries to keep.
+   * Maximum number of history entries to keep. 
+   * This is for debugging.
    * If the number of entries exceeds this value, the oldest entries will be deleted in order.
    * Minimum is `0`; if a value lower than this is specified, this minimum value is used.
    * Default is `100`.
    */
   maxHistoryEntries?: number;
 
+  /**
+   * Maximum number of history files to keep. 
+   * This is for debugging.
+   * If the number of entries exceeds this value, the oldest entries will be deleted in order.
+   * Minimum is `0`; if a value lower than this is specified, this minimum value is used.
+   * Default is `100`.
+   */
+  maxHistoryFiles?: number;
 }
 
 /**
@@ -72,4 +83,5 @@ export const defaultFileLockConfig: Readonly<Required<FileLockConfig>> = {
   history:            false,
   lockDirectory:      null,
   maxHistoryEntries:  100,
+  maxHistoryFiles:    100,
 };

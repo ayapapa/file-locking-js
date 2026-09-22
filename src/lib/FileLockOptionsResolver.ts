@@ -24,22 +24,22 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
     const basics = super._getCheckTypePairs();
     return {
       ...basics,
-      pollIntervalSec:       "number",
-      pollIntervalMs:        "number",
-      heartbeatIntervalSec:  "number",
-      heartbeatIntervalMs:   "number",
-      heartbeatTimeoutSec:   "number",
-      heartbeatTimeoutMs:    "number",
-      retriesOnIOErr:        "number",
-      retryIntervalSec:      "number",
-      retryIntervalMs:       "number"
+      pollIntervalSec:      "number",
+      pollIntervalMs:       "number",
+      heartbeatIntervalSec: "number",
+      heartbeatIntervalMs:  "number",
+      heartbeatTtlSec:      "number",
+      heartbeatTtlMs:       "number",
+      retriesOnIOErr:       "number",
+      retryIntervalSec:     "number",
+      retryIntervalMs:      "number"
     };
   }
   
   /** Get an array of time-related base names (keys) from the option properties. */
   protected override _getTimeKeys(): TimeBasedKey<FileLockOptions>[] {
     const bases = super._getTimeKeys();
-    bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTimeout', 'retryInterval');
+    bases.push('pollInterval', 'heartbeatInterval', 'heartbeatTtl', 'retryInterval');
     return bases;
   }
 

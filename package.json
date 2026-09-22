@@ -35,12 +35,13 @@
     "prepublishOnly": "npm run release:check"
   },
   "devDependencies": {
-    "@ayapapa-npm/pretty-console-js": "^0.2.2",
+    "@ayapapa-npm/pretty-console-js": "^0.2.3",
     "@types/node": "^26.2.0",
     "@types/proper-lockfile": "^4.1.4",
     "@vitest/coverage-v8": "^5.0.1",
     "@vitest/ui": "^5.0.1",
     "pino": "^10.3.1",
+    "rotating-file-stream": "^3.2.10",
     "tsup": "^8.5.1",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.13.0",
