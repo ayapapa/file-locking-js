@@ -6,7 +6,7 @@
 
 # Class: LockError
 
-Defined in: [src/lib/LockBaseErrors.ts:7](https://github.com/ayapapa/file-lock-js/blob/82b98f504a9b2efdb6272a4465a442fc043ed63d/src/lib/LockBaseErrors.ts#L7)
+Defined in: [src/lib/LockBaseErrors.ts:7](https://github.com/ayapapa/file-lock-js/blob/46b751556b497dc7d8f403e15fb32e73a4d8df8f/src/lib/LockBaseErrors.ts#L7)
 
 Basic lock handling error.
 
@@ -28,7 +28,7 @@ Basic lock handling error.
 
 > **new LockError**(`msg?`, `params?`): `LockError`
 
-Defined in: [src/lib/LockBaseErrors.ts:14](https://github.com/ayapapa/file-lock-js/blob/82b98f504a9b2efdb6272a4465a442fc043ed63d/src/lib/LockBaseErrors.ts#L14)
+Defined in: [src/lib/LockBaseErrors.ts:14](https://github.com/ayapapa/file-lock-js/blob/46b751556b497dc7d8f403e15fb32e73a4d8df8f/src/lib/LockBaseErrors.ts#L14)
 
 Constructor.
 
@@ -78,7 +78,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/82b98f504a9b2efdb6272a4465a442fc043ed63d/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/46b751556b497dc7d8f403e15fb32e73a4d8df8f/src/lib/LockBaseErrors.ts#L8)
 
 ***
 

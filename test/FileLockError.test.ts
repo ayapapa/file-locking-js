@@ -1031,5 +1031,30 @@ describe('FileLockError', () => {
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+  it("ロック共有者の削除失敗", async () => {
+    const unlinkSync = fs.unlinkSync;
+    vi.spyOn(fs, 'unlinkSync').mockImplementation((path) => {
+      if (path.toString().includes(".sharer\\.lock\\") ) {
+        throw Error("unlinkSync error!");
+      }
+      return unlinkSync(path);
+    });
+    const key = 'lock_sharer_remove_fail';
+    try {
+      await FileLock.withLock(key, () => {
+
+      });
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+    }
+  });
+
+  it("ロック共有者のリスト取得失敗", () => {
+    // countSharer, readdirSync
+    vi.spyOn(fs, 'readdirSync').mockImplementation(() => {
+      return [];
+    });
+  });
 
 });

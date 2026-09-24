@@ -593,7 +593,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       'EIO'      : () => FileLockError.lockFailedDueToIO(this._key, causes),
       'EHISTORY' : () => FileLockError.lockFailedDueToHistory(FileLock.#historyPath, causes),
     } as const as Record<string, () => void>;
-    const err = errIns[tryRes.reason] ? errIns[tryRes.reason]() : null;
+    const err = errIns[tryRes.reason] && errIns[tryRes.reason]();
     ENSURE_DEBUG(err != null, 'Unexpected lock failure reason. This may be a malfunction.',
       FileLockError, { code: 'EUNEXPECTED', props: { cause: tryRes.cause } });
     throw err;
@@ -684,7 +684,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
       // Could not open with exclusive access, so reading metadata.
       let meta = null;
-      meta = this.#getInfoIfExists(options, true);
+      meta = this.#getInfoIfExists(options/*, true*/);
 
       if (meta && this.#isLockExpired(meta) === false)  {
         return { lockable: false, reason: 'ELOCKED' }; // This lock is alive.
@@ -1017,14 +1017,14 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options Options.
    * @returns null if not exist, or the contents as object.
    */
-  #getInfoIfExists(options: AllOptions, throwErr: boolean = false): FileLockMeta | null {
+  #getInfoIfExists(options: AllOptions/*, throwErr: boolean = false*/): FileLockMeta | null {
     try {
       if (!this.#existsSync(options._filePath, options)) return null;
       return this.#getInfo(options, false);
     }
     catch (err) {
-      if (throwErr) throw err;
-      return null; 
+      /*if (throwErr) */throw err;
+      //return null; 
     }
   }
 
