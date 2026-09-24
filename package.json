@@ -1,6 +1,6 @@
 {
   "name": "@ayapapa-npm/file-locking-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "File-based mutual exclusion using mutex files for cross-process locking",
   "license": "MIT",
   "author": "ayapapa",

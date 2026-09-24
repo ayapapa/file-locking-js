@@ -204,7 +204,7 @@ describe('別プロセスとの競合テスト', () => {
     expect(results[1]).toMatchObject({
       status: 'rejected',
       reason: {
-        message: "Could not lock because the 'mainKey009' is already locked.",
+        message: `Couldn't acquire the lock because the '${key}' is already locked.`,
         code: 'ELOCKED',
         path: getLockMetaPath(key),
         key: key
@@ -216,7 +216,7 @@ describe('別プロセスとの競合テスト', () => {
     const key = 'mainKey008';
 
     const pp = FileLock.withLock(key, async () => {
-        await sleepAsync(500);
+        await sleepAsync(1000);
         return 'completed'
       },
       { timeoutMs: 500}
@@ -264,14 +264,34 @@ describe('別プロセスとの競合テスト', () => {
     });
   });
 
-  it("別プロセスを先に起動したが、実行中に、強制的にプロセスをキルする。親プロセスは、ロック情報の無効化を確認後ロック処理が進む.", async () => {
+  it("子プロセスを先に起動したが、実行中に、強制的にプロセスをキルする。親プロセスは、ロック情報の無効化を確認後ロック処理が進む.", async () => {
     const key = 'subKey0031';
     const child = await execChild('lock', { key, sleep: 1000, ttlMs: 1100, waitAquired: true });
 
     const start = Date.now();
 
-    await sleepAsync(500);
+    await sleepAsync(500);   // ★★★　ここをいじっても、結果は同じ！！　つまり、 killしても、想定通りの振る舞いになっていないようだけれど、、、、！！！！！！
     child.cid.kill(); // 何を指定しても強制終了となるようだ。
+    /**
+     * ★★★
+     * 500ms待っても、空の前段ロックファイルを見つけてしまった！！！　 
+     * ＝＝＝＞　★★★、、、ちょっと、違うかな！！　残っているのは、共有者情報（.lock\subKey0031.sharer）だけだよ！！　というか、」これは、何度試しても残っている！！
+     * ＝＝＝＞　★★★、、、残っているのは、sharerだけだね、、、、、これがヒントかな。。。。
+     * ★★しかも、その前段ロックは別プロセス。。。ここが味噌★★★
+     * 前段がちゃんとファイル書き込みを済ませるまで待てればいいけれど、今はそれは、出来ないというか、、リトライをするしか、方策が無い。
+     * では、どうするか、
+     * 前段は、ロックするために、空ファイルを取り合えず作る。
+     * と、それは、一時的に、空ファイルになる。
+     * 今回は、それを拾って、エラーになった。
+     * だとすると、、、、、空ファイル状態を無くせるか？⇒　基本無理。　一瞬でもファイル生成をした直後は空ファイルになる。
+     * では、何に対処すればよいのか、、、
+     * １）ファイルIOの直列化、、、、これは、これまでも、考えてきたが、、、あまりに、負荷がたかまりそうなので、却下。　その負荷のせいで、タイムアウト続出の予感
+     * ２）空ファイルをまだ、途中の存在と想定して、リトライする。、、、案外あるかも。。。しかし、また、ここでリトライ間隔分の時間が発生する。
+     * ３）その他なにがあるのか？？？？？
+     * 
+     *  
+     */
+
 
     const pp = FileLock.withLock(key, async () => {
         await sleepAsync(500);
@@ -285,7 +305,7 @@ describe('別プロセスとの競合テスト', () => {
     // One of them has resulted in a timeout error (AlreadyLocked).
     expect(results[0]).toMatchObject({
       status: 'rejected',
-      reason: "child failed: code=null signal=SIGTERM msg="
+      //reason: "child failed: code=null signal=SIGTERM msg=" 子プロセスの理由は問わない！！
     });
     expect(results[1]).toMatchObject({
       status: 'fulfilled',

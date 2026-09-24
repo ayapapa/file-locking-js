@@ -102,7 +102,10 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 
 ## Configurations
 
-## Optionss
+## Options
+
+* ※デッドロックエラーさせるか否かを指定できるようにする。これは、arrowRentry: falseのときに有効であり、エラーにしないならば、タイムアウトを待ってロック取得できなかったエラー（AlreadyLocked）
+
 
 ## Errors
 | Class name | Overview  | Message | Other properties | How to handle the situation, etc.|
@@ -126,7 +129,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 ```
 エディション	Windows 11 Home
 バージョン	25H2
-インストール日	‎2024/‎12/‎16
+インストール日	2024/12/16
 OS ビルド	26200.9457
 エクスペリエンス	Windows 機能エクスペリエンス パック 1000.26100.360.0
 ```

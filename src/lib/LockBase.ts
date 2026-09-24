@@ -4,9 +4,11 @@ import { Contracts } from '@ayapapa-npm/contracts-js';
 import { LockError, DeadlockDetected, TTLExceeded } from './LockBaseErrors.ts';
 import { type AllOptions } from './AllOptions.ts';
 import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
-import { type LockBaseInternalState, type Monitor } from './LockBaseInternalState.ts'
+import { type LockBaseInternalState } from './LockBaseInternalState.ts'
 import { defaultLockBaseConfig, type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
 import { isEqualObjectType } from './Util.ts';
+import { LockCompromised } from './FileLockErrors.ts';
+import { type Monitor } from './LockMonitor.ts';
 
 const {REQUIRE_DEBUG} = Contracts;
 
@@ -180,9 +182,15 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Function that signals a forced termination.
+   * Function to report a forced termination during asynchronous processing.
    */
   #onExitReject: ((reason?: unknown) => void) | null = null;
+
+  /**
+   * @internal
+   * Function to report that an erosion error occurred during asynchronous processing.
+   */
+  #onCompromisedReject: ((reason?: unknown) => void) | null = null;
 
   /**
    *  Instance methods. 
@@ -310,16 +318,19 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     // Created promises.
     const ttlTimer = this.#createTtlTimer(options);
     const onExitPromise = this.#onExitPromise();
+    const onCompromised = this.#onCompromised();
     const cbPromise = this.#execCallback(onLockFn, options);
 
     // A race between callback processing and the TTL timer.
     try {
-      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise])
+      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise, onCompromised.promise])
         .finally(() => { // In any case, turn off the timer.
           // Avoid if statements as a measure against coverage issue
           ttlTimer.id && clearTimeout(ttlTimer.id);
           onExitPromise.onExitResolve('No forced termination');
           this.#onExitReject = null;
+          onCompromised.onCompromisedResolve('No compromised');
+          this.#onCompromisedReject = null;
         }
       );
     }
@@ -359,6 +370,20 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
         this.#onExitReject = reject;
       }),
       onExitResolve
+    };
+  }
+
+  /**
+   * @internal
+   */
+  #onCompromised() {
+    let onCompromisedResolve!: ((v: unknown) => void);
+    return {
+      promise: new Promise((resolve, reject) => {
+        onCompromisedResolve = resolve;
+        this.#onCompromisedReject = reject;
+      }),
+      onCompromisedResolve
     };
   }
 
@@ -405,6 +430,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   protected _prepare(options: AllOptions<O, I>): void {
     this.#newMonitor(options);
+    options._sharerId = crypto.randomUUID();
+    // Note: If this lock request succeeds in acquiring the lock (i.e., if the key is currently unlocked), 
+    // `_sharerId` will be overwritten with this instance's owner ID(`this._ownerId`) upon acquisition.
   }
   
   /**
@@ -419,6 +447,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     if (this.#isAlreadyCancelled(options)) return;
     const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
     this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
+    if (err instanceof LockCompromised && this.#onCompromisedReject) {
+      this.#onCompromisedReject(err);
+    };
   }
 
   /**

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole, type LogEntry } from '@ayapapa-npm/pretty-console-js';
-import * as Pino from 'pino'
-import { pino } from 'pino'
+import Pino, { pino } from 'pino'
+//import { pino } from 'pino'
 import { createStream } from 'rotating-file-stream'
 
 import { FileLock } from '../src/index.ts';
@@ -72,6 +72,11 @@ export function getLockMetaPath(key: string): string {
   //return path.join(TestLock.getLockDirPath(), key, 'meta.json');
 }
 
+export function getLockSharerDir(key: string): string {
+  return path.join(TestLock.getLockDirPath(), key + '.sharer');
+  //return path.join(TestLock.getLockDirPath(), key, 'meta.json');
+}
+
 export const getLockMeta = (key: string) => {
   const lockMetaPath = getLockMetaPath(key);
   const contents: string = fs.readFileSync(lockMetaPath, 'utf8');
@@ -87,6 +92,8 @@ export const setLockMeta = (key: string, meta: any) => {
 export function removeLockFiles(key: string) {
   const lockMetaPath = getLockMetaPath(key);
   if (fs.existsSync(lockMetaPath)) fs.unlinkSync(lockMetaPath);
+  const sharer = getLockSharerDir(key);
+  if (fs.existsSync(sharer)) fs.rmSync(sharer, { force: true, recursive:true });
   /*
   const lockMetaPath = path.dirname(getLockMetaPath(key));
   if (fs.existsSync(lockMetaPath)) fs.rmSync(lockMetaPath, { recursive: true, force: true });
@@ -118,7 +125,9 @@ export class TestLock extends FileLock {
   static isReleasedState(key: string): boolean {
     const lock = this.getLock(key);
     // @ts-ignore
-    return lock._acquired === false && lock._heartbeatTimer === null && fs.existsSync(getLockMetaPath(key)) === false;
+    return lock._acquired === false && lock._heartbeatTimer === null && 
+      fs.existsSync(getLockMetaPath(key)) === false &&
+      fs.existsSync(getLockSharerDir(key)) === false;
   }
 
   static getLockDirPath() {

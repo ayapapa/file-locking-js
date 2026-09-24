@@ -22,7 +22,7 @@
 
 - [FileLockConfig](interfaces/FileLockConfig.md)
 - [FileLockOptions](interfaces/FileLockOptions.md)
-- [Monitor](interfaces/Monitor.md)
+- [LockMonitor](interfaces/LockMonitor.md)
 
 ## Type Aliases
 

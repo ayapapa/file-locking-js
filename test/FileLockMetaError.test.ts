@@ -29,7 +29,7 @@ describe('FileLock', () => {
       await FileLock.withLock(
         key,
         async () => await sleepAsync(100),
-        { timeoutMs: 200 }// ttlMs: 1000 }
+        { timeoutMs: 0 }// ttlMs: 1000 }
       );
     } catch (err: any) {
       expect(err instanceof LockFileBroken).toBeTruthy();
@@ -43,7 +43,7 @@ describe('FileLock', () => {
         message: `The lock(key: ${key}) has been compromised(The lock information format is invalid).`,
       };
       const matchObj = {
-        causes: [ cause, cause, cause ],
+        causes: [ cause ],
         code: "EBROKEN",
         path: getLockMetaPath(key),
         message: "The contents of the lock file are corrupted, making it impossible to determine the lock status. " +

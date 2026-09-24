@@ -14,4 +14,7 @@ export interface FileLockInternalState extends LockBaseInternalState {
   /** Path to the lock information update history file. */
   //_historyFilePath: string;
 
+  // Path to the directory to store sharer's info.
+  _sharerDir: string;
+
 }

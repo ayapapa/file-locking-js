@@ -1,26 +1,20 @@
-/** Monitoring object passed to the callback function executed after acquiring the lock. */
-export interface Monitor {
-  /** Whether the operation was cancelled. */
-  cancelled: boolean;
-
-  /** The reason for cancellation determined by FileLock. */
-  reason?: string;
-
-  /** The object actually caught by the try-catch block. */
-  cause?: unknown;
-
-  /** Operation cancelled. */
-  operation?: string;
-
-  /** Monitor ID. */
-  id?: string;
-}
+import { type Monitor } from './LockMonitor.ts';
 
 /** 
  * @internal
- * Basic status information.
+ * Basic status information. <br>
+ * It is the definition of the lock processing status to be maintained for each lock request. 
+ * Internally, it is used during lock processing as part of the internal options merged 
+ * with user-specified options.
  */
 export interface LockBaseInternalState {
+  /**
+   * Lock sharer id. <br>
+   * An identifier asserted when sharing a lock. This ID is a unique identifier 
+   * assigned for each option (i.e., for each lock request).
+   */
+  _sharerId: string;
+
   /** 
    * Lock owner id. <br>
    * This ID is initially unset and is determined when the lock is acquired. 

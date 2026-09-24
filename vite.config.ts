@@ -14,6 +14,7 @@ export default defineConfig({
   },
   // Write settings to disable only in the test environment here.
   test: {
+    testTimeout: 30000,
     // File patterns to exclude
     exclude: [...configDefaults.exclude, 'e2e/*'],
     

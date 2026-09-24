@@ -16,8 +16,8 @@ export class FileLockError extends LockError {
     super(msg, p);
   }
 
-  public static lockFailedDueToIO(path: string, causes: unknown[]) {
-    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { path, causes } });
+  public static lockFailedDueToIO(key: string, causes: unknown[]) {
+    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { key, causes } });
   }
 
   /**
