@@ -280,7 +280,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     this.#onExitReject && 
       this.#onExitReject(new LockError("Forced termination.", {
         code: 'ETERM',
-        props: { exitReason: { code, signal } }
+        props: { reason: { code, signal } }
       }));
   }
 
@@ -361,6 +361,21 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * @param onLockFn 
+   * @param options 
+   */
+  async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
+    return this.#execLockCommon(
+      onLockFn, 
+      () => this._incReantryCount(options), 
+      () => this._decReantryCount(options), 
+      'Re-entrant locking callback.',
+      options
+    );
+  }
+
+  /**
+   * @internal
    */
   #onExitPromise() {
     let onExitResolve!: ((v: unknown) => void);
@@ -386,21 +401,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       onCompromisedResolve
     };
   }
-
-  /**
-   * @internal
-   * @param onLockFn 
-   * @param options 
-   */
-  async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
-    return this.#execLockCommon(
-      onLockFn, 
-      () => this._incReantryCount(options), 
-      () => this._decReantryCount(options), 
-      'Re-entrant locking callback.',
-      options
-    );
- }
 
   /**
    * @internal

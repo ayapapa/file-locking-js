@@ -15,6 +15,7 @@ import { type AllOptions as AllOptionsT } from './AllOptions.ts';
 import { defaultFileLockConfig, type FileLockConfig } from './FileLockConfig.ts';
 import { getCallStack, includesAllKeysOf, sleepAsync, sleepSync, typedKeys } from './Util.ts'
 import { type FileLockMeta } from './FileLockMeta.ts'
+import { ReleaseFailed } from './LockBaseErrors.ts';
 
 /** 
  * @ internal
@@ -172,7 +173,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @return A Promise that resolves with the return value of onLockFn.
    */
   public static async withLock(key: string, onLockFn: CallbackOnLock, options: FileLockOptions  = {}): Promise<any> {
-    REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { code: 'EINVAL' });
+    REQUIRE(typeof key === 'string' && key !== '', '`key` must be specified as a non-empty string.', InvalidOptions, { name: 'key' });
 
     // If defaultOptions is specified in the config, it will be used as the default options.
     const defaultOpts: FileLockRequiredOptions = { ...FileLock.getDefaultOptions(), ...FileLock.#config.defaultOptions };
@@ -472,7 +473,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     }
     catch (err) {
       throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, sharer: options._sharerId, _causes: [err] }
+        code: 'EIO', props: { key: this._key, sharer: options._sharerId, causes: [err] }
       });
     }
   }
@@ -484,11 +485,19 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options 
    */
   protected override async _decReantryCount(options: AllOptions): Promise<void> {
-    await this.#removeSharer(options);
-
-    const count = await this.#countSharer(options, "Failed to count the lock sharer.");
-    if (count === 0) {
-      this.#actuallyRelease(options);
+    try {
+      await this.#removeSharer(options);
+      const count = await this.#countSharer(options, "Failed to count the lock sharer.");
+      if (count === 0) {
+        this.#actuallyRelease(options);
+      }
+    }
+    catch (err) {
+      // 正常なリリース処理が出来ないため、強制的に解除
+      this.#actuallyRelease(options, false);
+      err = new ReleaseFailed('', { key: this._key, path: options._filePath, sharer: options._sharerDir, props: { causes: [err] } });
+      this._onError(err, "release lock or decrement lock counter", options)
+      throw err;
     }
     /*
     // 残りの共有者数が0なら、ロック解除を実行する
@@ -499,7 +508,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     }
     catch (err) {
       throw new FileLockError("Failed to decrement the lock counter.", {
-        code: 'EIO', props: { key: this._key, sharer: options._sharerId, _causes: [err] }
+        code: 'EIO', props: { key: this._key, sharer: options._sharerId, causes: [err] }
       });
     }
     */
@@ -595,7 +604,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     } as const as Record<string, () => void>;
     const err = errIns[tryRes.reason] && errIns[tryRes.reason]();
     ENSURE_DEBUG(err != null, 'Unexpected lock failure reason. This may be a malfunction.',
-      FileLockError, { code: 'EUNEXPECTED', props: { cause: tryRes.cause } });
+      FileLockError, { code: 'EUNEXPECTED', props: { reason: tryRes.reason, cause: tryRes.cause } });
     throw err;
 
     /*
@@ -684,7 +693,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
 
       // Could not open with exclusive access, so reading metadata.
       let meta = null;
-      meta = this.#getInfoIfExists(options/*, true*/);
+      meta = this.#getInfoIfExists(options);
 
       if (meta && this.#isLockExpired(meta) === false)  {
         return { lockable: false, reason: 'ELOCKED' }; // This lock is alive.
@@ -741,7 +750,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
           this._acquired && await this.#updateHeartbeat(options);
         }
         catch (err) {
-            this._logger.trace(`Heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
+          this._logger.trace(`Heartbeat update error at ${DateFormatter.format(new Date())}: ${err}`);
           this.#stopHeartbeat();
           this._onError(err, 'updateHeartbeat', options);
           // To maintain the lock, the heartbeat is not stopped here. 
@@ -815,7 +824,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
           expirationTime: Date.now() + options.ttlMs,
           heartbeatTtlMs: options.heartbeatTtlMs,
           lastHeartbeatAt: Date.now(),
-          counter: 1
+          //counter: 1
         },
         options
       );
@@ -857,19 +866,11 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * @param options 
    * @param errMsg 
    */
-  #removeLockFile(meta: FileLockMeta | null, options: AllOptions, force: boolean = false): void {
-    meta = meta || this.#getInfo/*IfExists*/(options, true);
-
-    // Unless a forced deletion is specified, the file will not be deleted 
-    // if the metadata cannot be read, or—even if it can be read—if the file is not one's own.
-    if (force === false && (meta === null || meta.ownerId !== options._ownerId)) return;
-
+  #removeLockFile(options: AllOptions): void {
+    // Verify that metadata can be successfully retrieved (throw an exception if retrieval fails).
+    this.#getInfo(options, true);
     // Remove them, bacause it is my own file.
     this.#removeFile(options);
-    /*
-    this.#unlinkSync(options._filePath, options);
-    this.#rmDirSync(options._sharerDir, options);
-    */
   }
 
   #rmDirSync(path: string, options: AllOptions, msg: string = "Couldn't remove the directory.") {
@@ -963,11 +964,19 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
    * Final unlock processing.
    * @param options Options.
    */
-  #actuallyRelease(options: AllOptions) {
+  #actuallyRelease(options: AllOptions, throwErr = true) {
     this._acquired = false;
-    // Stop the heartbeat (must be stopped before deletion)
-    this.#stopHeartbeat()
-    this.#removeLockFile(null, options);
+
+    try {
+      // Stop the heartbeat (must be stopped before deletion)
+      this.#stopHeartbeat()
+      // removes lock file, etc.
+      this.#removeLockFile(options);
+    }
+    catch (err) {
+      if (throwErr) throw err;
+    }
+
     options._ownerId = null;
 
     this._logger.trace(`Released the lock(key: ${this._key}) at ${DateFormatter.format(new Date())}`);
@@ -1051,7 +1060,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
     catch (err) {
       throw new LockCompromised(
         `Couldn't parse the lock file, it is probably broken.`,
-        {key: this._key, props: { path: options._filePath, contents, key: this._key, ownerId: options._ownerId } });
+        {key: this._key, props: { path: options._filePath, contents, ownerId: options._ownerId } });
     }
 
     VERIFY(checkOwner === false || options._ownerId == null || options._ownerId === meta.ownerId,
@@ -1086,7 +1095,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
       { key: "expirationTime",    type: "number" },
       { key: "heartbeatTtlMs",    type: "number" },
       { key: "lastHeartbeatAt",   type: "number" },
-      { key: "counter",           type: "number" },
+      //{ key: "counter",           type: "number" },
     ] as { key: keyof FileLockMeta, type: string | ((v: unknown) => boolean), optional?: boolean }[];
 
     const checkAll = () => {
@@ -1155,7 +1164,7 @@ export class FileLock extends LockBase<FileLockRequiredOptions, FileLockInternal
         }
       }
 
-      let history: Record<string, { meta: FileLockMeta, options: AllOptions }> = {};
+      let history!: Record<string, { meta: FileLockMeta, options: AllOptions }>;
       try {
         history = contents ? JSON.parse(contents) : {};
       }

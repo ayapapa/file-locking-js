@@ -2,33 +2,48 @@
 
 ***
 
-[@ayapapa-npm/file-locking-js](../README.md) / LockFileBroken
+[@ayapapa-npm/file-locking-js](../README.md) / ReleaseFailed
 
-# Class: LockFileBroken
+# Class: ReleaseFailed
 
-Defined in: [src/lib/FileLockErrors.ts:119](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/FileLockErrors.ts#L119)
+Defined in: [src/lib/LockBaseErrors.ts:97](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/LockBaseErrors.ts#L97)
 
-Lock file broken error.
+Failed to relase lock or decrement lock counter. <br>
+エラーの意味：　（エラー説明に記載すること）
+ロック解放またはロックカウンターの減算に失敗したことによる処理を中断。
+ファイルIOエラーによるものと思われるため、システムのチェックをお勧めする。
+また、ロックファイルやロック共有情報などのファイルやディレクトリが
+残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  *
 
 ## Extends
 
-- [`FileLockError`](FileLockError.md)
+- [`LockError`](LockError.md)
 
 ## Constructors
 
 ### Constructor
 
-> **new LockFileBroken**(`params`): `LockFileBroken`
+> **new ReleaseFailed**(`msg?`, `params?`): `ReleaseFailed`
 
-Defined in: [src/lib/FileLockErrors.ts:125](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/FileLockErrors.ts#L125)
+Defined in: [src/lib/LockBaseErrors.ts:103](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/LockBaseErrors.ts#L103)
 
 Constructor.
 
 #### Parameters
 
-##### params
+##### msg?
+
+`string`
+
+Error message.
+
+##### params?
 
 Parameters.
+
+###### key
+
+`string`
 
 ###### path
 
@@ -38,13 +53,17 @@ Parameters.
 
 [`LockErrorProps`](../type-aliases/LockErrorProps.md)
 
+###### sharer
+
+`string`
+
 #### Returns
 
-`LockFileBroken`
+`ReleaseFailed`
 
 #### Overrides
 
-[`FileLockError`](FileLockError.md).[`constructor`](FileLockError.md#constructor)
+[`LockError`](LockError.md).[`constructor`](LockError.md#constructor)
 
 ## Properties
 
@@ -56,7 +75,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`cause`](FileLockError.md#cause)
+[`LockError`](LockError.md).[`cause`](LockError.md#cause)
 
 ***
 
@@ -68,7 +87,7 @@ Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-j
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`code`](FileLockError.md#code)
+[`LockError`](LockError.md).[`code`](LockError.md#code)
 
 ***
 
@@ -80,7 +99,7 @@ Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1077
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`message`](FileLockError.md#message)
+[`LockError`](LockError.md).[`message`](LockError.md#message)
 
 ***
 
@@ -92,7 +111,7 @@ Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1076
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`name`](FileLockError.md#name)
+[`LockError`](LockError.md).[`name`](LockError.md#name)
 
 ***
 
@@ -104,7 +123,7 @@ Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1078
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`stack`](FileLockError.md#stack)
+[`LockError`](LockError.md).[`stack`](LockError.md#stack)
 
 ***
 
@@ -126,7 +145,7 @@ not capture any frames.
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`stackTraceLimit`](FileLockError.md#stacktracelimit)
+[`LockError`](LockError.md).[`stackTraceLimit`](LockError.md#stacktracelimit)
 
 ## Methods
 
@@ -196,101 +215,7 @@ a();
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`captureStackTrace`](FileLockError.md#capturestacktrace)
-
-***
-
-### dueToHistory()
-
-> `static` **dueToHistory**(`history`, `causes`): [`FileLockError`](FileLockError.md)
-
-Defined in: [src/lib/FileLockErrors.ts:30](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/FileLockErrors.ts#L30)
-
-**`Internal`**
-
-Create a history file analysis error instance.
-
-#### Parameters
-
-##### history
-
-`string`
-
-Path to the history file.
-
-##### causes
-
-`unknown`[]
-
-#### Returns
-
-[`FileLockError`](FileLockError.md)
-
-An instance of FileLockError.
-
-#### Inherited from
-
-[`FileLockError`](FileLockError.md).[`dueToHistory`](FileLockError.md#duetohistory)
-
-***
-
-### lockFailedDueToHistory()
-
-> `static` **lockFailedDueToHistory**(`history`, `causes`): [`FileLockError`](FileLockError.md)
-
-Defined in: [src/lib/FileLockErrors.ts:40](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/FileLockErrors.ts#L40)
-
-Create a lock acquisition errors caused by history file analysis errors.
- *
-
-#### Parameters
-
-##### history
-
-`string`
-
-Path to the history file. 
- *
-
-##### causes
-
-`unknown`[]
-
-#### Returns
-
-[`FileLockError`](FileLockError.md)
-
-An instance of FileLockError.
-
-#### Inherited from
-
-[`FileLockError`](FileLockError.md).[`lockFailedDueToHistory`](FileLockError.md#lockfailedduetohistory)
-
-***
-
-### lockFailedDueToIO()
-
-> `static` **lockFailedDueToIO**(`key`, `causes`): [`FileLockError`](FileLockError.md)
-
-Defined in: [src/lib/FileLockErrors.ts:19](https://github.com/ayapapa/file-lock-js/blob/02385e7ce5caf53483e8416d615060efa4955ce2/src/lib/FileLockErrors.ts#L19)
-
-#### Parameters
-
-##### key
-
-`string`
-
-##### causes
-
-`unknown`[]
-
-#### Returns
-
-[`FileLockError`](FileLockError.md)
-
-#### Inherited from
-
-[`FileLockError`](FileLockError.md).[`lockFailedDueToIO`](FileLockError.md#lockfailedduetoio)
+[`LockError`](LockError.md).[`captureStackTrace`](LockError.md#capturestacktrace)
 
 ***
 
@@ -320,4 +245,4 @@ https://v8.dev/docs/stack-trace-api#customizing-stack-traces
 
 #### Inherited from
 
-[`FileLockError`](FileLockError.md).[`prepareStackTrace`](FileLockError.md#preparestacktrace)
+[`LockError`](LockError.md).[`prepareStackTrace`](LockError.md#preparestacktrace)

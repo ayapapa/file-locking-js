@@ -110,9 +110,13 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 ## Errors
 | Class name | Overview  | Message | Other properties | How to handle the situation, etc.|
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
-| LockFileBroken | Corruption of lock file contents | The contents of the lock file are corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and, if necessary, manually delete the lock file. | { code: 'EBROKEN', path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `file`). Before deletion, ensure that no process is holding the file.[^1]
+| LockCompromised | Corruption of lock file contents | The lock was compromised during the locking process. | { code: 'ECOMPROMISED', key: '(`lock key`)'path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^1]
+| LockFileBroken | Corruption of lock file contents | When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary. | { code: 'EBROKEN', path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^2]
+| ReleaseFailed | Failure to release the lock or decrement the lock counter | Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information. | { code: 'ERELEASE', path: '(Path to `lock file`)', sharer: '(Path to `sharer`)' } | Possible causes include intentional modification of the lock file by another process, file system corruption, or insufficient disk space. In the former case, take the same action as for `LockFileBroken`. In the latter case, check the system status. Additionally, manually delete the `path` and `sharer` entries associated with the error after confirming that no owning process exists for them [^1]. Alternatively, you may simply wait for them to be automatically deleted once specific time intervals (such as `ttlMs`, `heartbeatTtlMs`, or `invalidTtlMs`) have elapsed. |
 
-[^1]: Although FileLock is designed to maintain a consistent lock file during normal operation, a corrupted lock file may remain due to events such as the forced termination of a process; therefore, it is recommended to delete the file only after confirming that no other locking processes are active.
+[^1]: Although FileLock is designed to maintain a consistent `lock file` during normal operation, it cannot prevent other processes that do not use FileLock from accessing the lock file. If the execution of such processes is anticipated, it is recommended to avoid conflicts by changing the `lock directory`.
+
+[^2]: Although FileLock is designed to maintain a consistent lock file during normal operation, a corrupted lock file may remain due to events such as the forced termination of a process; therefore, it is recommended to delete the file only after confirming that no other locking processes are active.
 
 
 
@@ -120,7 +124,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 というわけで、話を戻して、FileLockだけど、まずは、壊れたファイルは、リトライしまくって、ロックできなかったという実装までを目指すよ。そして、テストもそのように書く。そして、次の段階で、オプションでそのようなファイルの対処法指定しるために、「invalidLockFileTimeoutMs」なるものを導入した実装にすすもうと思う。[^2]
 
 
-[^2]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。（参考：invalidLockFileTimeoutMs は、heartbeatTtlMs を主な参考値として、利用環境に応じて設定してください）　⇒　最小値は、heartbeatTtlMsだろうなぁ。
+[^3]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。（参考：invalidLockFileTimeoutMs は、heartbeatTtlMs を主な参考値として、利用環境に応じて設定してください）　⇒　最小値は、heartbeatTtlMsだろうなぁ。
 
 ## ストレステスト
 テストでは、100プロセス同実行（全同キー、全別キー）にて正常、または、想定通りのエラーですべて終了することを確認していますが、これを保証するものではありません。

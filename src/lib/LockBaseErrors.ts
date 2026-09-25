@@ -30,10 +30,9 @@ export class DeadlockDetected extends LockError {
    */
   constructor(msg?: string | null, params?: { key: string, props?: LockErrorProps }) {
     msg = msg || 'A deadlock was detected.';
-    super(msg, {
-      code: 'EDEADLK' ,
-      props: params?.key ? { ...params?.props , key: params.key } : { ...params?.props }
-    });
+    const props = {...params?.props};
+    params?.key && (props.key = params?.key);
+    super(msg, { code: 'EDEADLK' , props });
   }
 };
 
@@ -87,3 +86,28 @@ export class InvalidOptions extends LockError {
   }
 };
 
+/** 
+ * Failed to relase lock or decrement lock counter. <br>
+ * エラーの意味：　（エラー説明に記載すること）
+ * ロック解放またはロックカウンターの減算に失敗したことによる処理を中断。
+ * ファイルIOエラーによるものと思われるため、システムのチェックをお勧めする。
+ * また、ロックファイルやロック共有情報などのファイルやディレクトリが
+ * 残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  * 
+ */
+export class ReleaseFailed extends LockError {
+  /**
+   * Constructor.
+   * @param msg   Error message.
+   * @param params  Parameters.
+   */
+  constructor(msg?: string, params?: { key: string, path: string, sharer: string, props?: LockErrorProps }) {
+    msg = msg || "Processing is interrupted because the lock release or lock counter decrement failed. " +
+      "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.";
+    const props = { ...params?.props };
+    params?.key     && (props.key = params?.key);
+    params?.path    && (props.path = params?.path);
+    params?.sharer  && (props.sharer = params?.sharer);
+    
+    super(msg, { code:'ERELEASE' , props });
+  }
+};

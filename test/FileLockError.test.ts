@@ -3,7 +3,8 @@ import fs, { PathLike } from 'node:fs';
 import path from 'node:path';
 import { getHistoryPath, getLockMeta, getLockMetaPath, getLockSharerDir, removeLockFiles, setLockMeta, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
 import { AlreadyLocked, FileLockConfig, DeadlockDetected, FileLock, FileLockError, LockDirectoryCreationFailed, 
-  LockDirectoryStatFailed, LockError, LockFileBroken, InvalidOptions, LockCompromised, TTLExceeded, type LockMonitor } from '../src/index.ts';
+  LockDirectoryStatFailed, LockError, LockFileBroken, InvalidOptions, LockCompromised, ReleaseFailed, TTLExceeded, type LockMonitor, 
+  FileLockOptions} from '../src/index.ts';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -15,6 +16,13 @@ afterEach(() => {
   vi.restoreAllMocks();
   FileLock.setConfig(orgConfig);
 });
+
+const eMsg = {
+  'EBROKEN':  "When checking whether a lock for the same key is already held, " + 
+              "the contents of the existing lock file were found to be corrupted, " +
+              "making it impossible to determine the lock status. " + 
+              "Please verify that the target process does not exist and delete the lock file if necessary."
+}
 
 describe('FileLockError', () => {
 
@@ -207,7 +215,7 @@ describe('FileLockError', () => {
   it("An error occurs if a compromise is detected within a callback function while the lock is held.", async () => {
 
     const key = "testKey999";
-    expect.assertions(7);
+    expect.assertions(6);
 
     await waitCallbackCompletedByCancelled(
       async (callback:(monitor: LockMonitor)=>Promise<void>) => {
@@ -234,9 +242,21 @@ describe('FileLockError', () => {
         }
       },
       (err) => {
-        expect(err).instanceOf(LockCompromised);
-        expect(err.code).toBe('ECOMPROMISED');
-        expect(err.message).contains("has been compromised");
+        expect(err).instanceOf(ReleaseFailed);
+        expect(err).toMatchObject({
+          code: "ERELEASE",
+          key,
+          path: getLockMetaPath(key),
+          sharer: getLockSharerDir(key),
+          message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+          causes: [{
+            code: "ECOMPROMISED",
+            key,
+            path: getLockMetaPath(key),
+            reason: "[VERIFY] The lock file was overwritten by another lock.",
+            message: "The lock was compromised during the locking process.",
+          }]
+        });
       },
       () => removeLockFiles(key)
     );
@@ -247,7 +267,7 @@ describe('FileLockError', () => {
     "in `LockCompromised` error being thrown.", async () => {
 
     const key = "testKey_9989";
-    expect.assertions(10);
+    expect.assertions(9);
 
     let completedCallbacks = 0;
 
@@ -289,9 +309,21 @@ describe('FileLockError', () => {
         }
       },
       (err) => {
-        expect(err).instanceOf(LockCompromised);
-        expect(err.code).toBe('ECOMPROMISED');
-        expect(err.message).contains("has been compromised");
+        expect(err).instanceOf(ReleaseFailed);
+        expect(err).toMatchObject({
+          code: "ERELEASE",
+          message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+          key,
+          path: getLockMetaPath(key),
+          sharer: getLockSharerDir(key),
+          causes: [{
+            code: "ECOMPROMISED",
+            key,
+            path: getLockMetaPath(key),
+            reason: "[VERIFY] The lock file was overwritten by another lock.",
+            message: "The lock was compromised during the locking process.",
+          }],
+        })
       },
       () => removeLockFiles(key)
     );
@@ -357,7 +389,7 @@ describe('FileLockError', () => {
 
   //LockCompromised 
   it("Instantiating an error class without parameters results in the default message.(LockCompromised).", async () => {
-    testNoParamsError(LockCompromised  , "The lock has been compromised.");
+    testNoParamsError(LockCompromised  , "The lock was compromised during the locking process.");
   });
 
 
@@ -463,11 +495,18 @@ describe('FileLockError', () => {
       );
     }
     catch (err) { // EREENTLOCK
-      expect(err).instanceOf(FileLockError);
+      expect(err).instanceOf(ReleaseFailed);
       expect(err).toMatchObject({
-        code: 'ERMOON', 
-        message: "Couldn't read the lock file.(readFileSync error!)",
-        path: getLockMetaPath(key)
+        code: "ERELEASE", 
+        key,
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+        path: getLockMetaPath(key),
+        sharer: getLockSharerDir(key),
+        causes: [{
+          code: "ERMOON",
+          path: getLockMetaPath(key),
+          message: "Couldn't read the lock file.(readFileSync error!)",
+        }],
       });
     }
     finally {
@@ -598,8 +637,7 @@ describe('FileLockError', () => {
     const key = 'testKey_18465xx_unlink_LockFileBroken'
     await testWriteAndUnlinkError(key, 500, LockFileBroken, {
       code: "EBROKEN",
-      message: "The contents of the lock file are corrupted, making it impossible to determine the lock status. " +
-               "Please verify that the target process does not exist and, if necessary, manually delete the lock file.",
+      message: eMsg['EBROKEN'],
       path: getLockMetaPath(key),
       causes: [{
         code: "EUNLINK",
@@ -623,6 +661,7 @@ describe('FileLockError', () => {
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+  // ★　このテストはもはや意味が無い？？もしくは、カバレッジ対策のテストなのか！！。。代わりに、"ロックファイルがあるのに無いと偽る"テストを追加する
   it("`existsSync` returns `true` exactly once, even though the specific file does not exist.", async () => {
     const key = 'testKey_existsSync_error_once'
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: PathLike) => {
@@ -705,13 +744,15 @@ describe('FileLockError', () => {
       );
     }
     catch (err) {
-      expect(err).instanceOf(LockCompromised);
+      expect(err).instanceOf(ReleaseFailed);
       expect(err).toMatchObject( {
-        code: 'ECOMPROMISED',
-        contents: "",
+        code: "ERELEASE",
         path: metaPath,
-        key: key,
-        message: `The lock(key: ${key}) has been compromised(Couldn't parse the lock file, it is probably broken.).`,
+        sharer: getLockSharerDir(key),
+        key,
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
+                 "Additionally, please manually delete any remaining files or directories, " + 
+                 "such as lock files or shared lock information.",
       });
       expect(fs.existsSync(metaPath)).toBeTruthy();
     }
@@ -744,14 +785,15 @@ describe('FileLockError', () => {
         code: "ECOMPROMISED",
         path: metaPath,
         contents: "",
-        key: key,
+        key,
         ownerId: undefined,
-        message: `The lock(key: ${key}) has been compromised(Couldn't parse the lock file, it is probably broken.).`
+        reason: "Couldn't parse the lock file, it is probably broken.",
+        message: "The lock was compromised during the locking process."
       };
+      const msg = eMsg['EBROKEN'];
       expect(err).toMatchObject({
         code: 'EBROKEN',
-        message: `The contents of the lock file are corrupted, making it impossible to determine the lock status. ` +
-                 `Please verify that the target process does not exist and, if necessary, manually delete the lock file.`,
+        message: msg,
         path: metaPath,
         causes: [cause]
       })
@@ -824,18 +866,18 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).toMatchObject({
         code: "ETERM",
-        exitReason: {
+        reason: {
           code: 2,
           signal: "SIGTERM",
         },
         message: "Forced termination."
       });
-        expect(mon).toMatchObject({
+      expect(mon).toMatchObject({
         cancelled: true,
         reason: "ETERM",
         cause: {
           code: "ETERM",
-          exitReason: {
+          reason: {
             code: 2,
             signal: "SIGTERM",
           },
@@ -848,18 +890,30 @@ describe('FileLockError', () => {
   });
 
   // 不正ロックファイルを故意に作成し、ファイルIOエラーを故意に引き起こすテスト
-  async function testSpyIO(key: string, targetFn: string, errCond: (counter: number) => boolean, sucsess: boolean, /*spyOn: () => void, */ErrClass: unknown, matchObj: object) {
-    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100};
-    setLockMeta(key, meta);
+  async function testSpyIO(
+    key: string, 
+    targetFn: string, 
+    spyCb: (counter: number, args: unknown[], orgFn: (...args: unknown[]) => any) => any, 
+    sucsess: boolean, 
+    ErrClass: unknown, 
+    matchObj: object,
+    sweep = false,
+    meta: Record<string, unknown> = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
+    ) {
+
+      if (meta) setLockMeta(key, meta);
+
     let counter = 0;
     //@ts-ignore
     const original = fs[targetFn];
     //@ts-ignore
-    vi.spyOn(fs, targetFn).mockImplementation((...args) => {
+    const spy = vi.spyOn(fs, targetFn).mockImplementation((...args) => {
       counter++;
-      if (errCond(counter)) throw Object.assign(new Error("#####"), { code: "EEXIST"});
-      return original(...args);
+      return spyCb(counter, args, original);
+      //if (errCond(counter)) throw Object.assign(new Error("#####"), { code: "EEXIST"});
+      //return original(...args);
     });
+
     const asCounts = (sucsess ? 1 : 2) + 1;
     expect.assertions(asCounts);
     const ret = "completed."
@@ -877,6 +931,11 @@ describe('FileLockError', () => {
       expect(err).instanceOf(ErrClass);
       expect(err).toMatchObject(matchObj);
     }
+    finally {
+      spy.mockRestore()
+      if (sweep) removeLockFiles(key);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
+    }
   }
 
   it("When an invalid lock file exists, an exclusive open attempt fails after the file is deleted. A subsequent lock succeeds.", async () => {
@@ -884,12 +943,14 @@ describe('FileLockError', () => {
     await testSpyIO(
       key,
       'openSync',
-      (counter: number) => counter === 2,
+      (counter, args, orgFn) => {
+        if (counter === 2) throw Object.assign(new Error("#####"), { code: "EEXIST"});
+        return orgFn(...args);
+      },
       true, 
       null,
       {}
     );
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("When an invalid lock file exists, an exclusive open attempt fails after the file is deleted. Subsequently, the lock fails.", async () => {
@@ -897,7 +958,10 @@ describe('FileLockError', () => {
     await testSpyIO(
       key,
       'openSync',
-      (counter: number) => counter >= 2,
+      (counter, args, orgFn) => {
+        if (counter >= 2) throw Object.assign(new Error("#####"), { code: "EEXIST"});
+        return orgFn(...args);
+      },
       false, 
       AlreadyLocked,
       {
@@ -907,17 +971,19 @@ describe('FileLockError', () => {
         message: `Couldn't acquire the lock because the '${key}' is already locked.`,
       }
     );
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("Failed to delete an invalid lock file, but subsequently succeeded in acquiring the lock.", async () => {
     const key = "testKey_staleMeta_unlinkFailed_lockOK";
-    let counter = 0;
-    const original = fs.unlinkSync;
+
     await testSpyIO(
       key,
       'unlinkSync',
-      (counter: number) => counter === 1,
+      //(counter: number) => counter === 1,
+      (counter, args, orgFn) => {
+        if (counter === 1) throw Object.assign(new Error("#####"), { code: "EEXIST"});
+        return orgFn(...args);
+      },
       true, 
       AlreadyLocked,
       {
@@ -927,7 +993,6 @@ describe('FileLockError', () => {
         message: `Couldn't the lock because the '${key}' is already locked.`
       }
     );
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("Failed to delete an invalid lock file. Subsequently, locking failed.", async () => {
@@ -945,26 +1010,23 @@ describe('FileLockError', () => {
         message: "#####",
       }],
     };
-    try {
-      await testSpyIO(
+
+    await testSpyIO(
+      key,
+      'unlinkSync',
+      (counter, args, orgFn) => {
+        throw Object.assign(new Error("#####"), { code: "EEXIST"});
+      },
+      false, 
+      FileLockError,
+      {
+        code: "EIO",
+        message: "Failed to acquire the lock due to a file I/O error.",
         key,
-        'unlinkSync',
-        () => true,
-        false, 
-        FileLockError,
-        {
-          code: "EIO",
-          message: "Failed to acquire the lock due to a file I/O error.",
-          key,
-          causes: [cause], 
-        }
-      );
-    }
-    finally {
-      vi.restoreAllMocks();
-      removeLockFiles(key);
-    }
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
+        causes: [cause], 
+      },
+      true
+    );
   });
 
   it("Circular deadlock. The one that did not time out first succeeds.", async () => {
@@ -1033,28 +1095,193 @@ describe('FileLockError', () => {
 
   it("ロック共有者の削除失敗", async () => {
     const unlinkSync = fs.unlinkSync;
-    vi.spyOn(fs, 'unlinkSync').mockImplementation((path) => {
-      if (path.toString().includes(".sharer\\.lock\\") ) {
-        throw Error("unlinkSync error!");
+    const spy = vi.spyOn(fs, 'unlinkSync').mockImplementation((path) => {
+      if (path.toString().includes(".sharer\\.lock") ) {
+        throw Object.assign(new Error("unlinkSync error!"), { code: 'EULMOON' });
       }
       return unlinkSync(path);
     });
     const key = 'lock_sharer_remove_fail';
     try {
-      await FileLock.withLock(key, () => {
-
-      });
+      await FileLock.withLock(key, () => {}, { timeoutMs: 0 });
     }
     catch (err) {
       expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code: "EIO",
+        key,
+        message: "Failed to acquire the lock due to a file I/O error.",
+        causes: [{
+          code: "EIO",
+          key,
+          message: "Failed to add the lock request to lock sharers.",
+          causes: [{
+            code: 'EULMOON',
+            path: path.join(getLockSharerDir(key), '.lock'),
+            message: "Couldn't remove the lock file.(unlinkSync error!)",
+            causes: [
+              { code: 'EULMOON', message: "unlinkSync error!" },
+              { code: 'EULMOON', message: "unlinkSync error!" }
+            ]
+          }],
+        }],
+      });
+    }
+    finally {
+      spy.mockRestore()
+      removeLockFiles(key);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
   });
 
-  it("ロック共有者のリスト取得失敗", () => {
-    // countSharer, readdirSync
-    vi.spyOn(fs, 'readdirSync').mockImplementation(() => {
-      return [];
-    });
+  it("ロック共有者のリスト取得失敗", async () => {
+    const key = 'Key_readdirSyncErr';
+    let targetPath: string = getLockSharerDir(key);
+    const cause2 = {
+      code: 'ERDMOON',
+      path: targetPath,
+      message: "Couldn't read the direcroty.(readdirSync error)",
+    };
+    const cause = {
+          code: 'EIO',
+          key,
+          message: "Failed to count the lock sharer.",
+          causes: [cause2]
+    };
+
+    await testSpyIO(
+      key,
+      'readdirSync',
+      (counter, args, orgFn) => {
+        if (targetPath === args[0]) {
+          throw Object.assign(new Error('readdirSync error'), { code: 'ERDMOON' });
+        }
+        return orgFn(...args);
+      },
+      false, // error
+      ReleaseFailed,
+      {
+        code: "ERELEASE",
+        key,
+        path: getLockMetaPath(key),
+        sharer: targetPath,
+        causes: [cause]
+      },
+      true, // sweep
+      undefined,
+    );
+  });
+
+  //removeSharer unlinkSync
+  it("ロック共有者削除エラー", async () => {
+    const key = 'Key_unlinkSyncErr';
+    const targetDir: string = getLockSharerDir(key);
+    let targetPath: string = '';
+
+    const cause2 = {
+      code: 'EULMOON',
+      message: "Couldn't remove the lock file.(unlinkSync error)",
+    };
+    const cause = {
+          code: 'EIO',
+          key,
+          message: "Failed to remove the lock request from the lock sharers.",
+          causes: [cause2]
+    };
+
+    await testSpyIO(
+      key,
+      'unlinkSync',
+      (counter, args, orgFn) => {
+        if (String(args[0]).includes(targetDir) === true && String(args[0]).includes(targetDir + '\\.lock') === false) {
+          targetPath = String(args[0]);
+          throw Object.assign(new Error('unlinkSync error'), { code: 'EULMOON' });
+        }
+        return orgFn(...args);
+      },
+      false, // error
+      ReleaseFailed,
+      {
+        code: "ERELEASE",
+        key,
+        path: getLockMetaPath(key),
+        sharer: getLockSharerDir(key),
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
+                 "Additionally, please manually delete any remaining files or directories, " +
+                 "such as lock files or shared lock information.",
+        causes: [cause]
+      },
+      true, // sweep
+      undefined,
+    );
+  });
+
+  it("ロックファイルがあるのに無いと偽る", async () => {
+    const key = 'Key_existsSync_false';
+    const targetPath = getLockMetaPath(key);
+
+    await testSpyIO(
+      key,
+      'existsSync',
+      (counter, args, orgFn) => {
+        if (String(args[0]) == targetPath) return false;
+        return orgFn(...args);
+      },
+      false, // error
+      ReleaseFailed,
+      {
+        code: "ERELEASE",
+        key,
+        path: targetPath,
+        sharer: getLockSharerDir(key),
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
+                 "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+        causes: [{
+          code: "ECOMPROMISED",
+          path: targetPath,
+          key,
+          reason: "[REQUIRE] The lock file does not exist.",
+          message: "The lock was compromised during the locking process.",
+        }],
+      },
+      true, // sweep
+      undefined,
+    );
+
+  });
+
+  it("前段ロックファイルがあるので、排他オープンに失敗するが、そのそのファイルの存在を確認すると、無いと言われる。", async () => {
+    const key = 'Key_existsSync_false';
+    const targetPath = getLockMetaPath(key);
+
+    await testSpyIO(
+      key,
+      'existsSync',
+      (counter, args, orgFn) => {
+        if (String(args[0]) == targetPath) return false;
+        return orgFn(...args);
+      },
+      false, 
+      ReleaseFailed,
+      {
+        code: "ERELEASE",
+        key,
+        path: targetPath,
+        sharer: getLockSharerDir(key),
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
+                 "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+        causes: [{
+          code: "ECOMPROMISED",
+          path: targetPath,
+          key,
+          reason: "[REQUIRE] The lock file does not exist.",
+          message: "The lock was compromised during the locking process.",
+        }],
+      },
+      true,
+      {ownerId: "hoge", expirationTime: Date.now(), heartbeatTtlMs:25000, lastHeartbeatAt: Date.now() - 3000},
+    );
   });
 
 });
+

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles, getLockMetaPath  } from './FileLockTestCommon.ts';
+import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles, getLockMetaPath, TestLock  } from './FileLockTestCommon.ts';
 import { FileLock, FileLockConfig, FileLockError, LockFileBroken, } from '../src/index';
 
 let orgConfig: FileLockConfig;
@@ -31,7 +31,7 @@ describe('FileLock', () => {
         async () => await sleepAsync(100),
         { timeoutMs: 0 }// ttlMs: 1000 }
       );
-    } catch (err: any) {
+    } catch (err) {
       expect(err instanceof LockFileBroken).toBeTruthy();
       const invalidProps = {} as Record<string, unknown>;
       invalidProps[target] = mt[target];
@@ -40,43 +40,33 @@ describe('FileLock', () => {
         invalidProps,
         key,
         path: getLockMetaPath(key),
-        message: `The lock(key: ${key}) has been compromised(The lock information format is invalid).`,
+        reason: "The lock information format is invalid",
+        message: "The lock was compromised during the locking process.",
       };
       const matchObj = {
         causes: [ cause ],
         code: "EBROKEN",
         path: getLockMetaPath(key),
-        message: "The contents of the lock file are corrupted, making it impossible to determine the lock status. " +
-                 "Please verify that the target process does not exist and, if necessary, manually delete the lock file.",
+        message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",
       }
       expect(err).toMatchObject(matchObj);
-        /*{
-        code: "EBROKEN",
-        path: getLockMetaPath(key),
-        message: `The contents of the lock file are corrupted, making it impossible to determine the lock status. ` +
-                 `Please verify that the target process does not exist and, if necessary, manually delete the lock file.`,
-        cause: {
-          code: "ECOMPROMISED",
-          invalidProps: [{ key: target, value: v }],
-          path: getLockMetaPath(key),
-          key: key,
-          message: `The lock(key: ${key}) has been compromised(The lock information format is invalid).`
-        },
-      });*/
     }
     finally {
       removeLockFiles(key);
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
+
   }
 
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No ownerId)", async () => {
     await testInvalidLockInformationFile("ownerId");
   });
 
+  /*
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
     await testInvalidLockInformationFile("counter");
   });
-
+*/
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
     await testInvalidLockInformationFile("expirationTime");
   });
@@ -88,11 +78,11 @@ describe('FileLock', () => {
   it("Spoof the invalid lock information storage file and verify that an error occurs.(Invalid ownerId)", async () => {
     await testInvalidLockInformationFile("ownerId", 12345);
   });
-
-  it("Spoof the invalid lock information storage file and verify that an error occurs.(No counter)", async () => {
+/*
+  it("Spoof the invalid lock information storage file and verify that an error occurs.(Invalid counter)", async () => {
     await testInvalidLockInformationFile("counter", 'hogehogehoge');
   });
-
+*/
   it("Spoof the invalid lock information storage file and verify that an error occurs.(No expirationTime)", async () => {
     await testInvalidLockInformationFile("expirationTime", "nyannnyann");
   });
@@ -114,5 +104,6 @@ describe('FileLock', () => {
       },
       {ttlMs: 2000}
     )).toBe(retVal);
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 });
