@@ -188,7 +188,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Function to report that an erosion error occurred during asynchronous processing.
+   * Function to report that an lock compromised error occurred during asynchronous processing.
    */
   #onCompromisedReject: ((reason?: unknown) => void) | null = null;
 
@@ -211,10 +211,10 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   /**
    * @internal
    * Acquires a lock for the specified key,
-   * executes the function `onLockFn` under exclusive control, and returns a Promise that resolves with the return value of `onLockFn` after the lock is released.
+   * executes the function `onLockFn` under exclusive control, 
+   * and returns a Promise that resolves with the return value of `onLockFn` after the lock is released.
    *
    * @param onLockFn      A user-specified callback function to be executed after acquiring the lock.
-   * @param execWithLock  The callback function that actually executes `withLock`.  
    * @param options       Options.
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
@@ -236,7 +236,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
         if (!options.allowReentry) throw new DeadlockDetected(null, { key: this._key });
 
         // Since re-entry is permitted, increment the lock count and then execute the callback.
-        this._logger.trace("Allow re-entry locks in accordance with `options.allowReentry`.");
+        this._logger.trace(`Allow re-entry lock(key=${this._key}) ` + "in accordance with `options.allowReentry`.");
         return this.#execWithoutLock(onLockFn, options)
       }
 

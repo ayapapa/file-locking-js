@@ -27,9 +27,4 @@ export interface FileLockMeta {
   /** The last heartbeat time. */
   lastHeartbeatAt: number,
 
-  /** Lock counter.
-   * A value that increments or decrements when re-entrant locking is permitted. 
-   * ★★オーナー以外も書き換える可能性があるので、分離せよ★★
-   */
-  //counter: number
 }

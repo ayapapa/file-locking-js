@@ -65,7 +65,10 @@ export interface LockBaseOptions {
    *    (such as read-only operations or operations where repeating the same action causes no inconsistencies). 
    */
    allowReentry?: boolean;
-}
+
+   // When `allowReentry` is `false` and an option other than an immediate error is required, consider the following options.
+   // ConflictPolicy: 'FAIL_FAST' | 'WAIT_UNTIL_TIMEOUT';
+  }
 
 /**
  * @internal

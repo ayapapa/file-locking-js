@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FileLock, FileLockConfig, LockError } from '../src/index';
+import { FileLock, FileLockConfig, LockError, LockMonitor } from '../src/index';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
-import { Monitor } from '../src/lib/LockBaseInternalState.ts'
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
 import { getCallStack, isEqualObjectType, sleepAsync, sleepSync } from '../src/lib/Util.ts'
@@ -75,10 +74,10 @@ describe('LockBase and Util', () => {
         await this._release({ _ownerId: "", _contextId: "" } as any);
     }
 
-    test_onError(err: Error, op: string) : Monitor {
+    test_onError(err: Error, op: string) : LockMonitor {
       const opts = { _ownerId: "", _contextId: "" };
       this._onError(err, op, opts as any);
-      return '_monitor' in opts ? opts._monitor as Monitor : { cancelled: false };
+      return '_monitor' in opts ? opts._monitor as LockMonitor : { cancelled: false };
     }
   }
 

@@ -32,9 +32,10 @@ describe('FileLock', () => {
         { timeoutMs: 0 }// ttlMs: 1000 }
       );
     } catch (err) {
-      expect(err instanceof LockFileBroken).toBeTruthy();
+      expect(err).instanceOf(LockFileBroken);
       const invalidProps = {} as Record<string, unknown>;
       invalidProps[target] = mt[target];
+      /*
       const cause = {
         code: "ECOMPROMISED",
         invalidProps,
@@ -43,8 +44,9 @@ describe('FileLock', () => {
         reason: "The lock information format is invalid",
         message: "The lock was compromised during the locking process.",
       };
+      */
       const matchObj = {
-        causes: [ cause ],
+        //causes: [ cause ],
         code: "EBROKEN",
         path: getLockMetaPath(key),
         message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",

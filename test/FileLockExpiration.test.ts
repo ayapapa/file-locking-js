@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { logger, sleepAsync, getLockMeta, getLockMetaPath, setLockMeta, removeLockFiles  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, FileLockConfig, FileLock } from '../src/index';
+import { logger, sleepAsync, getLockMeta, getLockMetaPath, removeLockFiles, TestLock, setLockMeta  } from './FileLockTestCommon.ts';
+import { AlreadyLocked, FileLockConfig, FileLock, LockFileBroken } from '../src/index';
 import { randomUUID } from 'node:crypto';
 
 let orgConfig: FileLockConfig;
@@ -87,4 +87,19 @@ describe('FileLock', () => {
       removeLockFiles(key);
     }
   });
+
+  it("不正なロックファイルを故意に作成し、`invalidTtlMs`時間後にロック成功することを確認する", async () => {
+    const key = "invald_loclfile_error";
+    const meta = {};
+    setLockMeta(key, meta);
+    expect.assertions(2);
+    try {
+      expect(await FileLock.withLock(key, () => "completed", { heartbeatTtlMs: 2000, timeoutMs: 2500, invalidTtlMs: 2100 })).toBe("completed")
+    }
+    finally {
+      removeLockFiles(key);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
+    }
+  });
+
 });

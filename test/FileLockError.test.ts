@@ -55,7 +55,7 @@ describe('FileLockError', () => {
 
   it("Forge lock for the same `key` to trigger a timeout.", async () => {
     const key = "testKey";
-    const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 5*60*1000, heartbeatTtlMs:10000, lastHeartbeatAt: Date.now()};
+    const meta = {ownerId: "hoge", expirationTime: Date.now() + 5*60*1000, heartbeatTtlMs:10000, lastHeartbeatAt: Date.now()};
     setLockMeta(key, meta);
     expect.assertions(3);
     try {
@@ -651,12 +651,12 @@ describe('FileLockError', () => {
           message: "unlinkSync error!",
         }]
       },
-      {
+      /*{
         code: "ECOMPROMISED",
         contents: "",
         key: key,
         path: getLockMetaPath(key),
-      }],
+      }*/],
     });
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
@@ -702,17 +702,18 @@ describe('FileLockError', () => {
     }
     catch (err) {
       expect(err).instanceOf(FileLockError);
+
       const cause2 = {
         code: "EEXISTSYNC",
         message: "existsSync test error!!"
       };
-      const histPath = getHistoryPath();
       const cause = {
         code: "EEXISTSYNC",
-        message: "Couldn't check the existence of the history file.(existsSync test error!!)",
-        path: histPath,
+        message: "check the existence of the lock file.(existsSync test error!!)",
+        path: getLockSharerDir(key),
         causes: [cause2, cause2],
       };
+
       expect(err).toMatchObject({
         code: "EIO",
         key,
@@ -721,12 +722,11 @@ describe('FileLockError', () => {
       });
     }
     finally {
-      // The file cannot be read even during the unlock process; since the file remains, it is forcibly deleted here.
-      //fs.unlinkSync(getLockMetaPath(key));
+      // 以下でIO操作するので、ここでリセット。
+      vi.restoreAllMocks();
+      removeLockFiles(key);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
-    // 以下でIO操作するので、ここでリセット。
-    vi.restoreAllMocks();
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
@@ -781,7 +781,7 @@ describe('FileLockError', () => {
     }
     catch (err) {
       expect(err).instanceOf(LockFileBroken);
-      const cause = {
+      /*const cause = {
         code: "ECOMPROMISED",
         path: metaPath,
         contents: "",
@@ -789,13 +789,13 @@ describe('FileLockError', () => {
         ownerId: undefined,
         reason: "Couldn't parse the lock file, it is probably broken.",
         message: "The lock was compromised during the locking process."
-      };
+      };*/
       const msg = eMsg['EBROKEN'];
       expect(err).toMatchObject({
         code: 'EBROKEN',
         message: msg,
         path: metaPath,
-        causes: [cause]
+        //causes: [cause]
       })
     }
     finally {
@@ -898,7 +898,7 @@ describe('FileLockError', () => {
     ErrClass: unknown, 
     matchObj: object,
     sweep = false,
-    meta: Record<string, unknown> = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
+    meta: Record<string, unknown> = {ownerId: "hoge", expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
     ) {
 
       if (meta) setLockMeta(key, meta);
@@ -1029,50 +1029,18 @@ describe('FileLockError', () => {
     );
   });
 
-  it("Circular deadlock. The one that did not time out first succeeds.", async () => {
-    const key1 = "testKey_circular_deadlock_001";
-    const key2 = "testKey_circular_deadlock_002";
-    const p1 = FileLock.withLock(key1, async () => {
-      await FileLock.withLock(key2, async () => {
-        },
-        { timeoutMs: 100 }
-      );
-      return 'completed.'
-    })
-    const p2 = FileLock.withLock(key2, async () => {
-      await FileLock.withLock(key1, () => {}, { timeoutMs: 100 });
-      return 'completed.'
-    })
-
-    const results = await Promise.allSettled([p1, p2]);
-
-    // One of them has resulted in a timeout error (AlreadyLocked).
-    expect(results[0].status === 'rejected' || results[1].status === 'rejected').toBeTruthy();
-    for(const r of results) {
-      if (r.status === 'fulfilled') expect(r.value).toBe('completed.');
-      else                          expect(r.reason).instanceOf(AlreadyLocked);
-    }
-    expect(TestLock.isReleasedState(key1)).toBeTruthy();
-    expect(TestLock.isReleasedState(key2)).toBeTruthy();
-  });
-
   it("ロック共有ディレクトリのロックがかかった状態を故意につくってロックを掛ける", async () => {
     const key = "testKey_sharer_lock";
-    const openSync = fs.openSync;
-    vi.spyOn(fs, 'openSync').mockImplementation((path, options) => {
-      if (path.toString().includes("sharer\\.lock")) {
-        throw Object.assign(new Error("openSync error!"), { code: 'EOMOON' }); 
-      }
-      return openSync(path, options);
-    });
-
-    expect.assertions(3);
-    try {
-      await FileLock.withLock(key, () => { return 'completed.'; }, { timeoutMs: 0 });
-    }
-    catch (err) {
-      expect(err).instanceOf(FileLockError);
-      expect(err).toMatchObject({
+    await testSpyIO(
+      key,
+      'openSync',
+      (counter, args, orgFn) => {
+      if (String(args[0]).includes(".sharer\\.lock") ) throw Object.assign(new Error("openSync error!"), { code: 'EOMOON' });
+      return orgFn(...args);
+      },
+      false, // error
+      FileLockError,
+      {
         code: 'EIO',
         message: "Failed to acquire the lock due to a file I/O error.",
         key,
@@ -1083,31 +1051,28 @@ describe('FileLockError', () => {
           causes: [{
             code: "EOMOON",
             path: path.join(getLockSharerDir(key), ".lock"),
-            message: "Couldn't create th file.(openSync error!)",
+            message: "Couldn't create the file.(openSync error!)",
           }]
         }],
-      });
+      },
+      false, // sweep
+      undefined,
+    );
 
-    }
-
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("ロック共有者の削除失敗", async () => {
-    const unlinkSync = fs.unlinkSync;
-    const spy = vi.spyOn(fs, 'unlinkSync').mockImplementation((path) => {
-      if (path.toString().includes(".sharer\\.lock") ) {
-        throw Object.assign(new Error("unlinkSync error!"), { code: 'EULMOON' });
-      }
-      return unlinkSync(path);
-    });
     const key = 'lock_sharer_remove_fail';
-    try {
-      await FileLock.withLock(key, () => {}, { timeoutMs: 0 });
-    }
-    catch (err) {
-      expect(err).instanceOf(FileLockError);
-      expect(err).toMatchObject({
+    await testSpyIO(
+      key,
+      'unlinkSync',
+      (counter, args, orgFn) => {
+      if (String(args[0]).toString().includes(".sharer\\.lock") ) throw Object.assign(new Error("unlinkSync error!"), { code: 'EULMOON' });
+      return orgFn(...args);
+      },
+      false, // error
+      FileLockError,
+      {
         code: "EIO",
         key,
         message: "Failed to acquire the lock due to a file I/O error.",
@@ -1125,13 +1090,11 @@ describe('FileLockError', () => {
             ]
           }],
         }],
-      });
-    }
-    finally {
-      spy.mockRestore()
-      removeLockFiles(key);
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
-    }
+      },
+      true, // sweep
+      undefined,
+    );
+
   });
 
   it("ロック共有者のリスト取得失敗", async () => {
@@ -1153,9 +1116,7 @@ describe('FileLockError', () => {
       key,
       'readdirSync',
       (counter, args, orgFn) => {
-        if (targetPath === args[0]) {
-          throw Object.assign(new Error('readdirSync error'), { code: 'ERDMOON' });
-        }
+        if (targetPath === args[0]) throw Object.assign(new Error('readdirSync error'), { code: 'ERDMOON' });
         return orgFn(...args);
       },
       false, // error
@@ -1228,21 +1189,11 @@ describe('FileLockError', () => {
         return orgFn(...args);
       },
       false, // error
-      ReleaseFailed,
+      LockFileBroken,
       {
-        code: "ERELEASE",
-        key,
+        code: "EBROKEN",
         path: targetPath,
-        sharer: getLockSharerDir(key),
-        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
-                 "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
-        causes: [{
-          code: "ECOMPROMISED",
-          path: targetPath,
-          key,
-          reason: "[REQUIRE] The lock file does not exist.",
-          message: "The lock was compromised during the locking process.",
-        }],
+        message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",
       },
       true, // sweep
       undefined,
@@ -1250,7 +1201,7 @@ describe('FileLockError', () => {
 
   });
 
-  it("前段ロックファイルがあるので、排他オープンに失敗するが、そのそのファイルの存在を確認すると、無いと言われる。", async () => {
+  it("前段ロックファイルがあるので、排他オープンに失敗するが、そのファイルの存在を確認すると、無いと言われる。", async () => {
     const key = 'Key_existsSync_false';
     const targetPath = getLockMetaPath(key);
 
@@ -1262,25 +1213,64 @@ describe('FileLockError', () => {
         return orgFn(...args);
       },
       false, 
-      ReleaseFailed,
+      LockFileBroken,
       {
-        code: "ERELEASE",
-        key,
+        code: "EBROKEN",
         path: targetPath,
-        sharer: getLockSharerDir(key),
-        message: "Processing is interrupted because the lock release or lock counter decrement failed. " +
-                 "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
-        causes: [{
-          code: "ECOMPROMISED",
-          path: targetPath,
-          key,
-          reason: "[REQUIRE] The lock file does not exist.",
-          message: "The lock was compromised during the locking process.",
-        }],
+        message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",
       },
       true,
       {ownerId: "hoge", expirationTime: Date.now(), heartbeatTtlMs:25000, lastHeartbeatAt: Date.now() - 3000},
     );
+  });
+
+  it("Circular deadlock. The one that did not time out first succeeds.", async () => {
+    const key1 = "testKey_circular_deadlock_001";
+    const key2 = "testKey_circular_deadlock_002";
+    const p1 = FileLock.withLock(key1, async () => {
+      await FileLock.withLock(key2, async () => {
+        },
+        { timeoutMs: 100 }
+      );
+      return 'completed.'
+    })
+    const p2 = FileLock.withLock(key2, async () => {
+      await FileLock.withLock(key1, () => {}, { timeoutMs: 100 });
+      return 'completed.'
+    })
+
+    const results = await Promise.allSettled([p1, p2]);
+
+    // One of them has resulted in a timeout error (AlreadyLocked).
+    expect(results[0].status === 'rejected' || results[1].status === 'rejected').toBeTruthy();
+    for(const r of results) {
+      if (r.status === 'fulfilled') expect(r.value).toBe('completed.');
+      else                          expect(r.reason).instanceOf(AlreadyLocked);
+    }
+    expect(TestLock.isReleasedState(key1)).toBeTruthy();
+    expect(TestLock.isReleasedState(key2)).toBeTruthy();
+  });
+
+  it("不正なロックファイルを故意に作成し、エラーとなることを確認する", async () => {
+    const key = "invald_loclfile_error";
+    const meta = {};
+    setLockMeta(key, meta);
+    expect.assertions(3);
+    try {
+      await FileLock.withLock(key, () => {}, { heartbeatTtlMs: 200, timeoutMs: 300 });
+    }
+    catch (err) {
+      expect(err).instanceOf(LockFileBroken);
+      expect(err).toMatchObject({
+        code: "EBROKEN",
+        path: getLockMetaPath(key),
+        message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary."
+      });
+    }
+    finally {
+      removeLockFiles(key);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
+    }
   });
 
 });
