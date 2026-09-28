@@ -12,8 +12,10 @@ import { type Monitor } from './LockMonitor.ts';
 
 const {REQUIRE_DEBUG} = Contracts;
 
+export type MaybePromise = unknown | PromiseLike<unknown>;
+
 /** Definition of the callback function to be executed after acquiring the lock. */
-export type CallbackOnLock = (monitor: Monitor) => unknown;
+export type CallbackOnLock = (monitor: Monitor) => MaybePromise;
 
 /** 
  * @internal
@@ -222,15 +224,15 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
    * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
+  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>):Promise<unknown> {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
 
-    const whithLockInContext = async () => {
+    const whithLockInContext = async (): Promise<unknown> => {
       // Preparing for recursive lock checks.
       const rc = this._getReentrantContext();
       if (!rc) {
         // Since there is no context for reentrancy lock detection yet, I will create a new context and call `withLock` again within it.
-        return this.#runInNewContext(() => whithLockInContext());
+        return this.#runInNewContext(async () => whithLockInContext());
       }
 
       // Re-entry lock check.
@@ -262,7 +264,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options Lock options.
    * @abstract
    */
-  protected async _acquire(options: AllOptions<O, I>) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _acquire(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -272,7 +275,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options Lock options.
    * @abstract
    */
-  protected async _release(options: AllOptions<O, I>) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _release(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
@@ -311,6 +315,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options Lock options.
    * @abstract
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   protected async _incReantryCount(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
@@ -321,6 +326,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options Lock options.
    * @abstract
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   protected async _decReantryCount(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
@@ -362,7 +368,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Create a timer for TTL.
    * @param options Lock options.
    */
-  #createTtlTimer(options: AllOptions<O, I>): { id: NodeJS.Timeout | null, promise: Promise<any> } {
+  #createTtlTimer(options: AllOptions<O, I>): { id: NodeJS.Timeout | null, promise: Promise<unknown> } {
     let id: NodeJS.Timeout | null = null;
     const ttlMs = options.ttlMs;
     const promise = new Promise((_, reject) => {
@@ -384,7 +390,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options   Lock options.
    */
   async #execLockCommon(onLockFn: CallbackOnLock, aquire: () => Promise<void>, 
-    release: () => Promise<void>, operation: string, options: AllOptions<O, I>) {
+    release: () => Promise<void>, operation: string, options: AllOptions<O, I>): Promise<unknown> {
     // Acquire the lock.
     await aquire();
 
@@ -427,11 +433,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options   Lock options.
    * @returns 
    */
-  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
+  async #execWithLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>): Promise<unknown> {
     return this.#execLockCommon(
       onLockFn, 
-      () => this._acquire(options), 
-      () => this._release(options), 
+      async () => this._acquire(options), 
+      async () => this._release(options), 
       'Callback or Timer in withLock().',
       options
     );
@@ -446,8 +452,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   async #execWithoutLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
     return this.#execLockCommon(
       onLockFn, 
-      () => this._incReantryCount(options), 
-      () => this._decReantryCount(options), 
+      async () => this._incReantryCount(options), 
+      async () => this._decReantryCount(options), 
       'Re-entrant locking callback.',
       options
     );
@@ -515,7 +521,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param options   Lock options.
    * @returns A `Promise` that resolves to the return value of onLockFn.
    */
-  #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>) {
+  async #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>): Promise<unknown> {
     REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
     const parent = this._getReentrantContext();
     REQUIRE_DEBUG(parent !== undefined, 're-entrant context is undefined!', LockError, { code: 'EINVAL' });
@@ -532,6 +538,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       child.heldLocks.set(contextId, { monitor });
     }
 
+    // 'async' is intentional to treat synchronous exceptions as Promise rejections. 
+    // eslint-disable-next-line @typescript-eslint/require-await
     return LockBase._als.run(child, async () => onLockFn(monitor));
   }
 
@@ -550,7 +558,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param {function} fn Callback function to be called within the context.
    * @returns 
    */
-  #runInNewContext(fn: () => any) {
+  #runInNewContext(fn: () => unknown) {
     const initialContext: ReentrantContext = { heldLocks: new Map() };
     return LockBase._als.run(initialContext, () => fn());
   }
