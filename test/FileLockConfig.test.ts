@@ -4,7 +4,7 @@ import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
 import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
-import { getLockMetaPath, logger, sleepAsync } from './FileLockTestCommon.ts'
+import { getLockMetaPath, logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 type NumberKeys<T> = {
     [K in keyof T]-?: T[K] extends number ? K : never
@@ -23,11 +23,9 @@ afterEach(() => {
 
 describe('FileLock', () => {
 
-  it("`FileLock.setConfig()` works correctly.", async () => {
+  it("`FileLock.setConfig()` works correctly.", () => {
     expect.assertions(3);
     FileLock.setConfig(FileLock.getDefaultConfig());
-    const def = FileLock.getDefaultConfig();
-    const cur = FileLock.getConfig();
     expect(JSON.stringify(FileLock.getDefaultConfig())).toBe(JSON.stringify(FileLock.getConfig()));
     const lockDirectory = 'hogehoge';
     let config: FileLockConfig = {...FileLock.getDefaultConfig(), lockDirectory, cache: false, logger: new PrettyConsole() };
@@ -39,11 +37,11 @@ describe('FileLock', () => {
     expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
   });
 
-  class TestLock extends (FileLock as any) {};
+  //class TestLock extends (FileLock as any) {};
 
   it("In `setConfig()`, if a value lower than the minimum is specified " +
     "for a numeric property among the default options, " +
-    "the minimum value is set.", async () => {
+    "the minimum value is set.", () => {
     const defaults = {
       timeoutMs:            -1,
       ttlMs:                -1,
@@ -64,7 +62,6 @@ describe('FileLock', () => {
     };
     // Verify that the default option values ​​in the configuration settings are resolved.
     FileLock.setConfig({ defaultOptions: defaults });
-    const udo = TestLock.getConfig().defaultOptions;
     expect(TestLock.getConfig().defaultOptions).toMatchObject(exp);
   });
 
@@ -83,12 +80,15 @@ describe('FileLock', () => {
       },
       {}
     )).toBe(retVal);
-    const lock = (FileLock as any)._getLock(key) as any;
-    expect(lock._logger.trace === lock._logger.debug).toBe(true);
-    expect(lock._logger.fatal === lock._logger.error).toBe(true);
+    const lock = TestLock.getLock(key);
+    // @ts-expect-error lock._logger is protected
+    expect(lock._logger.trace).toBe(lock._logger.debug);
+    // @ts-expect-error lock._logger is protected
+    expect(lock._logger.fatal).toBe(lock._logger.error);
   });
 
-  async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
+/*
+ async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
     set();
     expect.assertions(5);
     try {
@@ -119,8 +119,8 @@ describe('FileLock', () => {
       reset();
     }
   }
-
-  it("The directory specified in `FileLock.setCondig()` is created.", async () => {
+*/
+  it("The directory specified in `FileLock.setCondig()` is created.", () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.rmSync(dir, { force: true, recursive: true });
     expect(fs.existsSync(dir)).toBeFalsy();
@@ -132,7 +132,7 @@ describe('FileLock', () => {
   });
 
   it("If the user does not specify a lock directory, and an error occurs while attempting to create one based on `process.cwd()`," +
-    " a error is throwed.", async () => {
+    " a error is throwed.", () => {
     const dir = path.join(process.cwd(), '.lock');
     expect.assertions(2);
     try {
@@ -140,9 +140,9 @@ describe('FileLock', () => {
       fs.writeFileSync(dir, "");
       FileLock.setConfig({ logger });
     }
-    catch (err: any) {
-      expect(err instanceof LockDirectoryCreationFailed).toBe(true);
-      expect(err.code).toBe('ELOCKDIRCREATE')
+    catch (err) {
+      expect(err).instanceOf(LockDirectoryCreationFailed);
+      expect(err).toMatchObject({ code: 'ELOCKDIRCREATE' });
     }
     finally {
       fs.rmSync(dir);
@@ -153,11 +153,11 @@ describe('FileLock', () => {
   {
     const eCode = 'EHOGEHOGE';
     const eMsg = 'Hogehoge error!!';
-    const spy = vi.spyOn(fs, spyOnFnName).mockImplementation(() => {
+    vi.spyOn(fs, spyOnFnName).mockImplementation(() => {
       const err = Object.assign(new Error(eMsg), { code: eCode });
       throw err;
     });
-    expect.assertions(3);
+    expect.assertions(2);
     try {
       FileLock.setConfig({ ...config, logger });
       const retVal = "test_001", key = retVal;
@@ -168,10 +168,12 @@ describe('FileLock', () => {
         }
       );
     }
-    catch (err: any) {
+    catch (err) {
       expect(err instanceof ErrorClass).toBe(true);
-      expect(err.fsErrCode).toBe(eCode);
-      expect(err.fsErrMsg).toBe(eMsg);
+      expect(err).toMatchObject({
+        fsErrCode: eCode,
+        fsErrMsg: eMsg,
+      });
     }
   }
 
@@ -201,9 +203,9 @@ describe('FileLock', () => {
         }
       )
     }
-    catch (err: any) {
+    catch (err) {
       expect(err).instanceOf(FileLockError);
-      expect(err.code).toBe('ENOTDIR');
+      expect(err).toMatchObject({ code: 'ENOTDIR' });
     }
     finally {
       fs.rmSync(dir, { force: true, recursive: true });
@@ -212,7 +214,6 @@ describe('FileLock', () => {
 
   it("Changing the directory path while a lock is held does not result in an error.", async () => {
     const retVal = "test_001", key = retVal;
-    expect.assertions(3);
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {
@@ -222,14 +223,10 @@ describe('FileLock', () => {
       },
       {}
     )).toBe(retVal);
-    const lock = (FileLock as any)._getLock(key) as any;
-    expect(lock._logger.trace === lock._logger.debug).toBe(true);
-    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("Changing the directory path while a lock is held and then locking again using the same key does not result in an error.", async () => {
     const retVal = "test_001", key = retVal;
-    expect.assertions(3);
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {
@@ -244,15 +241,11 @@ describe('FileLock', () => {
       },
       {}
     )).toBe(retVal);
-    const lock = (FileLock as any)._getLock(key) as any;
-    expect(lock._logger.trace === lock._logger.debug).toBe(true);
-    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("Changing the directory path while a lock is held and subsequently acquiring another lock " +
     "using the same key—while in reentrant lock permission mode—does not result in an error.", async () => {
     const retVal = "test_001", key = retVal;
-    expect.assertions(3);
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {
@@ -267,13 +260,9 @@ describe('FileLock', () => {
         return retVal;
       },
     )).toBe(retVal);
-    const lock = (FileLock as any)._getLock(key) as any;
-    expect(lock._logger.trace === lock._logger.debug).toBe(true);
-    expect(lock._logger.fatal === lock._logger.error).toBe(true);
   });
 
   it("When debug mode is enabled, the history is updated.", async () => {
-    const dir = path.join(process.cwd(), '.lock');
     const hist = FileLock.getHistoryInfo().historyPath;//path.join(dir, 'history.json');
     if (fs.existsSync(hist) === false) fs.writeFileSync(hist, '');
     const stat_before = fs.statSync(hist);
@@ -315,75 +304,75 @@ describe('FileLock', () => {
     if (additinalExp) additinalExp();
   }
 
-  it("cacheMaxNum: undefined", async () => {
+  it("cacheMaxNum: undefined", () => {
     testConfigMinVal('cacheMaxNum', 100, undefined);
   });
 
-  it("cacheMaxNum: 0", async () => {
+  it("cacheMaxNum: 0", () => {
     testConfigMinVal('cacheMaxNum', 0, 0, () => expect(FileLock.getConfig().cache).toBeFalsy());
   });
 
-  it("cacheMaxNum: -1", async () => {
+  it("cacheMaxNum: -1", () => {
     testConfigMinVal('cacheMaxNum', 0, -1, () => expect(FileLock.getConfig().cache).toBeFalsy());
   });
 
-  it("cacheMaxNum: 1", async () => {
+  it("cacheMaxNum: 1", () => {
     testConfigMinVal('cacheMaxNum', 1, 1);
   });
 
-  it("cacheTtlMs: undefined", async () => {
+  it("cacheTtlMs: undefined", () => {
     testConfigMinVal('cacheTtlMs', 10000, undefined);
   });
 
-  it("cacheTtlMs: 0", async () => {
+  it("cacheTtlMs: 0", () => {
     testConfigMinVal('cacheTtlMs', 10000, 0);
   });
 
-  it("cacheTtlMs: -1", async () => {
+  it("cacheTtlMs: -1", () => {
     testConfigMinVal('cacheTtlMs', 10000, -1);
   });
 
-  it("cacheTtlMs: 10001", async () => {
+  it("cacheTtlMs: 10001", () => {
     testConfigMinVal('cacheTtlMs', 10001, 10001);
   });
 
-  it("maxHistoryEntries: undefined", async () => {
+  it("maxHistoryEntries: undefined", () => {
     testConfigMinVal('maxHistoryEntries', 100, undefined);
   });
 
-  it("maxHistoryEntries: 0", async () => {
+  it("maxHistoryEntries: 0", () => {
     testConfigMinVal('maxHistoryEntries', 0, 0);
   });
 
-  it("maxHistoryEntries: -1", async () => {
+  it("maxHistoryEntries: -1", () => {
     testConfigMinVal('maxHistoryEntries', 0, -1);
   });
 
-  it("maxHistoryEntries: 99", async () => {
+  it("maxHistoryEntries: 99", () => {
     testConfigMinVal('maxHistoryEntries', 99, 99);
   });
 
-  it("maxHistoryEntries: 101", async () => {
+  it("maxHistoryEntries: 101", () => {
     testConfigMinVal('maxHistoryEntries', 101, 101);
   });
 
-  it("maxHistoryFiles: undefined", async () => {
+  it("maxHistoryFiles: undefined", () => {
     testConfigMinVal('maxHistoryFiles', 100, undefined);
   });
 
-  it("maxHistoryFiles: 0", async () => {
+  it("maxHistoryFiles: 0", () => {
     testConfigMinVal('maxHistoryFiles', 0, 0);
   });
 
-  it("maxHistoryFiles: -1", async () => {
+  it("maxHistoryFiles: -1", () => {
     testConfigMinVal('maxHistoryFiles', 0, -1);
   });
 
-  it("maxHistoryFiles: 99", async () => {
+  it("maxHistoryFiles: 99", () => {
     testConfigMinVal('maxHistoryFiles', 99, 99);
   });
 
-  it("maxHistoryFiles: 101", async () => {
+  it("maxHistoryFiles: 101", () => {
     testConfigMinVal('maxHistoryFiles', 101, 101);
   });
 

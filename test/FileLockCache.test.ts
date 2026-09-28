@@ -18,13 +18,10 @@ describe('FileLock', () => {
   it("After clearing the cache, the number of cache entries is 0.", async () => {
     const retVal = "test_005", key = retVal;
     try {
-    const ret = await FileLock.withLock(key, 
-      async () => {
+      await FileLock.withLock(key, async () => {
         await sleepAsync(500);
         return retVal;
-      },
-      {}
-    );
+      });
     }
     catch (err) {
       logger.error(err);
@@ -34,7 +31,7 @@ describe('FileLock', () => {
     expect(TestLock.getCacheSize()).toBe(0);  
   });
 
-  async function testCacheStatus(config: FileLockConfig, checkStatus: () => Promise<void>): Promise<void> {
+  async function testCacheStatus(config: FileLockConfig, checkStatus: () => Promise<void> | void): Promise<void> {
     TestLock.clearCache();
     const orgConf = FileLock.getConfig();
     FileLock.setConfig({ ...config, logger });
@@ -52,11 +49,11 @@ describe('FileLock', () => {
   }
 
   it("When the cache is cleared and locked, the number of cache entries becomes 1.", async () => {
-    await testCacheStatus({ cache: true }, async () => expect(TestLock.getCacheSize()).toBe(1));
+    await testCacheStatus({ cache: true }, () => expect(TestLock.getCacheSize()).toBe(1));
    });
 
   it("If the cache is reset, then disabled, and subsequently locked, the cache does not exist.", async () => {
-    await testCacheStatus({ cache: false }, async () => expect(TestLock.getCache()).toBeNull());
+    await testCacheStatus({ cache: false }, () => expect(TestLock.getCache()).toBeNull());
   });
 
   it("When the maximum cache size is set to 1, even after locking twice with different keys, " +
