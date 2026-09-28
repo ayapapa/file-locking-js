@@ -1,6 +1,6 @@
 //import { stderr } from "node:process";
 import { onExit } from 'signal-exit';
-import { FileLock, type Monitor } from "../src/index.ts";
+import { FileLock, type LockMonitor } from "../src/index.ts";
 
 import { sleepAsync } from "./FileLockTestCommon.ts";
 /*
@@ -30,7 +30,7 @@ const instruction = {
     let sleepTime = Number(args[2]);
     const timeoutMs = args[3] ? Number(args[3]) : 5000;
     const ttlMs = args[4] ? Number(args[4]) : 2000;
-    let monitor!: Monitor;
+    let monitor!: LockMonitor;
     await FileLock.withLock(
       key, async (mon) => {
         monitor = mon;
@@ -56,8 +56,7 @@ try {
   if (ins) await ins();
 }
 catch (err) {
-  // @ts-ignore
-  console.error(err.message);
+  console.error("[ERROR]", err);
   process.exit(1);
 }
 console.log('finished it.')

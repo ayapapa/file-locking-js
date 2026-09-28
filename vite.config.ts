@@ -14,7 +14,12 @@ export default defineConfig({
   },
   // Write settings to disable only in the test environment here.
   test: {
+    // for long run test
     testTimeout: 30000,
+
+    // Asynchronous execution of test files is prohibited.
+    fileParallelism: false,
+
     // File patterns to exclude
     exclude: [...configDefaults.exclude, 'e2e/*'],
     

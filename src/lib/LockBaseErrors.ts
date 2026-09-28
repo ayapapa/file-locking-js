@@ -11,7 +11,7 @@ export class LockError extends Error {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { code?: string, props?: LockErrorProps }) {
+  constructor(msg: string, params?: { code?: string, props?: LockErrorProps | null}) {
     super(msg);
     const props = {...params?.props};
     this.code = (params?.code) ?? 'ELOCK';
@@ -28,7 +28,7 @@ export class DeadlockDetected extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { key: string, props?: LockErrorProps }) {
+  constructor(msg: string | null, params?: { key: string, props?: LockErrorProps }) {
     msg = msg || 'A deadlock was detected.';
     const props = {...params?.props};
     params?.key && (props.key = params?.key);
@@ -45,7 +45,7 @@ export class TTLExceeded extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string | null, params?: { ttlMs: number, props?: LockErrorProps }) {
+  constructor(msg: string | null, params?: { ttlMs: number, props?: LockErrorProps }) {
     const ttlMs = params?.ttlMs;
     msg = msg || `The maximum processing time(${ttlMs ?? "options.ttlMs"} milliseconds) while locked has been exceeded.`;
     const props = {...params?.props };
@@ -61,7 +61,7 @@ export class AlreadyLocked extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { key: string, props?: LockErrorProps } ) {
+  constructor(msg: string, params?: { key: string, props?: LockErrorProps } ) {
     const key = params?.key;
     msg = msg || `Couldn't acquire the lock because the '${key ?? "key"}' is already locked.`;
     const props = {...params?.props};
@@ -77,7 +77,7 @@ export class InvalidOptions extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { name?: string, props?: LockErrorProps } ) {
+  constructor(msg: string, params?: { name?: string, props?: LockErrorProps } ) {
     const name: string | null = params?.name ?? null;
     msg = msg || `The value of the specified options${name ? '(' + name + ')' : ''} is invalid.`;
     const props = {...params?.props};
@@ -100,7 +100,7 @@ export class ReleaseFailed extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: { key: string, path: string, sharer: string, props?: LockErrorProps }) {
+  constructor(msg: string, params?: { key: string, path: string, sharer: string, props?: LockErrorProps }) {
     msg = msg || "Processing is interrupted because the lock release or lock counter decrement failed. " +
       "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.";
     const props = { ...params?.props };

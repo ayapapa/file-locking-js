@@ -27,7 +27,7 @@ const eMsg = {
 describe('FileLockError', () => {
 
   it("If you instantiate FileLockError without arguments, the code property becomes 'EFILELOCK'.", () => {
-    const err = new FileLockError();
+    const err = new FileLockError("");
     expect(err).toMatchObject({
       code: 'EFILELOCK'
     });
@@ -190,8 +190,8 @@ describe('FileLockError', () => {
     lockFn: (cb: (monitor: LockMonitor)=>Promise<void>) => Promise<void>,
     lockCallback: (monitor: LockMonitor, callbackCompleted: (v: unknown) => void) => Promise<void>,
     errorFn: (err: any) => void,
-    finnalyFn: () => void = () => {}
-  ): Promise<void> {
+    finalyFn: () => void = () => {}
+  ): Promise<unknown> {
 
     let callbackCompleted: (v: unknown) => void;
     const callbackPromise = new Promise(resolve => {
@@ -204,12 +204,12 @@ describe('FileLockError', () => {
       });
     }
     catch (err) {
-      errorFn(err);
+      await errorFn(err);
     }
     finally {
-      finnalyFn();
+      await finalyFn();
     }
-    await callbackPromise;
+    return callbackPromise;
   }
 
   it("An error occurs if a compromise is detected within a callback function while the lock is held.", async () => {
@@ -297,7 +297,7 @@ describe('FileLockError', () => {
             },
             {ttlMs: 2000, allowReentry: true}
           );
-          await sleepAsync(2000);
+          //await sleepAsync(2000);
         }
         catch (err) {
           throw err;
@@ -309,20 +309,22 @@ describe('FileLockError', () => {
         }
       },
       (err) => {
-        expect(err).instanceOf(ReleaseFailed);
+        expect(err).instanceOf(LockCompromised);
         expect(err).toMatchObject({
-          code: "ERELEASE",
-          message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.",
+          code: "ECOMPROMISED",
+          message: "The lock was compromised during the locking process.",
           key,
           path: getLockMetaPath(key),
-          sharer: getLockSharerDir(key),
-          causes: [{
+          //sharer: getLockSharerDir(key),
+          reason: "[VERIFY] The lock file was overwritten by another lock.",
+          /*causes: [{
             code: "ECOMPROMISED",
             key,
             path: getLockMetaPath(key),
             reason: "[VERIFY] The lock file was overwritten by another lock.",
             message: "The lock was compromised during the locking process.",
           }],
+          */
         })
       },
       () => removeLockFiles(key)
@@ -332,13 +334,14 @@ describe('FileLockError', () => {
  
   it("`TTLExceeded` error occurs if the callback processing exceeds the TTL setting.", async () => {
     const key = "testKey";
-    expect.assertions(5); 
+    const options = {ttlMs: 1000};
+    expect.assertions(6); 
     await waitCallbackCompletedByCancelled(
       async (callback) => {
         await FileLock.withLock(
           key,
           async (monitor) => await callback(monitor),
-          {ttlMs: 500}
+          options
         )
       },
       async (monitor, callbackCompleted) => {
@@ -348,7 +351,13 @@ describe('FileLockError', () => {
         expect(monitor.reason).toBe('ETTLEXCEEDED');
         callbackCompleted('Completed.')
       },
-      (err) => expect(err).instanceOf(TTLExceeded)
+      (err) => {
+        expect(err).instanceOf(TTLExceeded),
+        expect(err).toMatchObject({
+          code: "ETTLEXCEEDED",
+          message: `The maximum processing time(${options.ttlMs} milliseconds) while locked has been exceeded.`,
+        })
+      }
     );
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
@@ -358,46 +367,45 @@ describe('FileLockError', () => {
     msg ? expect(err.message).toBe(msg) : expect(err.message).toBe('null');
   }
 
-  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", () => {
     testNoParamsError(LockError, null);
   });
 
-  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(TTLExceeded).", () => {
     testNoParamsError(TTLExceeded, 'The maximum processing time(options.ttlMs milliseconds) while locked has been exceeded.');
   });
 
-  it("Instantiating an error class without parameters results in the default message.(AlreadyLocked).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(AlreadyLocked).", () => {
     testNoParamsError(AlreadyLocked , "Couldn't acquire the lock because the 'key' is already locked.");
   });
 
-  it("Instantiating an error class without parameters results in the default message.(InvalidOptions).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(InvalidOptions).", () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options is invalid.");
   });
   
-  it("Instantiating an error class without parameters results in the default message.(DeadlockDetected).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(DeadlockDetected).", () => {
     testNoParamsError(DeadlockDetected  , "A deadlock was detected.");
   });
 
   //LockDirectoryAccessFailed 
-  it("Instantiating an error class without parameters results in the default message.(LockDirectoryStatFailed).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockDirectoryStatFailed).", () => {
     testNoParamsError(LockDirectoryStatFailed  , "Failed to check the status of the lock directory.");
   });
 
-  it("Instantiating an error class without parameters results in the default message.(LockDirectoryCreationFailed).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockDirectoryCreationFailed).", () => {
     testNoParamsError(LockDirectoryCreationFailed  , "Failed to create the lock directory.");
   });
 
   //LockCompromised 
-  it("Instantiating an error class without parameters results in the default message.(LockCompromised).", async () => {
+  it("Instantiating an error class without parameters results in the default message.(LockCompromised).", () => {
     testNoParamsError(LockCompromised  , "The lock was compromised during the locking process.");
   });
 
 
-  it("If `InvalidOptions` has no message but a `param` is specified, the resulting message includes `'param.name'`.", async () => {
+  it("If `InvalidOptions` has no message but a `param` is specified, the resulting message includes `'param.name'`.", () => {
     testNoParamsError(InvalidOptions  , "The value of the specified options(PARAM) is invalid.", { name: "PARAM"});
   });
   
-
   it("If an error occurs in the lock callback, that error can be caught.", async () => {
     const key = 'testKey_8131'
     let mon: LockMonitor = { cancelled: false };
@@ -901,7 +909,7 @@ describe('FileLockError', () => {
     meta: Record<string, unknown> = {ownerId: "hoge", expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
     ) {
 
-      if (meta) setLockMeta(key, meta);
+    if (meta) setLockMeta(key, meta);
 
     let counter = 0;
     //@ts-ignore

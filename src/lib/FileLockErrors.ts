@@ -9,7 +9,7 @@ export class FileLockError extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg?: string, params?: {code: string, props?: LockErrorProps }) {
+  constructor(msg: string, params?: {code: string, props?: LockErrorProps }) {
     const p = { ...params };
     // Avoided using `if` statements to ensure code coverage.
     p.code == null && (p.code = 'EFILELOCK');

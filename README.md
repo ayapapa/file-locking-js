@@ -75,19 +75,11 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 
 ## Usage
   ```js
-  // Global default options (if necessary)
-  const defaultOptions = FileLock.getDefaultOptions();
-  defaultOptions.timeoutMs  = 2000;
-  defaultOptions.ttlMs      = 2000;
-  heartbeatIntervalMs       = 500;
-  heartbeatTtlMs        = 5000;
-  
+  // Specify `lock directory`.
+  // If not specified, `${process.cwd()}/.lock` is used as the `lock directory`. 
   FileLock.setConfig({ 
     lockDirectory: "Specify the directory path where the file containing lock information is stored.",
-    defaultOptions // Global default options, if necessary.
-  }};
-
-  const options = { ttlMs: 5000 };
+  });
 
   const ret = await FileLock.withLock(
     "Specify the lock key.", 
@@ -95,17 +87,13 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
       "Describes the operations to be performed while the lock is held.";
       return "Specify the results if any.";
     },
-    options // Overrides the global default options set via FileLock.SetConfig().
   );
-  console.log(ret); // "Specify the results if any.";
+  console.log(ret); // "Specify the results if any."
   ```
 
 ## Configurations
 
 ## Options
-
-* ※デッドロックエラーさせるか否かを指定できるようにする。これは、arrowRentry: falseのときに有効であり、エラーにしないならば、タイムアウトを待ってロック取得できなかったエラー（AlreadyLocked）
-
 
 ## Errors
 | Class name | Overview  | Message | Other properties | How to handle the situation, etc.|

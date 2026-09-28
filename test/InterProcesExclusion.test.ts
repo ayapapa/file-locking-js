@@ -12,17 +12,29 @@ const commandPath = './subCommand.ts';
 const stdOut: string[] = [];
 const stdErr: string[] = [];
 let orgConfig: FileLockConfig;
+let childErrCount = 0;
+let childExecCount = 0;
+const childExecCounts = [] as number[];
+const childErrCounts = [] as number[];
+const childErrors = [] as string[];
 
 beforeEach(() => {
   vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
   stdOut.splice(0);
   stdErr.splice(0);
+  childErrCount = 0;
+  childExecCount = 0;
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   FileLock.setConfig(orgConfig);
+  childExecCounts.push(childExecCount);
+  childErrCounts.push(childErrCount);
+  console.log("### Child exec count =", childExecCounts);
+  console.log("### Child error count =", childErrCounts);
+  console.log(`### Child errors(count = ${childErrors.length}) =`, childErrors);
 });
 
 interface Options {
@@ -51,6 +63,7 @@ describe('別プロセスとの競合テスト', () => {
     // このため、process.execPathの代わりに、'node'とする =>　結局、'node'としても、ciシステム内で絶対パスに変換され、スペースありのパスになってしまうようなので、解決しなかった、、このため、20.xはciの対象から外した
     //const child = spawn(process.execPath, args);
     const child = spawn('node', args);
+    childExecCount++;
 
     let locked = false;
     let errMsg = '';
@@ -67,6 +80,8 @@ describe('別プロセスとの競合テスト', () => {
       const msg = data.toString();
       if (msg.includes('FATAL') || msg.includes('ERROR')) {
         errMsg = msg;
+        childErrors.push(msg);
+        childErrCount++;
       }
       process.stderr.write(msg);
       stdErr.push(msg);
@@ -374,6 +389,14 @@ describe('別プロセスとの競合テスト', () => {
 
   it("すべて別キーの複数のプロセスを同時に50個起動し、いずれも、問題なく処理が正常終了する。", async () => {
     await testMultiProcess(50);
+  });
+
+  it("すべて別キーの複数のプロセスを同時に100個起動し、いずれも、問題なく処理が正常終了する。", async () => {
+    await testMultiProcess(100);
+  });
+
+  it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    //await testMultiProcess(50);
   });
 
   it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
