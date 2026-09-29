@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FileLockConfig, FileLock } from '../src/index.ts';
+import { type FileLockConfig, FileLock } from '../src/index.ts';
 import { logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 let orgConfig: FileLockConfig;

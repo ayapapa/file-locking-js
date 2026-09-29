@@ -1,15 +1,6 @@
-//import { stderr } from "node:process";
-import { onExit } from 'signal-exit';
 import { FileLock, type LockMonitor } from "../src/index.ts";
 
 import { sleepAsync } from "./FileLockTestCommon.ts";
-/*
-onExit((code, signal) => {
-  console.log("Child process exited by", code, signal);
-});
-*/
-
-const config = FileLock.getConfig();
 
 // extract command args
 const args: string[] = [];
@@ -30,17 +21,15 @@ const instruction = {
     let sleepTime = Number(args[2]);
     const timeoutMs = args[3] ? Number(args[3]) : 5000;
     const ttlMs = args[4] ? Number(args[4]) : 2000;
-    let monitor!: LockMonitor;
+    let monitor: LockMonitor;
     await FileLock.withLock(
       key, async (mon) => {
         monitor = mon;
         const sleep = Math.floor(sleepTime / 10);
         for (; sleepTime > 0; sleepTime -= sleep) {
           await sleepAsync(sleep);
-          if (mon.cancelled) {
-            const hoge = 0;
+          if (monitor.cancelled) {
             console.info('###lock interrupted.###')
-            //console.error('lock interrupted.')
           }
         }
       },
@@ -48,7 +37,7 @@ const instruction = {
     );
     console.log('lock completed.')
   },
-} as Record<string, any>;
+} as Record<string, (() => Promise<unknown>)>;
 
 const ins = instruction[args[0]];
 console.log('do it.')
@@ -56,6 +45,7 @@ try {
   if (ins) await ins();
 }
 catch (err) {
+  console.log("##### Child caught Error #####");
   console.error("[ERROR]", err);
   process.exit(1);
 }

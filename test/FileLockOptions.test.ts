@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FileLock, FileLockConfig, FileLockError, FileLockOptions, InvalidOptions } from '../src/index.ts';
+import { FileLock, type FileLockConfig, type FileLockOptions, InvalidOptions } from '../src/index.ts';
 import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver.ts';
-import { FileLockRequiredOptions, minimumFileLockOptions } from '../src/lib/FileLockOptions.ts';
-import { OptionsForTesting } from '../src/lib/AllOptions.ts'
+import { type FileLockRequiredOptions, minimumFileLockOptions } from '../src/lib/FileLockOptions.ts';
+import { type OptionsForTesting } from '../src/lib/AllOptions.ts'
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -44,13 +44,13 @@ describe('FileLockOptions test.', () => {
     expect(opts.invalidTtlMs).toBeUndefined();
   }
 
-  it("Default options are valid.", async () => {
+  it("Default options are valid.", () => {
     testToBeSameAsTheDefaultOptions(FileLock.getDefaultOptions());
   });
 
   it("When the lock with no options, internally resolved options are same as the default options.", async () => {
     const retVal = "test_001", key = retVal;
-    const opts =  {} as any;
+    const opts =  {} as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -59,8 +59,11 @@ describe('FileLockOptions test.', () => {
       opts
     )).toBe(retVal);
     // Check options resolved internally.
-    expect(opts._resolvedOpts).toBeDefined();
-    testToBeSameAsTheDefaultOptions(opts._resolvedOpts);
+    expect('_resolvedOpts' in opts).toBeTruthy();
+    if ('_resolvedOpts' in opts) {
+      const resolved = opts._resolvedOpts as FileLockOptions;
+      testToBeSameAsTheDefaultOptions(resolved);
+    }
   });
 
   it("When the lock with xxxSec options only,  internally resolved options have valid calculated xxxMs properties.", async () => {
@@ -101,7 +104,7 @@ describe('FileLockOptions test.', () => {
 
   it("When the lock with options other than time-related ones,  internally resolved options are valid.", async () => {
     const retVal = "test_001", key = retVal;
-    const opts =  { allowReentry: true, retriesOnIOErr: 2 } as any;
+    const opts =  { allowReentry: true, retriesOnIOErr: 2 } as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -110,32 +113,35 @@ describe('FileLockOptions test.', () => {
       opts
     )).toBe(retVal);
     // Check options resolved internally.
-    expect(opts._resolvedOpts).toBeDefined();
+    expect('_resolvedOpts' in opts).toBeTruthy();
     const defaultOpts = FileLock.getDefaultOptions();
     // Check basic options
-    expect(opts._resolvedOpts.timeoutSec).toBeUndefined();
-    expect(opts._resolvedOpts.timeoutMs).toBe(defaultOpts.timeoutMs);
-    expect(opts._resolvedOpts.ttlSec).toBeUndefined();
-    expect(opts._resolvedOpts.ttlMs).toBe(defaultOpts.ttlMs);
-    expect(opts._resolvedOpts.allowReentry).toBe(opts.allowReentry);
-    // Check basic options
-    expect(opts._resolvedOpts.pollIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.pollIntervalMs).toBe(defaultOpts.pollIntervalMs);
-    expect(opts._resolvedOpts.heartbeatIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.heartbeatIntervalMs).toBe(defaultOpts.heartbeatIntervalMs);
-    expect(opts._resolvedOpts.heartbeatTtlSec).toBeUndefined();
-    expect(opts._resolvedOpts.heartbeatTtlMs).toBe(defaultOpts.heartbeatTtlMs);
-    expect(opts._resolvedOpts.retriesOnIOErr).toBe(opts.retriesOnIOErr);
-    expect(opts._resolvedOpts.retryIntervalSec).toBeUndefined();
-    expect(opts._resolvedOpts.retryIntervalMs).toBe(defaultOpts.retryIntervalMs);
-    expect(opts._resolvedOpts.invalidTtlSec).toBeUndefined();
-    expect(opts._resolvedOpts.invalidTtlMs).toBeUndefined();
+    if ('_resolvedOpts' in opts) {
+      const resolved = opts._resolvedOpts as FileLockOptions;
+      expect(resolved.timeoutSec).toBeUndefined();
+      expect(resolved.timeoutMs).toBe(defaultOpts.timeoutMs);
+      expect(resolved.ttlSec).toBeUndefined();
+      expect(resolved.ttlMs).toBe(defaultOpts.ttlMs);
+      expect(resolved.allowReentry).toBe(opts.allowReentry);
+      // Check basic options
+      expect(resolved.pollIntervalSec).toBeUndefined();
+      expect(resolved.pollIntervalMs).toBe(defaultOpts.pollIntervalMs);
+      expect(resolved.heartbeatIntervalSec).toBeUndefined();
+      expect(resolved.heartbeatIntervalMs).toBe(defaultOpts.heartbeatIntervalMs);
+      expect(resolved.heartbeatTtlSec).toBeUndefined();
+      expect(resolved.heartbeatTtlMs).toBe(defaultOpts.heartbeatTtlMs);
+      expect(resolved.retriesOnIOErr).toBe(opts.retriesOnIOErr);
+      expect(resolved.retryIntervalSec).toBeUndefined();
+      expect(resolved.retryIntervalMs).toBe(defaultOpts.retryIntervalMs);
+      expect(resolved.invalidTtlSec).toBeUndefined();
+      expect(resolved.invalidTtlMs).toBeUndefined();
+    }
   });
 
   // 同時指定不可テスト
   async function testOptionConflicting(name: string, eMsg: string) {
     const retVal = "test_001", key = retVal;
-    const opts =  {} as any;
+    const opts =  {} as Record<string, number>;
     const keySec = `${name}Sec`;
     const keyMs  = `${name}Ms`;
     opts[keySec] = 1.5;
@@ -150,12 +156,14 @@ describe('FileLockOptions test.', () => {
         opts
       );
     }
-    catch(err: any) {
-      expect(err instanceof InvalidOptions).toBeTruthy();
-      expect(err.code).toBe('EINVAL');
-      expect(err.message).toContain(keyMs);
-      expect(err.message).toContain(keySec);
-      expect(err.message).toContain(eMsg);
+    catch(err) {
+      expect(err).instanceOf(InvalidOptions);
+      expect(err).toMatchObject( { code: 'EINVAL' });
+      if (err instanceof Error) {
+        expect(err.message).toContain(keyMs);
+        expect(err.message).toContain(keySec);
+        expect(err.message).toContain(eMsg);
+      }
     }
   }
 
@@ -188,25 +196,27 @@ describe('FileLockOptions test.', () => {
   });
 
   // type error test.
-  async function testTypeErrorOption(name: string, value: any, eMsg: string = 'The type of option') {
+  async function testTypeErrorOption(name: string, value: unknown, eMsg: string = 'The type of option') {
     const retVal = "test_001", key = retVal;
-    const opts =  {} as any;
+    const opts =  {} as Record<string, unknown>;
     opts[name] = value;
     
     try {
       await FileLock.withLock(key, 
         async () => {
-          sleepAsync(500);
+          await sleepAsync(500);
           return retVal
         },
         opts
       );
     }
-    catch(err: any) {
-      expect(err instanceof InvalidOptions).toBeTruthy();
-      expect(err.code).toBe('EINVAL');
-      expect(err.message).toContain(name);
-      expect(err.message).toContain(eMsg);
+    catch(err) {
+      expect(err).instanceOf(InvalidOptions);
+      expect(err).toMatchObject({ code: 'EINVAL' });
+      if (err instanceof Error) {
+        expect(err.message).toContain(name);
+        expect(err.message).toContain(eMsg);
+      }
     }
   }
 
@@ -277,8 +287,10 @@ describe('FileLockOptions test.', () => {
   // null系指定が許可されていないオプションのnull系指定エラーテスト
   function _testNullKindValueOption(key: keyof FileLockOptions, value: undefined | null) {
     const options: FileLockOptions = {};
+    const addedOpt = {} as Record<string, unknown>;
+    addedOpt[key] = value;
     // テストのため強制型キャスト
-    options[key] = value as any;
+    Object.assign(options, addedOpt);
     try {
       new FileLockOptionsResolver(options, minimumFileLockOptions);
     }
@@ -295,77 +307,86 @@ describe('FileLockOptions test.', () => {
     _testNullKindValueOption(key, undefined);
   }
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutSec).", () => {
     testNullKindValueOption('timeoutSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(timeoutMs).", () => {
     testNullKindValueOption('timeoutMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlSec).", () => {
     testNullKindValueOption('ttlSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(ttlMs).", () => {
     testNullKindValueOption('ttlMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(allowReentry).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(allowReentry).", () => {
     testNullKindValueOption('allowReentry')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalSec).", () => {
     testNullKindValueOption('pollIntervalSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(pollIntervalMs).", () => {
     testNullKindValueOption('pollIntervalMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalSec).", () => {
     testNullKindValueOption('heartbeatIntervalSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatIntervalMs).", () => {
     testNullKindValueOption('heartbeatIntervalMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTtlSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTtlSec).", () => {
     testNullKindValueOption('heartbeatTtlSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTtlMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(heartbeatTtlMs).", () => {
     testNullKindValueOption('heartbeatTtlMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retriesOnIOErr).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retriesOnIOErr).", () => {
     testNullKindValueOption('retriesOnIOErr')
   });
   
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalSec).", () => {
     testNullKindValueOption('retryIntervalSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(retryIntervalMs).", () => {
     testNullKindValueOption('retryIntervalMs')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(invalidTtlSec).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(invalidTtlSec).", () => {
     testNullKindValueOption('invalidTtlSec')
   });
 
-  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(invalidTtlMs).", async () => {
+  it("Specifying `undefined` or `null` as an option property value passed to `new FileLockOptionsResolver()` results in an error.(invalidTtlMs).", () => {
     testNullKindValueOption('invalidTtlMs')
   });
 
-  it("When a resolved option is modified and resolved again, the result is correctly reflected.", async () => {
+  it("When a resolved option is modified and resolved again, the result is correctly reflected.", () => {
     const options: FileLockOptions & {[_resolvedOpts: string]: FileLockOptions} = {};
-    const rOpts = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions();
     options.allowReentry = true;
+    const rOpts1 = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions()
+    expect(rOpts1.allowReentry).toBe(options.allowReentry);
+    expect('_resolvedOpts' in options && options._resolvedOpts.allowReentry === rOpts1.allowReentry).toBeTruthy();
+    options._resolvedOpts.allowReentry = false;
+    expect('_resolvedOpts' in options && options._resolvedOpts.allowReentry === rOpts1.allowReentry).toBeTruthy();
+    expect(options.allowReentry).toBe(true);
+    expect(options._resolvedOpts.allowReentry).toBe(false);
+
+    // もう一度、同じoptions(_resolvedOpts付き)を解決すると、
+    // _resolvedOptsは、options.allowReentryと同じ値になっているはず。
     const rOpts2 = new FileLockOptionsResolver(options, minimumFileLockOptions).getOptions()
     expect(rOpts2.allowReentry).toBe(options.allowReentry);
-    expect('_resolvedOpts' in options ? options._resolvedOpts?.allowReentry : 'error').toBe(options.allowReentry);
+    expect('_resolvedOpts' in options ? options._resolvedOpts?.allowReentry : "hoge").toBe(options.allowReentry);
   });
 
   //FileLockOptionsResolver
@@ -380,12 +401,12 @@ describe('FileLockOptions test.', () => {
     }
 
     public test_getRequiredOptions_noDefaults() {
-      this.defaultOptions = undefined;
+      delete this.defaultOptions;// = undefined;
       return super.getRequiredOptions();
     }
   }
 
-  it("Calling `getRequiredOptions()` results in an error if an option lacks a required property and no default options have been specified.", async () => {
+  it("Calling `getRequiredOptions()` results in an error if an option lacks a required property and no default options have been specified.", () => {
     const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
     expect.assertions(2);
     try {
@@ -400,11 +421,11 @@ describe('FileLockOptions test.', () => {
     }
   });
 
-  it("Calling getRequiredOptions() without specifying default options results in an error.", async () => {
-    const or = new TestOptionResolver({}, FileLock.getDefaultOptions());
+  it("Calling getRequiredOptions() without specifying default options results in an error.", () => {
+    const optionResolver = new TestOptionResolver({}, FileLock.getDefaultOptions());
     expect.assertions(2);
     try {
-      or.test_getRequiredOptions_noDefaults();
+      optionResolver.test_getRequiredOptions_noDefaults();
     }
     catch (err) {
       expect(err).instanceOf(InvalidOptions);
@@ -439,9 +460,10 @@ describe('FileLockOptions test.', () => {
       invalidTtlMs:         2000,
     };
 
-    FileLock.withLock('testKey8989', () => {}, opts);
-    // @ts-ignore because `_resolvedOpts` is for testing purposes only.
-    expect(opts._resolvedOpts).toMatchObject(exp);
+    await FileLock.withLock('testKey8989', () => {}, opts);
+    
+    expect('_resolvedOpts' in opts).toBeTruthy();
+    expect('_resolvedOpts' in opts && opts['_resolvedOpts']).toMatchObject(exp);
   });
 
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FileLock, FileLockConfig, LockError, LockMonitor } from '../src/index';
+import { FileLock, type FileLockConfig, LockError, type LockMonitor } from '../src/index.ts';
 import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TestLock } from './FileLockTestCommon.ts'
@@ -19,13 +19,13 @@ afterEach(() => {
 
 describe('LockBase and Util', () => {
 
-  it("The reentrancy context is shared even when the lock instances are different.", async () => {
-    const als = (LockBase as any)._als as AsyncLocalStorage<ReentrantContext>;
+  it("The reentrancy context is shared even when the lock instances are different.", () => {
+    const als = LockBase["_als"] as AsyncLocalStorage<ReentrantContext>;
     const rc: ReentrantContext | undefined = als.getStore();
     const childContext: ReentrantContext = { heldLocks: new Map(rc?.heldLocks) };
     const contextId = 'text-context';
     childContext.heldLocks.set(contextId, { monitor: { cancelled: false } });
-    als.run(childContext, async () => {
+    als.run(childContext, () => {
       const key1 = 'testKey1', key2 = 'testKey2';
       const ins1 = TestLock.getLock(key1);
       const ins2 = TestLock.getLock(key2);
@@ -44,7 +44,7 @@ describe('LockBase and Util', () => {
     expect(elapsed).toBeGreaterThanOrEqual(99);
   });
 
-  it("`sleepSync()` sleeps for the specified duration.", async () => {
+  it("`sleepSync()` sleeps for the specified duration.", () => {
     const start = Date.now();
     sleepSync(100);
     
@@ -59,29 +59,34 @@ describe('LockBase and Util', () => {
     }
 
     async test_incReantryCount() {
-        await this._incReantryCount({ _ownerId: "", _contextId: "" } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await this._incReantryCount({ _ownerId: "", _contextId: "" } as any);
     }
 
     async test_decReantryCount() {
-        await this._decReantryCount({ _ownerId: "", _contextId: "" } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       return await this._decReantryCount({ _ownerId: "", _contextId: "" } as any);
     }
 
     async test_acquire() {
-        await this._acquire({ _ownerId: "", _contextId: "" } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await this._acquire({ _ownerId: "", _contextId: "" } as any);
     }
 
     async test_release() {
-        await this._release({ _ownerId: "", _contextId: "" } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await this._release({ _ownerId: "", _contextId: "" } as any);
     }
 
     test_onError(err: Error, op: string) : LockMonitor {
       const opts = { _ownerId: "", _contextId: "" };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this._onError(err, op, opts as any);
       return '_monitor' in opts ? opts._monitor as LockMonitor : { cancelled: false };
     }
   }
 
-  async function testNotImpleMethod(cb: () => void) {
+  async function testNotImpleMethod(cb: () => Promise<void>) {
     expect.assertions(3)
     try {
       await cb();
@@ -119,7 +124,7 @@ describe('LockBase and Util', () => {
     });
   });
 
-  it("When you specify an error that does not have a code in `LockBase._onError()`.", async () => {
+  it("When you specify an error that does not have a code in `LockBase._onError()`.", () => {
     const tl = new TestLockBase();
     const operation = 'OP';
     const mon = tl.test_onError(new Error("test `LockBase._onError()`"), operation);
@@ -130,7 +135,7 @@ describe('LockBase and Util', () => {
   });
 
   it("If `stack` is undefined, return `Call stack: couldn't get.`", () => {
-    vi.spyOn(Error, 'captureStackTrace').mockImplementation((targetObject: object) => {});
+    vi.spyOn(Error, 'captureStackTrace').mockImplementation(() => {});
 
     expect(getCallStack()).toBe(`Call stack: couldn't get.`);
   });
@@ -149,12 +154,10 @@ describe('LockBase and Util', () => {
       expect(signal).toBe(null);
       count++;
     };
-    // @ts-ignore
-    const before = TestLock._onExitFns.length;
+    const before = TestLock.getExitFuncs().length;
     TestLock.testAddOnExit(onExit);
     TestLock.testAddOnExit(onExit);
-    // @ts-ignore
-    expect(TestLock._onExitFns.length).toBe(before + 1);
+    expect(TestLock.getExitFuncs().length).toBe(before + 1);
     LockBase.onExit(0, null);
     expect(count).toBe(1);
   });

@@ -12,7 +12,7 @@ export default defineConfig(
 	},
 
 	{
-		files: ['**/*.ts', 'src/*.ts', 'src/lib/*.ts'],
+		files: ['**/*.ts', 'src/lib/*.ts'],
 		extends: [
 			js.configs.recommended,
 			...tseslint.configs.recommended,

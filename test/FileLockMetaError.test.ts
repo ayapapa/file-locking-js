@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles, getLockMetaPath, TestLock  } from './FileLockTestCommon.ts';
-import { FileLock, FileLockConfig, FileLockError, LockFileBroken, } from '../src/index';
+import { FileLock, type FileLockConfig, LockFileBroken, } from '../src/index.ts';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -15,10 +15,10 @@ afterEach(() => {
 
 describe('FileLock', () => {
 
-  async function testInvalidLockInformationFile(target: string, v?: any ) {
+  async function testInvalidLockInformationFile(target: string, v?: unknown ) {
     const key = "testKey";
     const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 10*1000, heartbeatTtlMs:5000, lastHeartbeatAt: Date.now()};
-    const mt = {...meta} as any;
+    const mt = {...meta} as Record<string, unknown>;
     if (v) {
       mt[target] = v;
     } else {
@@ -35,18 +35,8 @@ describe('FileLock', () => {
       expect(err).instanceOf(LockFileBroken);
       const invalidProps = {} as Record<string, unknown>;
       invalidProps[target] = mt[target];
-      /*
-      const cause = {
-        code: "ECOMPROMISED",
-        invalidProps,
-        key,
-        path: getLockMetaPath(key),
-        reason: "The lock information format is invalid",
-        message: "The lock was compromised during the locking process.",
-      };
-      */
+
       const matchObj = {
-        //causes: [ cause ],
         code: "EBROKEN",
         path: getLockMetaPath(key),
         message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",

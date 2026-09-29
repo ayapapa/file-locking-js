@@ -15,7 +15,7 @@ export type TimeBasedKey<T> = {
  * @internal
  * Type of Key-Type map.
  */
-export type KeyTypeMap<T> = Record<keyof T, any>;
+export type KeyTypeMap<T> = Record<keyof T, unknown>;
 
 /** 
  * @internal

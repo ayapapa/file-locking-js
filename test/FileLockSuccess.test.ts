@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getHistoryPath, getLockMetaPath, logger, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
-import { FileLockConfig, FileLock, FileLockOptions } from '../src/index';
+import { getHistoryPath, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
+import { type FileLockConfig, FileLock, type FileLockOptions } from '../src/index.ts';
 import fs from 'node:fs';
-import path from 'node:path';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -19,7 +18,7 @@ describe('FileLock', () => {
 
   it("The lock is successfully acquired, and the return value of the callback is obtained.", async () => {
     const retVal = "test_00111", key = retVal;
-    const opts =  {timeoutSec : 1 } as any;
+    const opts =  {timeoutSec : 1 } as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {
         await sleepAsync(500);
@@ -89,11 +88,11 @@ describe('FileLock', () => {
     const key1 = "testKey_10000", key2 = 'testKey_20000';
     const ret = "OK";
     const options: FileLockOptions = { allowReentry: true }
-    expect(await FileLock.withLock(key1, async (monitor1) => {
-      return await FileLock.withLock(key2, async (monitor2) => {
+    expect(await FileLock.withLock(key1, async () => {
+      return await FileLock.withLock(key2, async () => {
         return await FileLock.withLock(
           key1, 
-          async (monitor3) => {
+          async () => {
             await sleepAsync(500);
             return ret;
           },
@@ -168,19 +167,14 @@ describe('FileLock', () => {
   it("maxHistoryEntries: 1", async () => {
     const histInfo = FileLock.getHistoryInfo();
     FileLock.setConfig({ _debug: true, maxHistoryEntries: 1 });
-    expect.assertions(2);
-    try {
-      await FileLock.withLock('debug_mode_key', 
-        async () => {
-          await sleepAsync(100);
-        },
-      );
-      expect(fs.existsSync(histInfo.historyPath)).toBeTruthy();
-      const h = JSON.parse(fs.readFileSync(histInfo.historyPath, 'utf-8'));
-      expect(Object.keys(h).length).toBe(1);
-    }
-    finally {
-    }
+    await FileLock.withLock('debug_mode_key', 
+      async () => {
+        await sleepAsync(100);
+      },
+    );
+    expect(fs.existsSync(histInfo.historyPath)).toBeTruthy();
+    const h = JSON.parse(fs.readFileSync(histInfo.historyPath, 'utf-8'));
+    expect(Object.keys(h).length).toBe(1);
   });
 
   it("maxHistoryEntries: 0", async () => {

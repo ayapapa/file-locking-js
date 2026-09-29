@@ -1,30 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
 
-import { FileLock, FileLockConfig, FileLockOptions, LockError } from '../src/index.ts';
-import { LockBase, type ReentrantContext } from '../src/lib/LockBase.ts';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { logger, getLockMetaPath, removeLockFiles, sleepAsync } from './FileLockTestCommon.ts';
+import { FileLock, ReleaseFailed, type FileLockConfig } from '../src/index.ts';
+import { getLockMetaPath, removeLockFiles, sleepAsync, execChild, stdOut, childErrCount, childExecCount, childErrors, resetExecResources, TestLock, type Options, getLockMeta, setLockMeta } from './FileLockTestCommon.ts';
 
-const commandPath = './subCommand.ts';
-const stdOut: string[] = [];
-const stdErr: string[] = [];
-let orgConfig: FileLockConfig;
-let childErrCount = 0;
-let childExecCount = 0;
 const childExecCounts = [] as number[];
 const childErrCounts = [] as number[];
-const childErrors = [] as string[];
+
+let orgConfig: FileLockConfig;
 
 beforeEach(() => {
   vi.restoreAllMocks();
   orgConfig = FileLock.getConfig();
-  stdOut.splice(0);
-  stdErr.splice(0);
-  childErrCount = 0;
-  childExecCount = 0;
+  resetExecResources();
 });
 
 afterEach(() => {
@@ -32,83 +20,15 @@ afterEach(() => {
   FileLock.setConfig(orgConfig);
   childExecCounts.push(childExecCount);
   childErrCounts.push(childErrCount);
+});
+
+afterAll(() => {
   console.log("### Child exec count =", childExecCounts);
   console.log("### Child error count =", childErrCounts);
   console.log(`### Child errors(count = ${childErrors.length}) =`, childErrors);
 });
 
-interface Options {
-  key: string, 
-  sleep: number, 
-  timeOutMs?: number, // default is 5000 
-  ttlMs?: number, // default is 2000
-  waitAquired?: boolean, // default is false
-};
-
 describe('別プロセスとの競合テスト', () => {
-
-  // 別プロセスを非同期で実行する関数を用意する。
-  async function execChild(command: string, options: Options) {
-    const cmodPath = path.isAbsolute(commandPath) ? commandPath : path.resolve(__dirname, commandPath);
-    const args: string[] = [
-      cmodPath, 
-      command, 
-      options.key, 
-      String(options.sleep), 
-      String(options.timeOutMs ?? 5000), 
-      String(options.ttlMs ?? 2000)
-    ];
-    
-    // tnode 20.xのバグで、パスに空白が入っていると、spawnそのものが失敗し、子プロセス起動ができない。
-    // このため、process.execPathの代わりに、'node'とする =>　結局、'node'としても、ciシステム内で絶対パスに変換され、スペースありのパスになってしまうようなので、解決しなかった、、このため、20.xはciの対象から外した
-    //const child = spawn(process.execPath, args);
-    const child = spawn('node', args);
-    childExecCount++;
-
-    let locked = false;
-    let errMsg = '';
-
-    child.stdout?.on('data', data => {
-      const str: string = data.toString();
-      process.stdout.write(str);
-      stdOut.push(str);
-      // ★★ロック獲得条件をトレースログを見ていることに注意★★
-      // つまり、デバッグ時（かつ、トレースレベルログ時）にのみ有効である。
-      if (str.includes('Acquired the lock')) locked = true;
-    });
-    child.stderr?.on('data', data => {
-      const msg = data.toString();
-      if (msg.includes('FATAL') || msg.includes('ERROR')) {
-        errMsg = msg;
-        childErrors.push(msg);
-        childErrCount++;
-      }
-      process.stderr.write(msg);
-      stdErr.push(msg);
-    });
-
-    const promise = new Promise((resolve, reject) => {
-      child.once('error', reject);
-
-      child.once('close', (code, signal) => {
-        if (code === 0) {
-          resolve({ code, signal });
-        } else {
-          reject(`child failed: code=${code} signal=${signal} msg=${errMsg}`);
-        }
-      });
-    });
-
-    if (options.waitAquired) {
-      const cStart = Date.now();
-      // 子プロセスのロック処理突入を確認
-      while(locked === false && (Date.now() - cStart) <= options.sleep + 110/** マージンが必要なようだ、、そうでないと先をこされる*/) {
-        await sleepAsync(100);
-      }
-    }
-
-    return { cid: child, promise };
-  } 
 
   function childCompeleted() {
     for (const v of stdOut) {
@@ -122,7 +42,7 @@ describe('別プロセスとの競合テスト', () => {
     const child = await execChild('lock', { key, sleep: 1000, waitAquired: true });
 
     expect.assertions(3);
-    const start = Date.now();
+
     try {
       await sleepAsync(500);
       child.cid.kill(); // 何を指定しても強制終了となるようだ。
@@ -132,7 +52,6 @@ describe('別プロセスとの競合テスト', () => {
       expect(err).toBe("child failed: code=null signal=SIGTERM msg=");
     }
 
-    const elapsed = Date.now() - start;
     // 強制終了なので、
     // 子プロセスは完了していない
     expect(childCompeleted()).toBeFalsy();
@@ -187,22 +106,23 @@ describe('別プロセスとの競合テスト', () => {
     const pp = FileLock.withLock(key, async () => {
       await sleepAsync(parentSleep);
       console.log('elapsed =', Date.now() - start);
+      return 'complete'
     })
 
     const start = Date.now();
     const child = await execChild('lock', { key, sleep: childSleep });
     await child.promise;
+    expect(await pp).toBe('complete');
 
     const elapsed =  Date.now() - start;
     console.log('elapsed =', elapsed);
     expect(elapsed).toBeGreaterThanOrEqual(parentSleep - 1);
-    let inc = false;
     expect(childCompeleted()).toBeTruthy();
   });
 
-  it("同じキーをつかい、親プロセスがタイムアウトエラーになる.", async () => {
+  it("同じキーをつかい、子プロセスを先に起動し、親プロセスがタイムアウトエラーになる.", async () => {
     const key = 'mainKey009';
-    const child = await execChild('lock', { key, sleep: 500, waitAquired: true });
+    const child = await execChild('lock', { key, sleep: 1000, waitAquired: true });
 
     const pp = FileLock.withLock(key, async () => {
         await sleepAsync(100);
@@ -227,86 +147,53 @@ describe('別プロセスとの競合テスト', () => {
     });
   });
 
-  it("同じキーをつかい、子プロセスがタイムアウトエラーになる.", async () => {
-    const key = 'mainKey008';
-
-    const pp = FileLock.withLock(key, async () => {
-        await sleepAsync(1000);
+  async function testChildError(key: string, pPara: { sleep: number, timeout: number }, cPara: { sleep: number, ttl?: number }, childFirst: boolean, reason: string): Promise<void> {
+    const createParentPr = async () => FileLock.withLock(key, async () => {
+        await sleepAsync(pPara.sleep);
         return 'completed'
       },
-      { timeoutMs: 500}
+      { timeoutMs: pPara.timeout }
     );
+    const createChild = async () => {
+      const cOpts = { key, sleep: cPara.sleep, timeOutMs: 0, waitAquired: true } as Options;
+      if (cPara.ttl) cOpts.ttlMs = cPara.ttl;
+      return execChild('lock', cOpts);
+    };
+    const promises = [] as Promise<unknown>[];
+    if (childFirst) {
+      // It is necessary to wait for the child process to acquire the lock.
+      promises.push((await createChild()).promise);
+      promises.push(createParentPr());
+    }
+    else {
+      promises.push(createParentPr());
+      promises.push((await createChild()).promise);
+    }
 
-    const child = await execChild('lock', { key, sleep: 150, timeOutMs: 0, waitAquired: true });
+    const results = await Promise.allSettled(promises/*[child.promise, parent]*/);
 
-    const results = await Promise.allSettled([child.promise, pp]);
+    const cIdx = childFirst ? 0 : 1;
+    const pIdx = (cIdx + 1) % 2;
+    // The child promise should have failed due to `reason`.
+    expect(results[cIdx]).toMatchObject({ status: 'rejected' });
+    expect('reason' in results[cIdx] && results[cIdx].reason.includes(reason)).toBeTruthy();
+    expect(results[pIdx]).toMatchObject({ status: 'fulfilled', value: 'completed' });
+  } 
 
-    // One of them has resulted in a timeout error (AlreadyLocked).
-    expect(results[0]).toMatchObject({
-      status: 'rejected',
-    });
-    // @ts-ignore
-    expect(results[0].reason.includes('AlreadyLocked')).toBeTruthy();
-    expect(results[1]).toMatchObject({
-      status: 'fulfilled',
-      value: 'completed'
-    });
+  it("同じキーをつかい、親プロセスを先に起動し、子プロセスがタイムアウトエラーになる.", async () => {
+    await testChildError('mainKey008', { sleep: 1000, timeout: 500 }, { sleep: 150 }, false, 'AlreadyLocked');
   });
 
-  it("別プロセスを先に起動したが、ttlエラーになり、処理はキャンセル状態となったところで、親プロセスはロック処理が進む.", async () => {
-    const key = 'mainKey007';
-
-    const child = await execChild('lock', { key, sleep: 1000, timeOutMs: 0, ttlMs: 500, waitAquired: true });
-
-    const pp = FileLock.withLock(key, async () => {
-        await sleepAsync(500);
-        return 'completed'
-      },
-      { timeoutMs: 1500}
-    );
-
-    const results = await Promise.allSettled([child.promise, pp]);
-
-    // One of them has resulted in a ttl error (TTLExceeded).
-    expect(results[0]).toMatchObject({
-      status: 'rejected',
-    });
-    // @ts-ignore
-    expect(results[0].reason.includes('TTLExceeded')).toBeTruthy();
-    expect(results[1]).toMatchObject({
-      status: 'fulfilled',
-      value: 'completed'
-    });
+  it("同じキーを使い、子プロセスを先に起動したがttlエラーになり、処理はキャンセル状態となったところで、親プロセスはロック処理が進む.", async () => {
+    await testChildError('mainKey007', { sleep: 500, timeout: 1500 }, { sleep: 1000, ttl: 500 }, true, 'TTLExceeded');
   });
 
   it("子プロセスを先に起動したが、実行中に、強制的にプロセスをキルする。親プロセスは、ロック情報の無効化を確認後ロック処理が進む.", async () => {
     const key = 'subKey0031';
     const child = await execChild('lock', { key, sleep: 1000, ttlMs: 1100, waitAquired: true });
 
-    const start = Date.now();
-
     await sleepAsync(500);   // ★★★　ここをいじっても、結果は同じ！！　つまり、 killしても、想定通りの振る舞いになっていないようだけれど、、、、！！！！！！
-    child.cid.kill(); // 何を指定しても強制終了となるようだ。
-    /**
-     * ★★★
-     * 500ms待っても、空の前段ロックファイルを見つけてしまった！！！　 
-     * ＝＝＝＞　★★★、、、ちょっと、違うかな！！　残っているのは、共有者情報（.lock\subKey0031.sharer）だけだよ！！　というか、」これは、何度試しても残っている！！
-     * ＝＝＝＞　★★★、、、残っているのは、sharerだけだね、、、、、これがヒントかな。。。。
-     * ★★しかも、その前段ロックは別プロセス。。。ここが味噌★★★
-     * 前段がちゃんとファイル書き込みを済ませるまで待てればいいけれど、今はそれは、出来ないというか、、リトライをするしか、方策が無い。
-     * では、どうするか、
-     * 前段は、ロックするために、空ファイルを取り合えず作る。
-     * と、それは、一時的に、空ファイルになる。
-     * 今回は、それを拾って、エラーになった。
-     * だとすると、、、、、空ファイル状態を無くせるか？⇒　基本無理。　一瞬でもファイル生成をした直後は空ファイルになる。
-     * では、何に対処すればよいのか、、、
-     * １）ファイルIOの直列化、、、、これは、これまでも、考えてきたが、、、あまりに、負荷がたかまりそうなので、却下。　その負荷のせいで、タイムアウト続出の予感
-     * ２）空ファイルをまだ、途中の存在と想定して、リトライする。、、、案外あるかも。。。しかし、また、ここでリトライ間隔分の時間が発生する。
-     * ３）その他なにがあるのか？？？？？
-     * 
-     *  
-     */
-
+    child.cid.kill();
 
     const pp = FileLock.withLock(key, async () => {
         await sleepAsync(500);
@@ -331,87 +218,52 @@ describe('別プロセスとの競合テスト', () => {
     expect(childCompeleted()).toBeFalsy();
   });
 
-  /**
-   * 
-   * @param n       同時実行するプロセス数(うち、1個は親(本)プロセス、n-1個は子プロセス)
-   * @param oneKey  全て同じキーにする場合に利用するキー
-   */
-  async function testMultiProcess(n: number, oneKey?: string) {
-    const options: FileLockOptions = { timeoutMs: 1000, ttlMs: 1000, heartbeatTtlMs: 2000 };
-    const parentKey = "testMultiProcess"
-    const parentPr = FileLock.withLock(parentKey, async () => { await sleepAsync(500); return 'completed'; }, options);
-    const children = {} as Record<string, { cid: ChildProcessWithoutNullStreams, promise: Promise<unknown> }>;
-    for( let i = 0; i < n - 1; i++) {
-      /*
-      const nDigits = Math.floor(Math.log10(99));
-      const zero = nDigits > 0 ? '0000'.slice(0, -nDigits) : '0000';
-      */
-     const key = `childKey_${String(i).padStart(4, '0')}`;
-      children[key] = await execChild('lock', { key, sleep: 500, waitAquired: false, ...options });
-    }
+  it("同じキーを使い、親プロセスを先に起動したが、親のロックファイルが賞味期限となり、子プロセスがロックファイルを上書きしてロックを取得し完了する", async () => {
+    const key = 'keyParentStale001';
 
-    const results = await Promise.allSettled([parentPr, ...Object.values(children).map(({ promise }) => promise)]);
-    expect(results[0]).toMatchObject({
-      status: 'fulfilled',
-      value: 'completed'
+    const parentPr = FileLock.withLock(key, async () => {
+      const lock = TestLock.getLock(key);
+
+      // ハートビートを強制的に止める
+      clearInterval(lock["_heartbeatTimer"] as NodeJS.Timeout);
+
+      lock["_heartbeatTimer"] = null;
+      // ロックファイルのttlMsを2000に書き換える
+      const meta = getLockMeta(key);
+      meta["expirationTime"] = Date.now() + 1950; // 遅延考慮
+      setLockMeta(key, meta);
+
+      await sleepAsync(4000);
+      return 'completed'
+    }, {
+      timeoutMs: 1000, ttlMs: 5000, heartbeatTtlMs: 2000
     });
-    // ロックファイルが削除されていることを確認
-    expect(fs.existsSync(getLockMetaPath(parentKey))).toBeFalsy();
-    Object.keys(children).forEach((key, i) => {
-      expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
-      if (results[i+1].status === 'rejected') {
-        // 破損系エラーではないことを確認する
-        // @ts-ignore
-        const reason = results[i+1].reason as string; 
-        //expect(reason.includes('AlreadyLocked') || reason.includes('TTLExceeded')).toBeTruthy();
-        expect(reason.includes('LockFileBroken') || reason.includes('LockCompromised')).toBeFalsy();
-      }
-      else {
-        expect(results[i+1]).toMatchObject({
-          status: 'fulfilled',
-          value: { code: 0, signal: null, }
-        });
+
+    const child = await execChild('lock', { key, sleep: 450, ttlMs: 1500, timeOutMs: 5000, waitAquired: true });
+
+    const results = await Promise.allSettled([child.promise, parentPr]);
+
+    // The result of child.
+    expect(results[0]).toMatchObject({ status: 'fulfilled'/*, value: 'completed'*/ });
+    // The result of parent.
+    expect('reason' in results[1] && results[1].reason instanceof ReleaseFailed).toBeTruthy();
+    expect(results[1]).toMatchObject({
+      status: 'rejected',
+      reason: {
+        code: "ERELEASE",
+        key,
+        message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information."
       }
     });
-  }
-
-  it("すべて別キーの複数のプロセスを同時に5個起動し、いずれも、問題なく処理が正常終了する。", async () => {
-    await testMultiProcess(5);
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
-  it("すべて別キーの複数のプロセスを同時に10個起動し、いずれも、問題なく処理が正常終了する。", async () => {
-    await testMultiProcess(10);
-  });
-
-  it("すべて別キーの複数のプロセスを同時に25個起動し、いずれも、問題なく処理が正常終了する。", async () => {
-    await testMultiProcess(25);
-  });
-
-  it("すべて別キーの複数のプロセスを同時に50個起動し、いずれも、問題なく処理が正常終了する。", async () => {
-    await testMultiProcess(50);
-  });
-
-  it("すべて別キーの複数のプロセスを同時に100個起動し、いずれも、問題なく処理が正常終了する。", async () => {
-    await testMultiProcess(100);
-  });
-
-  it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
-    //await testMultiProcess(50);
-  });
-
-  it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
-    //await testMultiProcess(50);
-  });
-
-  // そして、上記の先に自分、あとから、別プロセスの順で、同様のことをテストする。
-  // 起動した結果が何らかの形で取得できるような仕掛けにする必要ありだね。
 
 });
 
 
 /*
 
-複数子プロセス → 同時Lock競合
 TTL / Heartbeat
 子Lock中 → TTL超過
 子Lock中 → Heartbeat timeout

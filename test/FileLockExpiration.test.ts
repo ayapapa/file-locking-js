@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { logger, sleepAsync, getLockMeta, getLockMetaPath, removeLockFiles, TestLock, setLockMeta  } from './FileLockTestCommon.ts';
-import { AlreadyLocked, FileLockConfig, FileLock, LockFileBroken } from '../src/index';
+import { logger, sleepAsync,  removeLockFiles, TestLock, setLockMeta  } from './FileLockTestCommon.ts';
+import { AlreadyLocked, type FileLockConfig, FileLock, } from '../src/index.ts';
 import { randomUUID } from 'node:crypto';
 
 let orgConfig: FileLockConfig;
@@ -32,8 +32,8 @@ describe('FileLock', () => {
         {timeoutMs: 1000}
       );
     }
-    catch (err: any) {
-      expect(err instanceof AlreadyLocked).toBe(true);
+    catch (err) {
+      expect(err).instanceOf(AlreadyLocked);
     }
     finally {
       removeLockFiles(key);

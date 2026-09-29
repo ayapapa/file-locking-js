@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PrettyConsole } from '@ayapapa-npm/pretty-console-js';
 
-import { FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index';
-import { getLockMetaPath, logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
+import { type FileLockConfig, FileLock, FileLockError, LockDirectoryCreationFailed, LockDirectoryStatFailed } from '../src/index.ts';
+import { getHistoryPath, getLockMetaPath, logger, sleepAsync, TestLock } from './FileLockTestCommon.ts'
 
 type NumberKeys<T> = {
     [K in keyof T]-?: T[K] extends number ? K : never
@@ -376,5 +376,15 @@ describe('FileLock', () => {
     testConfigMinVal('maxHistoryFiles', 101, 101);
   });
 
+  it("最大ヒストリーファイル数を0に設定すると、ヒストリーファイルは生成されない。", async () => {
+    const key = "MaxHisFiles_0";
+
+    FileLock.setConfig({ maxHistoryFiles: 0 });
+
+    await FileLock.withLock(key, () => {});
+
+    expect(fs.existsSync(getHistoryPath())).toBeFalsy();
+    
+  });
 
 });
