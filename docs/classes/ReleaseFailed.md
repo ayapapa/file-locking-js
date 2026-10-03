@@ -6,14 +6,15 @@
 
 # Class: ReleaseFailed
 
-Defined in: [src/lib/LockBaseErrors.ts:97](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L97)
+Defined in: [src/lib/LockBaseErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L104)
 
 Failed to relase lock or decrement lock counter. <br>
 エラーの意味：　（エラー説明に記載すること）
 ロック解放またはロックカウンターの減算に失敗したことによる処理を中断。
 ファイルIOエラーによるものと思われるため、システムのチェックをお勧めする。
 また、ロックファイルやロック共有情報などのファイルやディレクトリが
-残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  *
+残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  * 
+★★★これは、基本クラスのエラーであるため、ファイルの概念は持ち込まない（ただ、上記説明は、ファイルロックのエラー説明に加えて！！）
 
 ## Extends
 
@@ -25,7 +26,7 @@ Failed to relase lock or decrement lock counter. <br>
 
 > **new ReleaseFailed**(`msg`, `params?`): `ReleaseFailed`
 
-Defined in: [src/lib/LockBaseErrors.ts:103](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L103)
+Defined in: [src/lib/LockBaseErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L110)
 
 Constructor.
 
@@ -45,17 +46,9 @@ Parameters.
 
 `string`
 
-###### path
-
-`string`
-
 ###### props?
 
 [`LockErrorProps`](../type-aliases/LockErrorProps.md)
-
-###### sharer
-
-`string`
 
 #### Returns
 
@@ -83,7 +76,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

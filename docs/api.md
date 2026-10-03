@@ -15,7 +15,6 @@
 - [LockDirectoryCreationFailed](classes/LockDirectoryCreationFailed.md)
 - [LockDirectoryStatFailed](classes/LockDirectoryStatFailed.md)
 - [LockError](classes/LockError.md)
-- [LockFileBroken](classes/LockFileBroken.md)
 - [ReleaseFailed](classes/ReleaseFailed.md)
 - [TTLExceeded](classes/TTLExceeded.md)
 

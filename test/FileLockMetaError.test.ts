@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sleepAsync, getLockMeta, setLockMeta, removeLockFiles, getLockMetaPath, TestLock  } from './FileLockTestCommon.ts';
-import { FileLock, type FileLockConfig, LockFileBroken, } from '../src/index.ts';
+import { AlreadyLocked, FileLock, type FileLockConfig, } from '../src/index.ts';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -32,14 +32,23 @@ describe('FileLock', () => {
         { timeoutMs: 0 }// ttlMs: 1000 }
       );
     } catch (err) {
-      expect(err).instanceOf(LockFileBroken);
+      expect(err).instanceOf(AlreadyLocked);
       const invalidProps = {} as Record<string, unknown>;
       invalidProps[target] = mt[target];
 
       const matchObj = {
-        code: "EBROKEN",
-        path: getLockMetaPath(key),
-        message: "When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary.",
+        code: "ELOCKED",
+        key,
+        reason: "InvalidMetadata",
+        message: "Lock file already exists, but its metadata is invalid.",
+        causes: [{
+          code: "ECOMPROMISED",
+          key,
+          invalidProps,
+          path: getLockMetaPath(key),
+          reason: "The lock information format is invalid.",
+          message: "The lock was compromised during the locking process.",
+        }],
       }
       expect(err).toMatchObject(matchObj);
     }

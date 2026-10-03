@@ -16,8 +16,15 @@ export class FileLockError extends LockError {
     super(msg, p);
   }
 
-  public static lockFailedDueToIO(key: string, causes: unknown[]) {
-    return new FileLockError("Failed to acquire the lock due to a file I/O error.", { code: 'EIO', props: { key, causes } });
+  /**
+   * @internal
+   * @param key     The `lock key` for which the lock acquisition failed.
+   * @param causes  The list of causes for the error.
+   * @param msg     Error message.
+   * @returns `FileLockError` instance.
+   */
+  public static lockFailedDueToIO( key: string, causes: unknown[], msg = "Failed to acquire the lock due to a file I/O error.") {
+    return new FileLockError(msg, { code: 'EIO', props: { key, causes } });
   }
 
   /**
@@ -109,27 +116,6 @@ export class LockCompromised extends FileLockError {
     super(
       `The lock was compromised during the locking process.`,
       {code: `ECOMPROMISED`, props }
-    );
-  }
-}
-
-/**
- * Lock file broken error.
- */
-export class LockFileBroken extends FileLockError {
-  /**
-   * Constructor.
-   * @param reason Reason for the error.
-   * @param params  Parameters.
-   */
-  constructor(params: { path: string, props?: LockErrorProps }) {
-    const props = { ...{ path: params.path }, ...params.props };
-    super(
-      `When checking whether a lock for the same key is already held, ` +
-      `the contents of the existing lock file were found to be corrupted, ` +
-      `making it impossible to determine the lock status. Please verify ` +
-      `that the target process does not exist and delete the lock file if necessary.`,
-      {code: `EBROKEN`, props }
     );
   }
 }

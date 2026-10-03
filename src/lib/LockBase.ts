@@ -248,7 +248,10 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       // Exeute locking operations.
       return this.#execWithLock(onLockFn, options);
     }
-    
+
+    // ★★★　ここでawaitしない方向で再検討せよ！！
+    // そうすると、ここはプロミスを返すだけにして、try-chatchはしない！　つまり、トレースもしない
+    // トレースするなら、この先でどうぞ！！
     try {
       return await whithLockInContext();
     }

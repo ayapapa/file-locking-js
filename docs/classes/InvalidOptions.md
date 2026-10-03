@@ -6,7 +6,7 @@
 
 # Class: InvalidOptions
 
-Defined in: [src/lib/LockBaseErrors.ts:74](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L74)
+Defined in: [src/lib/LockBaseErrors.ts:80](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L80)
 
 Invalid options error.
 
@@ -20,7 +20,7 @@ Invalid options error.
 
 > **new InvalidOptions**(`msg`, `params?`): `InvalidOptions`
 
-Defined in: [src/lib/LockBaseErrors.ts:80](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L80)
+Defined in: [src/lib/LockBaseErrors.ts:86](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L86)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/f9a40a1b2ec3ab0e592341c32a88ba338912db56/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

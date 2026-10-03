@@ -139,9 +139,9 @@ describe('別プロセスとの競合テスト', () => {
     expect(results[1]).toMatchObject({
       status: 'rejected',
       reason: {
-        message: `Couldn't acquire the lock because the '${key}' is already locked.`,
+        message: "Lock file already exists.",
         code: 'ELOCKED',
-        path: getLockMetaPath(key),
+        reason: "ExistingLock",
         key: key
       }
     });
@@ -252,7 +252,7 @@ describe('別プロセスとの競合テスト', () => {
       reason: {
         code: "ERELEASE",
         key,
-        message: "Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information."
+        message: "Processing is interrupted because the lock release or lock counter decrement failed."
       }
     });
     expect(TestLock.isReleasedState(key)).toBeTruthy();

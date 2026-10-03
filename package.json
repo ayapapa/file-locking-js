@@ -41,7 +41,7 @@
     "@types/node": "^24.19.0",
     "@types/proper-lockfile": "^4.1.4",
     "@vitest/coverage-v8": "^5.0.2",
-    "@vitest/ui": "^5.0.2",
+    "@vitest/ui": "^5.0.3",
     "eslint": "^10.11.0",
     "pino": "^10.3.1",
     "rotating-file-stream": "^3.2.10",
@@ -54,7 +54,7 @@
     "vitest": "^5.0.2"
   },
   "dependencies": {
-    "@ayapapa-npm/contracts-js": "^0.5.1",
+    "@ayapapa-npm/contracts-js": "^0.5.3",
     "@ayapapa-npm/date-formatter-js": "^0.1.2",
     "lru-cache": "^11.5.2",
     "signal-exit": "^4.1.0"

@@ -1,8 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fs from 'node:fs';
 
-import { FileLock, type FileLockConfig, type FileLockOptions } from '../src/index.ts';
-import { getLockMetaPath, sleepAsync, execChild, childErrCount, childExecCount, childErrors, resetExecResources, getLockSharerDir } from './FileLockTestCommon.ts';
+import { AlreadyLocked, FileLock, type FileLockConfig, type FileLockOptions } from '../src/index.ts';
+import { sleepAsync, execChild, childErrCount, childErrors, childExecCount, resetExecResources, logger, TestLock } from './FileLockTestCommon.ts';
 
 const childExecCounts = [] as number[];
 const childErrCounts = [] as number[];
@@ -20,13 +19,33 @@ afterEach(() => {
   FileLock.setConfig(orgConfig);
   childExecCounts.push(childExecCount);
   childErrCounts.push(childErrCount);
-  console.log("### Child exec count =", childExecCounts);
-  console.log("### Child error count =", childErrCounts);
 });
 
 afterAll(() => {
-  console.log(`### Child errors(count = ${childErrors.length}) =`, childErrors);
+  const cErrs =  [] as string[];
+  childErrors.forEach((eStr) => {
+    cErrs.push(eStr
+      .split(/\r?\n/)
+      .filter(line => !line.includes("    at ") && line.includes("Error"))
+      .join("\n")
+    )
+  });
+
+  logger.log(`### Child errors(count = ${cErrs.length}) =`, cErrs);
+  logger.log("### PARENT_ERRORS =", PARENT_ERRORS);
+  logger.log("### BROKEN_ERRORS =", BROKEN_ERRORS);
+  
+  logger.log("### PARENT_ERRORS count =", PARENT_ERRORS.length);
+  logger.log("### BROKEN_ERRORS count =", BROKEN_ERRORS.length);
+  logger.log("### COMPROMISED_ERRORS count =", COMPROMISED_ERRORS.length);
+  logger.log("### Child exec count =", childExecCounts);
+  logger.log("### Child error count =", childErrCounts);
 });
+
+const BROKEN_ERROR_WATCH_MODE: boolean = false;
+const BROKEN_ERRORS = [] as unknown[];
+const COMPROMISED_ERRORS = [] as unknown[];
+const PARENT_ERRORS = [] as unknown[];
 
 describe('ストレステスト', () => {
 /*
@@ -43,9 +62,9 @@ describe('ストレステスト', () => {
    * @param oneKey  全て同じキーにする場合に利用するキー
    */
   async function testMultiProcess(n: number, oneKey?: string) {
-    const options: FileLockOptions = { timeoutMs: 1000, ttlMs: 1000, heartbeatTtlMs: 2000 };
+    const options: FileLockOptions = { timeoutMs: 5000, ttlMs: 5000, heartbeatTtlMs: 5000 };
     const parentKey = oneKey ? oneKey : "testMultiProcess"
-    const parentPr = FileLock.withLock(parentKey, async () => { await sleepAsync(500); return 'completed'; }, options);
+    const parentPr = FileLock.withLock(parentKey, async () => { await sleepAsync(100); return 'completed'; }, options);
     //const children = {} as Record<string, { cid: ChildProcessWithoutNullStreams, promise: Promise<unknown> }>;
     const childrenPr = [] as Promise<unknown>[];
     const childrenKey = [] as string[];
@@ -62,25 +81,48 @@ describe('ストレステスト', () => {
 
     //const results = await Promise.allSettled([parentPr, ...Object.values(children).map(async ({ promise }) => promise)]);
     const results = await Promise.allSettled([parentPr, ...childrenPr]);
-    expect(results[0]).toMatchObject({
-      status: 'fulfilled',
-      value: 'completed'
-    });
-    // ロックファイルが削除されていることを確認
-    expect(fs.existsSync(getLockMetaPath(parentKey))).toBeFalsy();
-    // ロックファイルが削除されていることを確認
-    expect(fs.existsSync(getLockSharerDir(parentKey))).toBeFalsy();
-   
+
+    // 親の結果をチェックする。
+    if (results[0].status === 'fulfilled') {
+      expect(results[0]).toMatchObject({
+        status: 'fulfilled',
+        value: 'completed'
+      });
+    }
+    else {
+      const reason = ('reason' in results[0]) ? results[0].reason : ''; 
+      // 破損ファイルの発見が無ければOK。
+      const foundBroken: boolean = reason instanceof AlreadyLocked && reason.message.includes('InvalidMetadata');
+      if (BROKEN_ERROR_WATCH_MODE === false) expect(foundBroken).toBeFalsy();
+      if (foundBroken) {
+        BROKEN_ERRORS.push(reason);
+      }
+      const foundCompromised: boolean = reason instanceof Error && reason.message.toLocaleLowerCase().includes('compromised');
+      if (foundCompromised) COMPROMISED_ERRORS.push(reason);
+      PARENT_ERRORS.push(reason);
+    }
     childrenPr.forEach((_, i) => {
       if (childrenKey.length === childrenPr.length) {
-        expect(fs.existsSync(getLockMetaPath(childrenKey[i]))).toBeFalsy();
+        expect(TestLock.isReleasedState(childrenKey[i])).toBeTruthy();
       } 
       const result = results[i+1];
       if (result.status === 'rejected') {
         // 破損系エラーではないことを確認する
         const reason = ('reason' in result) ? result.reason as string : ''; 
         //expect(reason.includes('AlreadyLocked') || reason.includes('TTLExceeded')).toBeTruthy();
-        expect(reason.includes('LockFileBroken') || reason.includes('LockCompromised')).toBeFalsy();
+        // 想定以上の負荷により、TTL内に処理が完了しない、また、ハートビートが想定通りに刻まれないこともあり、
+        // その場合には、待機しているロック取得待ちプロセスがロックファイル賞味期限切れ判断し、
+        // ロック取得することになる、その場合に、自身のハートビート更新やリリース処理において、
+        // `LockCompromised`エラーとなるため、下記条件から、'LockCompromised'のチェックは外す。
+        // 破損ファイルの発見が無ければOK。
+        const foundBroken: boolean = reason.includes('InvalidMetadata');
+        if (BROKEN_ERROR_WATCH_MODE === false) expect(foundBroken).toBeFalsy();
+        if (foundBroken) {
+          BROKEN_ERRORS.push(reason);
+        }
+        const foundCompromised: boolean = reason.toLocaleLowerCase().includes('compromised');
+        if (foundCompromised) COMPROMISED_ERRORS.push(reason);
+        
       }
       else {
         expect(results[i+1]).toMatchObject({
@@ -89,6 +131,10 @@ describe('ストレステスト', () => {
         });
       }
     });
+
+    // ロックファイルが削除されていることを確認
+    expect(TestLock.isReleasedState(parentKey)).toBeTruthy();
+
     /*
     Object.keys(children).forEach((key, i) => {
       expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
@@ -109,15 +155,47 @@ describe('ストレステスト', () => {
     */
   }
 
-  it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
-    await testMultiProcess(5, "multiProcessLockWithSameKey");
+  it("すべて同じキーの複数のプロセスを同時に数個から5個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    await testMultiProcess(5, "multiProcessLockWithSameKey5");
   });
 
-  it("すべて同じキーの複数のプロセスを同時に数個から数十個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
-    //await testMultiProcess(50);
+  it("すべて同じキーの複数のプロセスを同時に数個から10個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    await testMultiProcess(10, "multiProcessLockWithSameKey10");
   });
 
-return;
+  it("すべて同じキーの複数のプロセスを同時に数個から25個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    await testMultiProcess(25, "multiProcessLockWithSameKey25");
+  });
+
+  it("すべて同じキーの複数のプロセスを同時に数個から50個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    await testMultiProcess(50, "multiProcessLockWithSameKey50");
+  });
+
+  /*****
+   * tmpが残ることがある、25回と50回で。
+   * また、ログによるとEBORKENがも確認した。
+   * １）tmpが残るのは、rename失敗である（だろう）、その原因の可能性を考えよう、、、他の理由で他プロセスが読み込み中とか？？　非同期処理で、読み込み中とか？？
+   *  -> 他プロセスによる排他的オープンの可能性がある。なので、これは、あきらめて、エラーとする。ただし、tmpの排他的オープンは、本体のそれと同時に行い、その結果として、ロック可能との判定をするように変更する
+   * 　そして、それでも、renameが失敗するか可能性は0には出来ないから、そのときは、責任をもって、tmpを削除する。通常の２倍のリトライで行い、それでもだめなら、致命的エラーとして、利用者に報告する。。。と言う感じでどうだろうか？？
+   * 
+   * 
+   * ２）EBROKENは、なぜ発生したのか、まずは、ログを診よう！　ログにはエラー内容が書かれているはずだが、、、その理由までわかるのか？？わからなければ、分るようにする必要あり！！
+   *  ログ確認の結果、ロック取得時に、tmpが既存のため排他的オープンできなかったときに、このえらーになることが分かった。★★★これは、ロジック見直しが必要！！★★★
+   * 　分解すると、、、ロックファイルオープン成功⇒tmpオープン失敗。。。このパターンだね
+   * 
+   * 
+   * まず、１）の対策で、２）は置きづらくなるはず。さらに、tmpオープン失敗は、単純にロックできなかったとすべし。。それは、既存のロックがあると判定する。
+   * しかし、事故により、ロックファイルおよびそのtmpが残ってしまっていることはありうるので（プロセス中断や、他の処理により、IOエラーリトライすらも失敗したとき（上記１に記載の通り））
+   * ロックファイルstale判定と同様に、tmpのstale判定も必要となる（tmpそのものに、メタ情報が残っている可能性は大きいからね）、、、、、それとも、あくまでも、stale判定は、ロックファイルのみとするか、、
+   * その場合は、tmpファイは中味は確認せずに、invalidデータ扱いとするか、、、ここは判断が必要。
+   * 
+   * 
+   * 
+   */
+  it("すべて同じキーの複数のプロセスを同時に数個から100個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
+    await testMultiProcess(100, "multiProcessLockWithSameKey100");
+  });
+
   it("すべて別キーの複数のプロセスを同時に5個起動し、いずれも、問題なく処理が正常終了する。", async () => {
     await testMultiProcess(5);
   });

@@ -13,6 +13,12 @@ export class LockError extends Error {
    */
   constructor(msg: string, params?: { code?: string, props?: LockErrorProps | null}) {
     super(msg);
+    Object.defineProperty(this, 'message', {
+      value: msg,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
     const props = {...params?.props};
     this.code = (params?.code) ?? 'ELOCK';
     Object.assign(this, props);
@@ -93,6 +99,7 @@ export class InvalidOptions extends LockError {
  * ファイルIOエラーによるものと思われるため、システムのチェックをお勧めする。
  * また、ロックファイルやロック共有情報などのファイルやディレクトリが
  * 残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  * 
+ * ★★★これは、基本クラスのエラーであるため、ファイルの概念は持ち込まない（ただ、上記説明は、ファイルロックのエラー説明に加えて！！）
  */
 export class ReleaseFailed extends LockError {
   /**
@@ -100,13 +107,10 @@ export class ReleaseFailed extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg: string, params?: { key: string, path: string, sharer: string, props?: LockErrorProps }) {
-    msg = msg || "Processing is interrupted because the lock release or lock counter decrement failed. " +
-      "Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information.";
+  constructor(msg: string, params?: { key: string, props?: LockErrorProps }) {
+    msg = msg || "Processing is interrupted because the lock release or lock counter decrement failed.";
     const props = { ...params?.props };
     params?.key     && (props.key = params?.key);
-    params?.path    && (props.path = params?.path);
-    params?.sharer  && (props.sharer = params?.sharer);
     
     super(msg, { code:'ERELEASE' , props });
   }

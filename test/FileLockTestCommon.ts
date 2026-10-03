@@ -66,7 +66,7 @@ const onPrettyLog = ( logEntry: LogEntry ) => {
   }
 }
 
-export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace' });
+export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace', compact: true });
 
 export function getLockMetaPath(key: string): string {
   return path.join(TestLock.getLockDirPath(), key + '.json');
@@ -214,7 +214,8 @@ export class TestLock extends FileLock {
     const lock = this.getLock(key);
     return lock["_acquired"] === false && lock["_heartbeatTimer"] === null && 
       fs.existsSync(getLockMetaPath(key)) === false &&
-      fs.existsSync(getLockSharerDir(key)) === false;
+      fs.existsSync(getLockSharerDir(key)) === false &&
+      fs.existsSync(getLockMetaPath(key) + '.tmp') === false;
   }
 
   static getLockDirPath() {
