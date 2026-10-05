@@ -49,7 +49,7 @@ describe('FileLockOptions test.', () => {
   });
 
   it("When the lock with no options, internally resolved options are same as the default options.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "noOpts", key = retVal;
     const opts =  {} as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {
@@ -67,7 +67,7 @@ describe('FileLockOptions test.', () => {
   });
 
   it("When the lock with xxxSec options only,  internally resolved options have valid calculated xxxMs properties.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "xxxSecOnlyOpts", key = retVal;
     const opts: FileLockOptions & TestOpts =  {
       timeoutSec : 1.2,  ttlSec: 1.00001, pollIntervalSec: 0.11, 
       heartbeatIntervalSec: 1.1, heartbeatTtlSec: 10.002555, retryIntervalSec: 0.213,
@@ -103,7 +103,7 @@ describe('FileLockOptions test.', () => {
   });
 
   it("When the lock with options other than time-related ones,  internally resolved options are valid.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "noTimeRelatedOpts", key = retVal;
     const opts =  { allowReentry: true, retriesOnIOErr: 2 } as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {
@@ -138,9 +138,11 @@ describe('FileLockOptions test.', () => {
     }
   });
 
+  let count = 0;
+
   // 同時指定不可テスト
   async function testOptionConflicting(name: string, eMsg: string) {
-    const retVal = "test_001", key = retVal;
+    const retVal = "testOptionConflicting_" + String(count++).padStart(2, '0'), key = retVal;
     const opts =  {} as Record<string, number>;
     const keySec = `${name}Sec`;
     const keyMs  = `${name}Ms`;
@@ -197,7 +199,8 @@ describe('FileLockOptions test.', () => {
 
   // type error test.
   async function testTypeErrorOption(name: string, value: unknown, eMsg: string = 'The type of option') {
-    const retVal = "test_001", key = retVal;
+    count = 0;
+    const retVal = "testTypeErrorOption_" + String(count++).padStart(2, '0'), key = retVal;
     const opts =  {} as Record<string, unknown>;
     opts[name] = value;
     

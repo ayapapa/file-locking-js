@@ -37,7 +37,7 @@ describe('FileLock', () => {
       invalidProps[target] = mt[target];
 
       const matchObj = {
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         key,
         reason: "InvalidMetadata",
         message: "Lock file already exists, but its metadata is invalid.",

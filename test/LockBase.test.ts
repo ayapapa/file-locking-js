@@ -162,6 +162,14 @@ describe('LockBase and Util', () => {
     expect(count).toBe(1);
   });
 
+  it("debugLog", () => {
+    FileLock.setConfig({ logger: console });
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const lock = TestLock.getLock("debugLog");
+    lock.debugLog("TEST!!!");
+    expect(spy).toHaveBeenCalledWith("TEST!!!");
+  });
+
 });
 
 

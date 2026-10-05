@@ -31,11 +31,12 @@ describe('FileLock', () => {
     expect(TestLock.getCacheSize()).toBe(0);  
   });
 
+  let count = 0;
   async function testCacheStatus(config: FileLockConfig, checkStatus: () => Promise<void> | void): Promise<void> {
     TestLock.clearCache();
     const orgConf = FileLock.getConfig();
     FileLock.setConfig({ ...config, logger });
-    const retVal = "test_001", key = retVal;
+    const retVal = "testCacheStatus_" + String(count++).padStart(2, '0'), key = retVal;
     expect(
       await FileLock.withLock(key, 
       async () => {
@@ -58,7 +59,7 @@ describe('FileLock', () => {
 
   it("When the maximum cache size is set to 1, even after locking twice with different keys, " +
     "the number of cache entries remains 1, and the cache for the second key persists.", async () => {
-    const retVal = "test_001";
+    const retVal = "maxCache_1";
     await testCacheStatus(
       { cache: true, cacheMaxNum: 1  }, 
       async () => {

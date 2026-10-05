@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 
-import { FileLock, ReleaseFailed, type FileLockConfig } from '../src/index.ts';
+import { AlreadyLocked, FileLock, ReleaseFailed, type FileLockConfig } from '../src/index.ts';
 import { getLockMetaPath, removeLockFiles, sleepAsync, execChild, stdOut, childErrCount, childExecCount, childErrors, resetExecResources, TestLock, type Options, getLockMeta, setLockMeta } from './FileLockTestCommon.ts';
 
 const childExecCounts = [] as number[];
@@ -44,7 +44,7 @@ describe('別プロセスとの競合テスト', () => {
     expect.assertions(3);
 
     try {
-      await sleepAsync(500);
+      //await sleepAsync(500);
       child.cid.kill(); // 何を指定しても強制終了となるようだ。
       await child.promise;
     }
@@ -84,14 +84,13 @@ describe('別プロセスとの競合テスト', () => {
     const key = 'mainKey002';
     const childSleep = 500;
     const parentSleep = 100;
-    const child = await execChild('lock', { key, sleep: childSleep, waitAquired: true });
     const start = Date.now();
+    const child = await execChild('lock', { key, sleep: childSleep, waitAquired: true });
     await FileLock.withLock(key, async () => {
       await sleepAsync(parentSleep);
-      console.log('elapsed =', Date.now() - start);
     })
     const elapsed =  Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(childSleep - 1);
+    expect(elapsed).toBeGreaterThanOrEqual(childSleep);
 
     await child.promise;
 
@@ -105,7 +104,6 @@ describe('別プロセスとの競合テスト', () => {
 
     const pp = FileLock.withLock(key, async () => {
       await sleepAsync(parentSleep);
-      console.log('elapsed =', Date.now() - start);
       return 'complete'
     })
 
@@ -115,7 +113,7 @@ describe('別プロセスとの競合テスト', () => {
     expect(await pp).toBe('complete');
 
     const elapsed =  Date.now() - start;
-    console.log('elapsed =', elapsed);
+    //console.log('elapsed =', elapsed);
     expect(elapsed).toBeGreaterThanOrEqual(parentSleep - 1);
     expect(childCompeleted()).toBeTruthy();
   });
@@ -126,6 +124,7 @@ describe('別プロセスとの競合テスト', () => {
 
     const pp = FileLock.withLock(key, async () => {
         await sleepAsync(100);
+        return 'complete';
       },
       { timeoutMs: 0}
     );
@@ -136,11 +135,12 @@ describe('別プロセスとの競合テスト', () => {
       status: 'fulfilled',
       value: { code: 0, signal: null }
     });
+    console.log("★★★★", results[1]);
     expect(results[1]).toMatchObject({
       status: 'rejected',
       reason: {
         message: "Lock file already exists.",
-        code: 'ELOCKED',
+        code: 'EALREADYLOCKED',
         reason: "ExistingLock",
         key: key
       }
@@ -192,7 +192,7 @@ describe('別プロセスとの競合テスト', () => {
     const key = 'subKey0031';
     const child = await execChild('lock', { key, sleep: 1000, ttlMs: 1100, waitAquired: true });
 
-    await sleepAsync(500);   // ★★★　ここをいじっても、結果は同じ！！　つまり、 killしても、想定通りの振る舞いになっていないようだけれど、、、、！！！！！！
+    //await sleepAsync(500);
     child.cid.kill();
 
     const pp = FileLock.withLock(key, async () => {
@@ -258,6 +258,34 @@ describe('別プロセスとの競合テスト', () => {
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+  it("同じキーを使い、子プロセスを先に起動⇒親のロック（タイムアウト0、リエントリー）→タイムアウトエラー", async () => {
+    const key = 'rentryAlreadyLocked';
+
+    const child = await execChild('lock', { key, sleep: 450, ttlMs: 1000, timeOutMs: 0, waitAquired: true });
+
+    const parentPr = FileLock.withLock(key, () => {
+      return 'completed'
+    }, {
+      timeoutMs: 0,
+      allowReentry: true,
+    });
+
+    const results = await Promise.allSettled([child.promise, parentPr]);
+
+    // The result of child.
+    expect(results[0]).toMatchObject({ status: 'fulfilled'/*, value: 'completed'*/ });
+    // The result of parent.
+    expect('reason' in results[1] && results[1].reason instanceof AlreadyLocked).toBeTruthy();
+    expect(results[1]).toMatchObject({
+      status: 'rejected',
+      reason: {
+        code: "EALREADYLOCKED",
+        key,
+        message: "Lock file already exists."
+      }
+    });
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
+  });
 
 });
 

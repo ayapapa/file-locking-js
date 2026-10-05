@@ -79,6 +79,15 @@ describe('ストレステスト', () => {
       if (oneKey === undefined) childrenKey.push(key);
     }
 
+    const checkState = (key: string) => {
+      const state = TestLock.isReleasedStateDetail(key);
+      expect(state.lock_acquired).toBe('ok');
+      expect(state.lock_heartbeatTimer).toBe('ok'); 
+      expect(state.lockfile_removed).toBe('ok');
+      expect(state.lockSharersDir_removed).toBe('ok');
+      expect(state.lockfile_tmp_removed).toBe('ok');
+    };
+
     //const results = await Promise.allSettled([parentPr, ...Object.values(children).map(async ({ promise }) => promise)]);
     const results = await Promise.allSettled([parentPr, ...childrenPr]);
 
@@ -102,8 +111,8 @@ describe('ストレステスト', () => {
       PARENT_ERRORS.push(reason);
     }
     childrenPr.forEach((_, i) => {
-      if (childrenKey.length === childrenPr.length) {
-        expect(TestLock.isReleasedState(childrenKey[i])).toBeTruthy();
+      if (oneKey == null) {
+        checkState(childrenKey[i]);
       } 
       const result = results[i+1];
       if (result.status === 'rejected') {
@@ -132,8 +141,8 @@ describe('ストレステスト', () => {
       }
     });
 
-    // ロックファイルが削除されていることを確認
-    expect(TestLock.isReleasedState(parentKey)).toBeTruthy();
+    // 親のロックファイルが削除されていることを確認
+   checkState(parentKey);
 
     /*
     Object.keys(children).forEach((key, i) => {
@@ -171,27 +180,6 @@ describe('ストレステスト', () => {
     await testMultiProcess(50, "multiProcessLockWithSameKey50");
   });
 
-  /*****
-   * tmpが残ることがある、25回と50回で。
-   * また、ログによるとEBORKENがも確認した。
-   * １）tmpが残るのは、rename失敗である（だろう）、その原因の可能性を考えよう、、、他の理由で他プロセスが読み込み中とか？？　非同期処理で、読み込み中とか？？
-   *  -> 他プロセスによる排他的オープンの可能性がある。なので、これは、あきらめて、エラーとする。ただし、tmpの排他的オープンは、本体のそれと同時に行い、その結果として、ロック可能との判定をするように変更する
-   * 　そして、それでも、renameが失敗するか可能性は0には出来ないから、そのときは、責任をもって、tmpを削除する。通常の２倍のリトライで行い、それでもだめなら、致命的エラーとして、利用者に報告する。。。と言う感じでどうだろうか？？
-   * 
-   * 
-   * ２）EBROKENは、なぜ発生したのか、まずは、ログを診よう！　ログにはエラー内容が書かれているはずだが、、、その理由までわかるのか？？わからなければ、分るようにする必要あり！！
-   *  ログ確認の結果、ロック取得時に、tmpが既存のため排他的オープンできなかったときに、このえらーになることが分かった。★★★これは、ロジック見直しが必要！！★★★
-   * 　分解すると、、、ロックファイルオープン成功⇒tmpオープン失敗。。。このパターンだね
-   * 
-   * 
-   * まず、１）の対策で、２）は置きづらくなるはず。さらに、tmpオープン失敗は、単純にロックできなかったとすべし。。それは、既存のロックがあると判定する。
-   * しかし、事故により、ロックファイルおよびそのtmpが残ってしまっていることはありうるので（プロセス中断や、他の処理により、IOエラーリトライすらも失敗したとき（上記１に記載の通り））
-   * ロックファイルstale判定と同様に、tmpのstale判定も必要となる（tmpそのものに、メタ情報が残っている可能性は大きいからね）、、、、、それとも、あくまでも、stale判定は、ロックファイルのみとするか、、
-   * その場合は、tmpファイは中味は確認せずに、invalidデータ扱いとするか、、、ここは判断が必要。
-   * 
-   * 
-   * 
-   */
   it("すべて同じキーの複数のプロセスを同時に数個から100個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {
     await testMultiProcess(100, "multiProcessLockWithSameKey100");
   });

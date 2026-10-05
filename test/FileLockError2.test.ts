@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getHistoryPath,  getLockMetaPath, getLockSharerDir, removeLockFiles, setLockMeta, sleepAsync, TestLock  } from './FileLockTestCommon.ts';
 import { AlreadyLocked, type FileLockConfig,  FileLock, FileLockError, ReleaseFailed, type LockMonitor } from '../src/index.ts';
+//import { FileLockOptionsResolver } from '../src/lib/FileLockOptionsResolver.ts';
 
 let orgConfig: FileLockConfig;
 beforeEach(() => {
@@ -26,7 +27,7 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).instanceOf(AlreadyLocked);
       expect(err).toMatchObject({
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         key,
         message: "Lock file already exists, but its metadata is invalid.",
         reason: "InvalidMetadata",
@@ -38,10 +39,13 @@ describe('FileLockError', () => {
         }]
       })
     }
+    finally {
+      fs.unlinkSync(getLockMetaPath(key));
+    }
   });
 
   async function testWriteAndUnlinkError(key: string, timeoutMs: number, ErrorClass: new(...args: any[]) => Error, matchObj: object) {
-    //const orgUnlink = fs.unlinkSync;
+    const orgUnlink = fs.unlinkSync;
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
       throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { throw Object.assign(new Error("unlinkSync error!"), { code: 'EUNLINK' }); });
@@ -55,19 +59,16 @@ describe('FileLockError', () => {
     }
     catch (err) {
       expect(err).instanceOf(ErrorClass);
-      console.log("### 1st expect ok! ###");
       expect(err).toMatchObject(matchObj);
-      console.log("### 2st expect ok! ###");
     }
-    /*
     finally {
       // 作りかけのファイルが残っているので、削除する。
       orgUnlink(getLockMetaPath(key) + '.tmp');
-    }*/
+    }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
-  it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
+  it("111111111111The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(FileLockError)", async () => {
     const key = 'testKey_18465xx_unlink'
     await testWriteAndUnlinkError(key, 50, FileLockError, {
@@ -95,24 +96,26 @@ describe('FileLockError', () => {
   it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(FileLockError)", async () => {
     const key = 'testKey_18465xx_unlink_LockFileBroken'
-    await testWriteAndUnlinkError(key, 500, FileLockError, {
-      code: "EIO",
-      message: "Failed to acquire the lock due to a file I/O error.",
-      //reason: "Updating",
+    await testWriteAndUnlinkError(key, 500, AlreadyLocked, {
+      code: "EALREADYLOCKED",
+      message: "Lock file already exists and may still be updating.",
+      reason: "Updating",
       key,
     });
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   // ★　このテストはもはや意味が無い？？もしくは、カバレッジ対策のテストなのか！！。。代わりに、"ロックファイルがあるのに無いと偽る"テストを追加する
+  /*
   it("`existsSync` returns `true` exactly once, even though the specific file does not exist.", async () => {
     const key = 'testKey_existsSync_error_once'
+    const existsSync = fs.existsSync;
     const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: fs.PathLike) => {
       if (name === getLockMetaPath(key)) {
         spy.mockRestore();
         return true;
       }
-      return false;
+      return existsSync(name);
     });
 
     expect(await FileLock.withLock(
@@ -126,7 +129,7 @@ describe('FileLockError', () => {
     //expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
-
+*/
   it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
     vi.spyOn(fs, 'existsSync').mockImplementation(() => {
@@ -208,7 +211,7 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).instanceOf(AlreadyLocked);
       expect(err).toMatchObject({
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         message: "Lock file already exists and may still be initializing.",
         key,
         reason: "Initializing",
@@ -300,7 +303,6 @@ describe('FileLockError', () => {
         },
         operation: "Callback or Timer in withLock().",
       })
-      console.log(err);
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
@@ -314,7 +316,7 @@ describe('FileLockError', () => {
     ErrClass: unknown, 
     matchObj: object,
     sweep = false,
-    meta: Record<string, unknown> = {ownerId: "hoge", expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
+    meta: Record<string, unknown> | null = {ownerId: "hoge", expirationTime: Date.now() - 100, heartbeatTtlMs: 50, lastHeartbeatAt: Date.now() - 100},
     ) {
 
     if (meta) setLockMeta(key, meta);
@@ -403,7 +405,7 @@ describe('FileLockError', () => {
       true, 
       AlreadyLocked,
       {
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         path: getLockMetaPath(key),
         key: key,
         message: `Couldn't the lock because the '${key}' is already locked.`
@@ -477,11 +479,12 @@ describe('FileLockError', () => {
         }],
       },
       false, // sweep
-      undefined,
+      null,
     );
 
   });
 
+/*  これは、上記、writeSync失敗後の、unlink失敗でテストされるべき内容であるため、不要。
   // options._filePath + '.tmp'
   it("ロック一時ファイルの削除失敗", async () => {
     const key = 'lock_tmp_remove_fail';
@@ -501,26 +504,13 @@ describe('FileLockError', () => {
         code: "ERELEASE",
         key,
         message: "Processing is interrupted because the lock release or lock counter decrement failed.",
-        /*causes: [{
-          code: "EIO",
-          key,
-          message: "Failed to remove old lock sharers.",
-          causes: [{
-            code: "ERMMOON",
-            path: path.join(getLockSharerDir(key), '.lock'),
-            message: "Couldn't remove the file or directory.(rmSync error!)",
-            causes: [
-              { code: "ERMMOON", message: "rmSync error!" },
-              //{ code: "ERMMOON", message: "rmSync error!" }
-            ]
-          }],
-        }],*/
       },
       true, // sweep
-      undefined,
+      null,
     );
 
   });
+*/
 
   it("ロック共有者の削除失敗", async () => {
     const key = 'lock_sharer_remove_fail';
@@ -555,7 +545,7 @@ describe('FileLockError', () => {
         }],
       },
       true, // sweep
-      undefined,
+      null,
     );
 
   });
@@ -591,7 +581,7 @@ describe('FileLockError', () => {
         causes: [cause]
       },
       true, // sweep
-      undefined,
+      null,
     );
   });
 
@@ -629,7 +619,7 @@ describe('FileLockError', () => {
         causes: [cause]
       },
       true, // sweep
-      undefined,
+      null,
     );
   });
 
@@ -647,14 +637,13 @@ describe('FileLockError', () => {
       false, // error
       AlreadyLocked,
       {
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         key,
         reason: "MetadataReadError",
         message: "The lock file already exists, but its validity could not be determined due to an I/O error.",
         causes:["ENOENT"],
       },
       true, // sweep
-      undefined,
     );
 
   });
@@ -673,7 +662,7 @@ describe('FileLockError', () => {
       false, 
       AlreadyLocked,
       {
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         key,
         reason: "MetadataReadError",
         message: "The lock file already exists, but its validity could not be determined due to an I/O error.",
@@ -721,7 +710,7 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).instanceOf(AlreadyLocked);
       expect(err).toMatchObject({
-        code: "ELOCKED",
+        code: "EALREADYLOCKED",
         key,
         reason: "InvalidMetadata",
         message: "Lock file already exists, but its metadata is invalid."
@@ -732,6 +721,137 @@ describe('FileLockError', () => {
       expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
   });
+
+  // tmp作成したフリ（つまり、作成してみたが、できずに、さらにエラーになっていないケース）して、進める。
+  // すると、tmpファイル書き込みエラーになり、結局、ロックできなかったエラーになるはず。
+  // そして、その場合でも、tmpファイル含めて、全てがクリーンであることをチェックする。
+  it("上記の通り", async() => {
+    const key = "fakeTmpCreation";
+    const openSync = fs.openSync as (...args: unknown[]) => number;
+    const dummyFd = -18465;
+    vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
+      if (args[0] === getLockMetaPath(key) + '.tmp') {
+        return dummyFd; // オープンせずに適当な値を返す
+      }
+      return openSync(...args);
+    });
+    const closeSync = fs.closeSync;
+    vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
+      if (args[0] === dummyFd) {
+        return;
+      }
+      closeSync(args[0] as number);
+    });
+
+    try {
+      await FileLock.withLock(key, () => {}, { timeoutMs: 0});
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code: "EIO",
+        key,
+        message: "Failed to acquire the lock due to a file I/O error.",
+        causes: [{
+          code: "ENOENT",
+          key,
+          message: "[VERIFY] The temporary `lock file` must exist, but it's not found."
+        }],
+      });
+    }
+    finally {
+      vi.restoreAllMocks();
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
+    }
+  });
+
+  // tmp作成したフリ（つまり、作成してみたが、できずに、さらにエラーになっていないケース）して、進める。
+  // すると、tmpファイル書き込みエラーになり、結局、ロックできなかったエラーになるはず。
+  // その後、さらに、rmSyncそ失敗させて、ロック空ファイルが残ってしまテスト。
+  // 最後に、強制削除してテスト終了する。
+  it("上記の通り2", async() => {
+    const key = "fakeTmpCreationAndRmError";
+    const openSync = fs.openSync as (...args: unknown[]) => number;
+    const dummyFd = -18465;
+    const path = getLockMetaPath(key);
+    vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
+      if (args[0] === path + '.tmp') {
+        return dummyFd; // オープンせずに適当な値を返す
+      }
+      return openSync(...args);
+    });
+    const closeSync = fs.closeSync;
+    vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
+      if (args[0] === dummyFd) {
+        return;
+      }
+      closeSync(args[0] as number);
+    });
+    vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw Object.assign(new Error("rmSyncError!!"), { code: "ERMMOON" }) });
+
+    try {
+      await FileLock.withLock(key, () => {}, { timeoutMs: 0});
+    }
+    catch (err) {
+      expect(err).instanceOf(FileLockError);
+      expect(err).toMatchObject({
+        code: "EIO",
+        key,
+        message: "Failed to acquire the lock due to a file I/O error.",
+        causes: [{
+          code: "ERMMOON",
+          path: path,
+          message: "Failed to remove the `lock file`(rmSyncError!!)",
+          causes: [{
+            code: "ERMMOON",
+            message: "rmSyncError!!",
+          }]
+        }],
+      });
+    }
+    finally {
+      vi.restoreAllMocks();
+      expect(fs.existsSync(path)).toBeTruthy();
+      fs.unlinkSync(path);
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
+    }
+  });
+
+
+  it("一時ロックファイル作成失敗", async () => {
+    const key = "createTmpFailed";
+    await testSpyIO(
+      key,
+      'openSync',
+      () => {
+        throw Object.assign(new Error("openSync error!"), { code: 'EOMOON' });
+      },
+      false, // error
+      FileLockError,
+      {
+        code: 'EIO',
+        message: "Failed to acquire the lock due to a file I/O error.",
+        key,
+        causes: [{
+          code: "EOMOON",
+          path: getLockMetaPath(key) + '.tmp',
+          message: "Couldn't create the file.(openSync error!)",
+          causes: [{
+            code: "EOMOON",
+            message: "openSync error!",
+          }]
+        }],
+      },
+      false, // sweep
+      null,
+    );
+
+  });
+
+
+  // 以下、カバレッジ対応
+  // tmpオープンOK,ロックファイルオープン失敗、その後のunlink失敗　=>　spy（ロックファイルオープンエラー、unlinkエラー）でOK　　＃＃＃　ま、これは独自実装かな
+  
 
 });
 

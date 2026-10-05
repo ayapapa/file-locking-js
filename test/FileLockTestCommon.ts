@@ -66,7 +66,7 @@ const onPrettyLog = ( logEntry: LogEntry ) => {
   }
 }
 
-export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'trace', compact: true });
+export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'debug', compact: true });
 
 export function getLockMetaPath(key: string): string {
   return path.join(TestLock.getLockDirPath(), key + '.json');
@@ -93,6 +93,8 @@ export const setLockMeta = (key: string, meta: unknown) => {
 export function removeLockFiles(key: string) {
   const lockMetaPath = getLockMetaPath(key);
   if (fs.existsSync(lockMetaPath)) fs.unlinkSync(lockMetaPath);
+  const lockMetaTmpPath = getLockMetaPath(key) + '.tmp';
+  if (fs.existsSync(lockMetaTmpPath)) fs.unlinkSync(lockMetaTmpPath);
   const sharer = getLockSharerDir(key);
   if (fs.existsSync(sharer)) fs.rmSync(sharer, { force: true, recursive:true });
   /*
@@ -129,7 +131,7 @@ export function resetExecResources() {
 }
 
 // 別プロセスを非同期で実行する関数を用意する。
-export async function execChild(command: string, options: Options) {
+export async function execChild(command: 'lock' | 'sleep', options: Options) {
   const cmodPath = path.isAbsolute(commandPath) ? commandPath : path.resolve(__dirname, commandPath);
   const args: string[] = [
     cmodPath, 
@@ -155,7 +157,9 @@ export async function execChild(command: string, options: Options) {
     stdOut.push(str);
     // ★★ロック獲得条件をトレースログを見ていることに注意★★
     // つまり、デバッグ時（かつ、トレースレベルログ時）にのみ有効である。
-    if (str.includes('Acquired the lock')) locked = true;
+    if (str.includes('Child acquired lock')) {
+      locked = true;
+    }
   });
   child.stderr?.on('data', data => {
     const msg = data.toString();
@@ -180,7 +184,7 @@ export async function execChild(command: string, options: Options) {
     });
   });
 
-  if (options.waitAquired) {
+  if (command === 'lock' && options.waitAquired) {
     const cStart = Date.now();
     // 子プロセスのロック処理突入を確認
     while(locked === false && (Date.now() - cStart) <= options.sleep + 110/** マージンが必要なようだ、、そうでないと先をこされる*/) {
@@ -210,12 +214,23 @@ export class TestLock extends FileLock {
     return new TestLock(super["_getLock"](key));
   }
 
-  static isReleasedState(key: string): boolean {
+  static isReleasedStateDetail(key: string) {
     const lock = this.getLock(key);
-    return lock["_acquired"] === false && lock["_heartbeatTimer"] === null && 
-      fs.existsSync(getLockMetaPath(key)) === false &&
-      fs.existsSync(getLockSharerDir(key)) === false &&
-      fs.existsSync(getLockMetaPath(key) + '.tmp') === false;
+    return {
+      lock_acquired: lock["_acquired"] === false ? 'ok' : 'ng',
+      lock_heartbeatTimer: lock["_heartbeatTimer"] === null ? 'ok' : 'ng', 
+      lockfile_removed: fs.existsSync(getLockMetaPath(key)) === false ? 'ok' : 'ng',
+      lockSharersDir_removed: fs.existsSync(getLockSharerDir(key)) === false ? 'ok' : 'ng',
+      lockfile_tmp_removed: fs.existsSync(getLockMetaPath(key) + '.tmp') === false? 'ok' : 'ng',
+    }
+  }
+  static isReleasedState(key: string): boolean {
+    const state = this.isReleasedStateDetail(key);
+    return state.lock_acquired === 'ok' &&
+      state.lock_heartbeatTimer === 'ok' && 
+      state.lockfile_removed === 'ok' &&
+      state.lockSharersDir_removed === 'ok' &&
+      state.lockfile_tmp_removed === 'ok';
   }
 
   static getLockDirPath() {
@@ -244,13 +259,16 @@ export class TestLock extends FileLock {
     return super["_getReentrantContext"]();
   }
 
-
   async testWithLockEmptyOptions(cb: () => unknown): Promise<unknown> {
     return super["withLock"](cb, {} as FileLockRequiredOptions);
   }
 
   static testAddOnExit(fn: (code: unknown, signal: unknown)=>void): void {
     super._addOnExit(fn);
+  }
+
+  debugLog(...args: unknown[]) {
+    this._debugLog(...args);
   }
 
 }

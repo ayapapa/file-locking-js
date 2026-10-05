@@ -7,10 +7,10 @@ const args: string[] = [];
 for (let i = 2; i < process.argv.length; i++) {
   args.push(process.argv[i]);
 }
-
+/*
 console.log('process.argv:', process.argv);
 console.log('sub-command args:', args);
-
+*/
 const instruction = {
   'sleep': async () => {
     await sleepAsync(Number(args[1]))
@@ -24,12 +24,13 @@ const instruction = {
     let monitor: LockMonitor;
     await FileLock.withLock(
       key, async (mon) => {
+        console.info("Child acquired lock");
         monitor = mon;
         const sleep = Math.floor(sleepTime / 10);
         for (; sleepTime > 0; sleepTime -= sleep) {
           await sleepAsync(sleep);
           if (monitor.cancelled) {
-            console.info('###lock interrupted.###')
+            //console.info('###lock interrupted.###')
           }
         }
       },
@@ -40,13 +41,20 @@ const instruction = {
 } as Record<string, (() => Promise<unknown>)>;
 
 const ins = instruction[args[0]];
-console.log('do it.')
+//console.log('do it.')
 try {
   if (ins) await ins();
 }
 catch (err) {
-  console.log("##### Child caught Error #####");
-  console.error("[ERROR]", err);
+  console.error("## Child caught [ERROR]", err); 
+  /*
+  const e = err as Error;
+  console.error("[Child caught ERROR]", { 
+    message: e.message,
+    code: 'code' in e ? e.code : 'none',
+    reason: 'reason' in e ? e.reason : 'none',
+  });
+  */
   process.exit(1);
 }
-console.log('finished it.')
+//console.log('finished it.')

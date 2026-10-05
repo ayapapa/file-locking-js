@@ -10,7 +10,7 @@ import { isEqualObjectType } from './Util.ts';
 import { LockCompromised } from './FileLockErrors.ts';
 import { type Monitor } from './LockMonitor.ts';
 
-const {REQUIRE_DEBUG} = Contracts;
+const { ENSURE_DEBUG, REQUIRE_DEBUG } = Contracts;
 
 export type MaybePromise = unknown | PromiseLike<unknown>;
 
@@ -85,12 +85,34 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     LockBase._onExitFns.forEach(fn => fn(code, signal));
   }
 
+  static #resolveConfig(config: LockBaseConfig): Required<LockBaseConfig> {
+    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
+      'The current configuration is invalid.', LockError, { code: 'EINVAL' });
+
+    const curConf = LockBase._config as Record<string, unknown>;
+    const newConf = config as Record<string, unknown>;
+    const rConf = { ...curConf } as Record<string, unknown>;
+    Object.keys(curConf).forEach(key => {
+      if (key in newConf) rConf[key] = newConf[key];
+    });
+    ENSURE_DEBUG((() => {
+      let ret = true;
+      const keys = Object.keys(defaultLockBaseConfig);
+      for (let i = 0; i < keys.length && (ret = keys[i] in rConf); i++);
+      return ret; 
+    })(), "Some required keys are missing.", LockError, { code: 'EINVAL' });
+    // Cast the value, as it has already been verified above.
+    return rConf as Required<LockBaseConfig>;
+  }
+
   /**
    * @internal
    * Statically holds the specified `config` (type: `LockBaseConfig`).
    * @param config  Configurations. 
    */
   protected static setConfig(config: LockBaseConfig): void {
+    const rConf = LockBase.#resolveConfig(config);
+    /*
     REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
       'The current configuration is invalid.', LockError, { code: 'EINVAL' });
 
@@ -100,6 +122,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     Object.keys(curConf).forEach(key => {
       if (key in newConf) curConf[key] = newConf[key];
     });
+    */
+    LockBase._config = rConf;
 
     // logger
     LockBase._logger = LockBase._resolveLogger(LockBase._config);
@@ -143,8 +167,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param config 
    * @returns A logger where all methods are mandatory.
    */
-  protected static _resolveLogger(config?: LockBaseConfig): Required<LogProvider> {
-    let logger: LogProvider = config?.logger ?? console
+  protected static _resolveLogger(config: Required<LockBaseConfig>): Required<LogProvider> {
+    let logger: LogProvider = config.logger;
     if (logger === console) {
       logger = {...console as LogProvider};
       logger.trace = logger.debug;
@@ -183,6 +207,12 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   protected _ownerId: string;
 
+  /** 
+   * @internal
+   * Lock key
+   */
+  protected _debug: boolean= false;
+
   /**
    * @internal
    * Function to report a forced termination during asynchronous processing.
@@ -207,10 +237,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param key     Lock key.
    * @param config  Configuration.
    */
-  protected constructor(key: string, config?: LockBaseConfig) {
-    this._key = key;
-    this._logger = LockBase._resolveLogger(config);
+  protected constructor(key: string, config: LockBaseConfig = LockBase._config) {
+    this._key     = key;
+    this._logger  = LockBase._resolveLogger(LockBase.#resolveConfig(config));
     this._ownerId = crypto.randomUUID();
+    this._debug   = config._debug === true;
   }
 
   /**
@@ -364,6 +395,16 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       this.#onCompromisedRejects[options._sharerId](err);
       delete this.#onCompromisedRejects[options._sharerId];
     };
+  }
+
+  /**
+   * @internal
+   * Outputs a debug log.<br>
+   * Outputs via `logger.log()` only when `_debug` in the configuration (the `config` constructor argument) is set to `true`.
+   * @param args The arguments passed to `logger.log()`.
+   */
+  protected _debugLog(...args: unknown[]): void {
+    this._debug && this._logger.log(...args);
   }
 
   /**
@@ -590,6 +631,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     options._monitor = options._monitor || this.#newMonitor(options);
     Object.assign(options._monitor, mon);
   }
+
 }
 
 /**

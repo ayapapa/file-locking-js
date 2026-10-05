@@ -58,13 +58,13 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).instanceOf(AlreadyLocked);
       expect(err).toMatchObject({
-        code: 'ELOCKED',
+        code: 'EALREADYLOCKED',
         key,
         reason: "ExistingLock",
         message: `Lock file already exists.`,
       });
       /*
-      expect(err.code).toBe('ELOCKED');
+      expect(err.code).toBe('EALREADYLOCKED');
       expect(err.key).toBe(key);
       expect(err instanceof AlreadyLocked).toBe(true);
       expect(err.message.includes("Couldn't the lock because the")).toBe(true);
@@ -96,13 +96,13 @@ describe('FileLockError', () => {
     catch (err) {
       expect(err).instanceOf(AlreadyLocked);
       expect(err).toMatchObject({
-        code: 'ELOCKED',
+        code: 'EALREADYLOCKED',
         key,
         reason: "ExistingLock",
         message: `Lock file already exists.`,
       });
       /*
-      expect(err.code).toBe('ELOCKED');
+      expect(err.code).toBe('EALREADYLOCKED');
       expect(err.key).toBe(key);
       expect(err instanceof AlreadyLocked).toBe(true);
       expect(err.message.includes("Couldn't the lock because the")).toBe(true);
@@ -574,7 +574,7 @@ describe('FileLockError', () => {
       const cause = {
         code: "EWMOON",
         path: getLockMetaPath(key) + '.tmp',
-        message: "Failed to write the temporary file for the lock file.(writeFileSync error!)",
+        message: "Failed to write the temporary `lock file`.(writeFileSync error!)",
         causes: [cause2]
       };
       expect(err).toMatchObject({

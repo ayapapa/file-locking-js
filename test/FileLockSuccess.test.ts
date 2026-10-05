@@ -17,7 +17,7 @@ afterEach(() => {
 describe('FileLock', () => {
 
   it("The lock is successfully acquired, and the return value of the callback is obtained.", async () => {
-    const retVal = "test_00111", key = retVal;
+    const retVal = "callbackRetrunedValue", key = retVal;
     const opts =  {timeoutSec : 1 } as FileLockOptions;
     expect(await FileLock.withLock(key, 
       async () => {

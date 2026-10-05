@@ -67,9 +67,9 @@ describe('FileLock', () => {
 
   it("`You can specify `console` as the logger, " +
     "and the `fatal` function has been replaced by the `error` function, " +
-    "while the `trace` function has been replaced by the `debug` function..", async () => {
+    "while the `trace` function has been replaced by the `debug` function.", async () => {
 
-    const retVal = "test_001", key = retVal;
+    const retVal = "test_logger", key = retVal;
     expect.assertions(3);
     FileLock.setConfig({ logger: console });
 
@@ -87,39 +87,6 @@ describe('FileLock', () => {
     expect(lock._logger.fatal).toBe(lock._logger.error);
   });
 
-/*
- async function testLockDirectoryCreation(dir: string, set: () => void, reset: () => void): Promise<void> {
-    set();
-    expect.assertions(5);
-    try {
-      const retVal = "test_001", key = retVal;
-      fs.rmSync(dir, { force: true, recursive: true });
-      expect(fs.existsSync(dir)).toBe(false);
-
-      let ret;
-      try {
-        ret = await FileLock.withLock(key, 
-          async () => {
-            await sleepAsync(500);
-            return retVal;
-          },
-          {}
-        );
-      }
-      catch (err) {
-        logger.error(err);
-      }
-      expect(ret).toBe(retVal)
-      expect(fs.existsSync(dir)).toBe(true);
-      expect(fs.statSync(dir).isDirectory()).toBe(true);
-      fs.rmSync(dir, { force: true, recursive: true });
-      expect(fs.existsSync(dir)).toBe(false);
-    }
-    finally {
-      reset();
-    }
-  }
-*/
   it("The directory specified in `FileLock.setCondig()` is created.", () => {
     const dir = path.join(process.cwd(), '.lock');
     fs.rmSync(dir, { force: true, recursive: true });
@@ -149,6 +116,8 @@ describe('FileLock', () => {
     }
   });
 
+  let count = 0;
+
   async function testFsErrorBySpyOn(spyOnFnName: 'statSync' | 'mkdirSync', config: FileLockConfig, ErrorClass: new (...args:any[]) => Error): Promise<void>
   {
     const eCode = 'EHOGEHOGE';
@@ -160,7 +129,8 @@ describe('FileLock', () => {
     expect.assertions(2);
     try {
       FileLock.setConfig({ ...config, logger });
-      const retVal = "test_001", key = retVal;
+      const key = "testFsErrorBySpyOn_"+ String(count++).padStart(2, '0');
+      const retVal = key;
       await FileLock.withLock(key, 
         async () => {
           await sleepAsync(500);
@@ -195,7 +165,7 @@ describe('FileLock', () => {
     expect.assertions(2);
     try {
       FileLock.setConfig({ lockDirectory: dir, logger });
-      const retVal = "test_001", key = retVal;
+      const retVal = "notDirectory", key = retVal;
       await FileLock.withLock(key, 
         async () => {
           await sleepAsync(500);
@@ -213,7 +183,7 @@ describe('FileLock', () => {
   });
 
   it("Changing the directory path while a lock is held does not result in an error.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "changeDir1", key = retVal;
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {
@@ -226,7 +196,7 @@ describe('FileLock', () => {
   });
 
   it("Changing the directory path while a lock is held and then locking again using the same key does not result in an error.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "changeDir2", key = retVal;
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {
@@ -245,7 +215,7 @@ describe('FileLock', () => {
 
   it("Changing the directory path while a lock is held and subsequently acquiring another lock " +
     "using the same key—while in reentrant lock permission mode—does not result in an error.", async () => {
-    const retVal = "test_001", key = retVal;
+    const retVal = "changeDir3", key = retVal;
     FileLock.setConfig({ logger: console });
     expect(await FileLock.withLock(key, 
       async () => {

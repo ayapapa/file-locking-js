@@ -6,7 +6,7 @@
 
 # Class: TTLExceeded
 
-Defined in: [src/lib/LockBaseErrors.ts:48](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L48)
+Defined in: [src/lib/LockBaseErrors.ts:48](https://github.com/ayapapa/file-lock-js/blob/dba2b3bf319ab816289c9477d38445432a2cf7e8/src/lib/LockBaseErrors.ts#L48)
 
 TTL exceeded error.
 
@@ -20,7 +20,7 @@ TTL exceeded error.
 
 > **new TTLExceeded**(`msg`, `params?`): `TTLExceeded`
 
-Defined in: [src/lib/LockBaseErrors.ts:54](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L54)
+Defined in: [src/lib/LockBaseErrors.ts:54](https://github.com/ayapapa/file-lock-js/blob/dba2b3bf319ab816289c9477d38445432a2cf7e8/src/lib/LockBaseErrors.ts#L54)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/fca305860e8fb3b180e3b0ff367e54865f9ab95a/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/dba2b3bf319ab816289c9477d38445432a2cf7e8/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 
