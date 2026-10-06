@@ -53,7 +53,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
       throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { throw Object.assign(new Error("unlinkSync error!"), { code: 'EUNLINK' }); });
-    // ★expect.assertions(3);
+    expect.assertions(3);
     try {
       await FileLock.withLock(
         key,
@@ -66,17 +66,15 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(err).toMatchObject(matchObj);
     }
     finally {
-      //writeSpy.mockRestore();
-      //unlinkSpy.mockRestore();
+      writeSpy.mockRestore();
+      unlinkSpy.mockRestore();
       vi.restoreAllMocks();
 
       // 作りかけのファイルが残っているので、削除する。
       const filePath = getLockMetaPath(key);
       const tmpPath = filePath + '.tmp';
 
-      const state = TestLock.isReleasedStateDetail(key);
-      console.log(state);
-
+      // node 22では、rmSyncが、unlinkSyncを呼び出すようなので、ロックファイルも残っている可能性がある
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
@@ -86,14 +84,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       }
       catch(_err) {};
     }
-    const state = TestLock.isReleasedStateDetail(key);
-    //console.log(state);
-    expect(state.lockSharersDir_removed).toBe('ok')
-    expect(state.lock_acquired).toBe('ok')
-    expect(state.lock_heartbeatTimer).toBe('ok')
-    expect(state.lockfile_removed).toBe('ok')
-    expect(state.lockfile_tmp_removed).toBe('ok')
-
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
