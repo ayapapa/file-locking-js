@@ -48,6 +48,10 @@ const COMPROMISED_ERRORS = [] as unknown[];
 const PARENT_ERRORS = [] as unknown[];
 
 describe('ストレステスト', () => {
+
+  it("一個も実行されてテストが無いとエラーになるので、ダミーとして空テストを置いておく。", async () => {
+  });
+
   if (isCI) return;
 /*
   function childCompeleted() {
