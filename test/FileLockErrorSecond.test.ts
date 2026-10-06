@@ -154,6 +154,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+*/
   it("If a corrupted metafile is encountered, it is possible that the file is still being created; " +
      "consequently, repeated retries should eventually result in a timeout error.", async () => {
     const key = 'testKey_18465xx'
@@ -185,7 +186,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     //expect(fs.existsSync(metaPath)).toBeFalsy();
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
-*/
 
   it("history JSON parsing error", async () => {
     const histPath = getHistoryPath();
