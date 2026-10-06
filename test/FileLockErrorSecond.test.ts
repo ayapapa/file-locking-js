@@ -600,7 +600,9 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     expect(TestLock.isReleasedState(key2)).toBeTruthy();
   });
 
-  it("不正なロックファイルを故意に作成し、エラーとなることを確認する", async () => {
+*/
+
+it("不正なロックファイルを故意に作成し、エラーとなることを確認する", async () => {
     const key = "invalid_locklfile_error";
     const meta = {};
     setLockMeta(key, meta);
@@ -623,7 +625,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
   });
 
-*/
 
   // tmp作成したフリ（つまり、作成してみたが、できずに、さらにエラーになっていないケース）して、進める。
   // すると、tmpファイル書き込みエラーになり、結局、ロックできなかったエラーになるはず。
