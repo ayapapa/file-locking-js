@@ -486,6 +486,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
+*/
   //removeSharer unlinkSync
   it("ロック共有者削除エラー", async () => {
     const key = 'Key_unlinkSyncErr';
@@ -524,7 +525,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
-*/
   it("ロックファイルがあるのに無いと偽る", async () => {
     const key = 'Key_existsSync_false';
     const targetPath = getLockMetaPath(key);
