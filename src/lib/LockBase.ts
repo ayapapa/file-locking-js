@@ -189,9 +189,15 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   *  Logger.
+   * Whether or not a lock is acquired.
    */
-  protected _logger: Required<LogProvider>;
+  protected _acquired: boolean = false;
+
+  /** 
+   * @internal
+   * Lock key
+   */
+  protected _debug: boolean= false;
 
   /** 
    * @internal
@@ -201,9 +207,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Whether or not a lock is acquired.
+   *  Logger.
    */
-  protected _acquired: boolean = false;
+  protected _logger: Required<LogProvider>;
 
   /**
    * @internal
@@ -211,24 +217,16 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   protected _ownerId: string;
 
-  /** 
-   * @internal
-   * Lock key
-   */
-  protected _debug: boolean= false;
-
   /**
    * @internal
    * Function to report a forced termination during asynchronous processing.
    */
-  //#onExitReject: ((reason?: unknown) => void) | null = null;
   #onExitRejects: Record<string, ((reason?: unknown) => void)> = {};
 
   /**
    * @internal
    * Function to report that an lock compromised error occurred during asynchronous processing.
    */
-  //#onCompromisedReject: ((reason?: unknown) => void) | null = null;
   #onInterruptRejects: Record<string, ((reason?: unknown) => void)> = {};
 
   /**
@@ -246,6 +244,134 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     this._logger  = LockBase._resolveLogger(LockBase.#resolveConfig(config));
     this._ownerId = crypto.randomUUID();
     this._debug   = config._debug === true;
+  }
+
+  /**
+   * @internal
+   * Acquire the lock.
+   * @param options Lock options.
+   * @abstract
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _acquire(options: AllOptions<O, I>): Promise<void> {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  /**
+   * @internal
+   * Outputs a debug log.<br>
+   * Outputs via `logger.log()` only when `_debug` in the configuration (the `config` constructor argument) is set to `true`.
+   * @param args The arguments passed to `logger.log()`.
+   */
+  protected _debugLog(...args: unknown[]): void {
+    this._debug && this._logger.log(...args);
+  }
+
+  /**
+   * @internal
+   * Decrement the re-entry lock counter.
+   * @param options Lock options.
+   * @abstract
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _decReantryCount(options: AllOptions<O, I>): Promise<void> {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+ /**
+   * @internal
+   * Increment the re-entry lock counter.
+   * @param options Lock options.
+   * @abstract
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _incReantryCount(options: AllOptions<O, I>): Promise<void> {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  /**
+   * @internal
+   * @abstract
+   * Determines whether an error that has occurred is an expected error (an interruption). 
+   * This method is intended to be overridden in conjunction with the `_interruptPromise` method. (See the `_interruptPromise` method.)
+   * @param _err Error occurred
+   * @returns Returns `true` if it is an expected error, otherwise `false`.
+   */
+  // v8 ignore next 3
+  protected _isInterrupt(_err: unknown): boolean {
+    return false;
+  }
+  
+  /**
+   * @internal
+   * Handle errors that occur while locked.
+   * @param err       Error instance.
+   * @param operation Operation description
+   * @param options   Lock options.
+   * @param codeIfNon Error code.
+   * @abstract
+   */
+  protected _onError(err: unknown, operation: string, options: AllOptions<O, I>, codeIfNon: string = 'ELOCK') {
+    if (this.#isAlreadyCancelled(options)) return;
+    const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
+    this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
+    if (this._isInterrupt(err) && this.#onInterruptRejects[options._sharerId]) {
+      this.#onInterruptRejects[options._sharerId](err);
+      delete this.#onInterruptRejects[options._sharerId];
+    };
+  }
+
+  /**
+   * @internal
+   * Execute termination processing.<br>
+   * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
+   * @param code    Exit code.
+   * @param signal  Recieved signal.
+   * @abstract
+   */
+  protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    // If `onExitReject` (the Promise's reject function) is non-null, 
+    // the lock has not been released, so an interruption error is set.
+    // Incidentally, I am avoiding the use of `if` statements to ensure adequate test coverage.
+    Object.keys(this.#onExitRejects).forEach(key => {
+      this.#onExitRejects[key](new LockError("Forced termination.", {
+        code: 'ETERM',
+        props: { reason: { code, signal } }
+      }));
+      delete this.#onExitRejects[key];
+    });
+    /*
+    this.#onExitReject && 
+      this.#onExitReject(new LockError("Forced termination.", {
+        code: 'ETERM',
+        props: { reason: { code, signal } }
+      }));
+    this.#onExitReject = null;
+    */
+  }
+
+  /** 
+   * @internal
+   * Make preparations for the lock.
+   * @param options Lock options.
+   * @abstract
+   */
+  protected _prepare(options: AllOptions<O, I>): void {
+    this.#newMonitor(options);
+    options._sharerId = crypto.randomUUID();
+    // Note: If this lock request succeeds in acquiring the lock (i.e., if the key is currently unlocked), 
+    // `_sharerId` will be overwritten with this instance's owner ID(`this._ownerId`) upon acquisition.
+  }
+
+  /**
+   * @internal
+   * Release the lock.
+   * @param options Lock options.
+   * @abstract
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  protected async _release(options: AllOptions<O, I>): Promise<void> {
+    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
   }
 
   /**
@@ -294,134 +420,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       this._logger.trace('Error occurred.', err);
       throw err;
     }
-  }
-
-  /**
-   * @internal
-   * Acquire the lock.
-   * @param options Lock options.
-   * @abstract
-   */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async _acquire(options: AllOptions<O, I>): Promise<void> {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
-  }
-
-  /**
-   * @internal
-   * Release the lock.
-   * @param options Lock options.
-   * @abstract
-   */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async _release(options: AllOptions<O, I>): Promise<void> {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
-  }
-
-  /**
-   * @internal
-   * Execute termination processing.<br>
-   * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
-   * @param code    Exit code.
-   * @param signal  Recieved signal.
-   * @abstract
-   */
-  protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
-    // If `onExitReject` (the Promise's reject function) is non-null, 
-    // the lock has not been released, so an interruption error is set.
-    // Incidentally, I am avoiding the use of `if` statements to ensure adequate test coverage.
-    Object.keys(this.#onExitRejects).forEach(key => {
-      this.#onExitRejects[key](new LockError("Forced termination.", {
-        code: 'ETERM',
-        props: { reason: { code, signal } }
-      }));
-      delete this.#onExitRejects[key];
-    });
-    /*
-    this.#onExitReject && 
-      this.#onExitReject(new LockError("Forced termination.", {
-        code: 'ETERM',
-        props: { reason: { code, signal } }
-      }));
-    this.#onExitReject = null;
-    */
-  }
-
- /**
-   * @internal
-   * Increment the re-entry lock counter.
-   * @param options Lock options.
-   * @abstract
-   */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async _incReantryCount(options: AllOptions<O, I>): Promise<void> {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
-  }
-
-  /**
-   * @internal
-   * Decrement the re-entry lock counter.
-   * @param options Lock options.
-   * @abstract
-   */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async _decReantryCount(options: AllOptions<O, I>): Promise<void> {
-    throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
-  }
-
-  /** 
-   * @internal
-   * Make preparations for the lock.
-   * @param options Lock options.
-   * @abstract
-   */
-  protected _prepare(options: AllOptions<O, I>): void {
-    this.#newMonitor(options);
-    options._sharerId = crypto.randomUUID();
-    // Note: If this lock request succeeds in acquiring the lock (i.e., if the key is currently unlocked), 
-    // `_sharerId` will be overwritten with this instance's owner ID(`this._ownerId`) upon acquisition.
-  }
-
-  /**
-   * @internal
-   * @abstract
-   * Determines whether an error that has occurred is an expected error (an interruption). 
-   * This method is intended to be overridden in conjunction with the `_interruptPromise` method. (See the `_interruptPromise` method.)
-   * @param _err Error occurred
-   * @returns Returns `true` if it is an expected error, otherwise `false`.
-   */
-  // v8 ignore next 3
-  protected _isInterrupt(_err: unknown): boolean {
-    return false;
-  }
-  
-  /**
-   * @internal
-   * Handle errors that occur while locked.
-   * @param err       Error instance.
-   * @param operation Operation description
-   * @param options   Lock options.
-   * @param codeIfNon Error code.
-   * @abstract
-   */
-  protected _onError(err: unknown, operation: string, options: AllOptions<O, I>, codeIfNon: string = 'ELOCK') {
-    if (this.#isAlreadyCancelled(options)) return;
-    const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
-    this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
-    if (this._isInterrupt(err) && this.#onInterruptRejects[options._sharerId]) {
-      this.#onInterruptRejects[options._sharerId](err);
-      delete this.#onInterruptRejects[options._sharerId];
-    };
-  }
-
-  /**
-   * @internal
-   * Outputs a debug log.<br>
-   * Outputs via `logger.log()` only when `_debug` in the configuration (the `config` constructor argument) is set to `true`.
-   * @param args The arguments passed to `logger.log()`.
-   */
-  protected _debugLog(...args: unknown[]): void {
-    this._debug && this._logger.log(...args);
   }
 
   /**

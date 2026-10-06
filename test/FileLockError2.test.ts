@@ -68,33 +68,18 @@ describe('FileLockError', () => {
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
-  it("111111111111The generation (writing) of the lock file fails when the preliminary lock is not held, " +
+  it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(FileLockError)", async () => {
     const key = 'testKey_18465xx_unlink'
     await testWriteAndUnlinkError(key, 50, FileLockError, {
       code: "EIO",
       message: "Failed to acquire the lock due to a file I/O error.",
       key,
-      /*
-      causes: [{
-        code: "EUNLINK",
-        path: getLockMetaPath(key) + '.tmp',
-        message: "Failed to remove the temporary file for the lock file.(unlinkSync error!)",
-        causes: [{
-          code: "EWMOON",
-          message: "Failed to write the temporary file for the lock file.(writeFileSync error!)",
-          path: getLockMetaPath(key) + '.tmp'
-        },
-        {
-          code: "EUNLINK",
-          message: "unlinkSync error!",
-        }],
-      }],*/
     });
   });
 
   it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
-     "and the subsequent attempt to delete the empty file also fails.(FileLockError)", async () => {
+     "and the subsequent attempt to delete the empty file also fails.(AlreadyLocked)", async () => {
     const key = 'testKey_18465xx_unlink_AlreadyLocked'
     await testWriteAndUnlinkError(key, 500, AlreadyLocked, {
       code: "EALREADYLOCKED",

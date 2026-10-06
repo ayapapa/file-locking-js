@@ -1,6 +1,6 @@
 {
   "name": "@ayapapa-npm/file-locking-js",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.01",
   "description": "File-based mutual exclusion using mutex files for cross-process locking",
   "license": "MIT",
   "author": "ayapapa",
@@ -38,7 +38,7 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "@ayapapa-npm/pretty-console-js": "^0.2.3",
+    "@ayapapa-npm/pretty-console-js": "^0.2.4",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.0",
     "@types/proper-lockfile": "^4.1.4",
