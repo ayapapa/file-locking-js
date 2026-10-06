@@ -69,7 +69,13 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       vi.restoreAllMocks();
       // 作りかけのファイルが残っているので、削除する。
       const tmpPath = getLockMetaPath(key) + '.tmp';
-      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      
+      if (fs.existsSync(tmpPath)) {
+        try {
+          fs.unlinkSync(tmpPath);
+        }
+        catch(_err) {};
+      }
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
