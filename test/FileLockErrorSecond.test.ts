@@ -50,7 +50,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
   });
 
   async function testWriteAndUnlinkError(key: string, timeoutMs: number, ErrorClass: new(...args: any[]) => Error, matchObj: object) {
-    const orgUnlink = fs.unlinkSync;
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
       throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { throw Object.assign(new Error("unlinkSync error!"), { code: 'EUNLINK' }); });
@@ -67,8 +66,10 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(err).toMatchObject(matchObj);
     }
     finally {
+      vi.restoreAllMocks();
       // 作りかけのファイルが残っているので、削除する。
-      orgUnlink(getLockMetaPath(key) + '.tmp');
+      const tmpPath = getLockMetaPath(key) + '.tmp';
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
