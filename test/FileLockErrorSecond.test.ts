@@ -524,6 +524,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
+*/
   it("ロックファイルがあるのに無いと偽る", async () => {
     const key = 'Key_existsSync_false';
     const targetPath = getLockMetaPath(key);
@@ -549,7 +550,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
-*/
   it("前段ロックファイルがあるので、排他オープンに失敗するが、そのファイルの存在を確認すると、無いと言われる。", async () => {
     const key = 'Key_existsSync_false';
     const targetPath = getLockMetaPath(key);
