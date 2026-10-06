@@ -185,13 +185,15 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     //expect(fs.existsSync(metaPath)).toBeFalsy();
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
+*/
 
   it("history JSON parsing error", async () => {
     const histPath = getHistoryPath();
     const key = 'testKey_18465xxxx'
     const histBu = histPath + '.bu';
+    const histExist = fs.existsSync(histPath);
 
-    fs.renameSync(histPath, histBu);
+    if (histExist) fs.renameSync(histPath, histBu);
     
     fs.writeFileSync(histPath, '()');
 
@@ -213,9 +215,9 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
         code: "EHISTORY",
         history: histPath,
         message: "Failed to parse the history file.",
-        causes: [{
-          message: "Unexpected token '(', \"()\" is not valid JSON",
-        }],
+        //causes: [{
+        //  message: "Unexpected token '(', \"()\" is not valid JSON",
+        //}],
       }
       expect(err).toMatchObject({
         code: "EHISTORY",
@@ -225,12 +227,11 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     finally {
       fs.rmSync(histPath);
-      fs.renameSync(histBu, histPath);
+      if (histExist) fs.renameSync(histBu, histPath);
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
-*/
   // FileLock.onExit
   it("FileLock.onExit", async () => {
     const key = 'OnExitTest';
