@@ -19,10 +19,6 @@ afterEach(() => {
 });
 
 describe('FileLockError2', () => {
-  it("JSONエラーになるロックファイル残存", async () => {});
-
-return;
-
 
   it("JSONエラーになるロックファイル残存", async () => {
     const key = "BadJsonLockFile";
@@ -850,7 +846,6 @@ return;
    * テスト用
    * 浸食エラーを割り込みと判定しないテストのためのクラス。
    */
-  /*
   class TestLockNoInterrupt extends TestLock {
 
     static getLock(key: string): TestLockNoInterrupt {
@@ -875,7 +870,6 @@ return;
 
     expect(await lock["withLock"](()=>{return 'complete'}, FileLock.getDefaultOptions())).toBe('complete');
   });
-  */
 
 });
 
