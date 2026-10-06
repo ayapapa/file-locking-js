@@ -410,6 +410,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
+*/
   it("ロック共有者の削除失敗", async () => {
     const key = 'lock_sharer_remove_fail';
     await testSpyIO(
@@ -451,7 +452,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
-*/
   it("ロック共有者のリスト取得失敗", async () => {
     const key = 'Key_readdirSyncErr';
     const targetPath: string = getLockSharerDir(key);
