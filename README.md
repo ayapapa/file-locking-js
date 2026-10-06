@@ -96,42 +96,40 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 ## Options
 
 ## Errors
-| Class name | Overview  | Message | Other properties | How to handle the situation, etc.|
+| Class name | Overview  | Message | Other key properties | How to handle the situation, etc.|
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
-| LockCompromised | Corruption of lock file contents | The lock was compromised during the locking process. | { code: 'ECOMPROMISED', key: '(`lock key`)'path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^1]
-| LockFileBroken | Corruption of lock file contents | When checking whether a lock for the same key is already held, the contents of the existing lock file were found to be corrupted, making it impossible to determine the lock status. Please verify that the target process does not exist and delete the lock file if necessary. | { code: 'EBROKEN', path: '(Path to `lock file`)' } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^2]
-| ReleaseFailed | Failure to release the lock or decrement the lock counter | Processing is interrupted because the lock release or lock counter decrement failed. Additionally, please manually delete any remaining files or directories, such as lock files or shared lock information. | { code: 'ERELEASE', key: '(`lock key`)' } | Possible causes include intentional modification of the lock file by another process, file system corruption, or insufficient disk space. In the former case, take the same action as for `LockFileBroken`. In the latter case, check the system status. Additionally, manually delete the `path` and `sharer` entries associated with the error after confirming that no owning process exists for them [^1]. Alternatively, you may simply wait for them to be automatically deleted once specific time intervals (such as `ttlMs`, `heartbeatTtlMs`, or `invalidTtlMs`) have elapsed. |
+| LockCompromised | Corruption of lock file contents | The lock was compromised during the locking process. | { code: 'ECOMPROMISED', key: '(`lock key`) } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^1]
+| ReleaseFailed | Failure to release the lock or decrement the lock counter | Processing is interrupted because the lock release or lock counter decrement failed. | { code: 'ERELEASE', key: '(`lock key`)' } | Possible causes include intentional modification of the lock file by another process, file system corruption, or insufficient disk space. In the former case, take the same action as for `LockFileBroken`. In the latter case, check the system status. Additionally, manually delete the `path` and `sharer` entries associated with the error after confirming that no owning process exists for them [^1]. Alternatively, you may simply wait for them to be automatically deleted once specific time intervals (such as `ttlMs`, `heartbeatTtlMs`, or `invalidTtlMs`) have elapsed. |
 
 [^1]: Although FileLock is designed to maintain a consistent `lock file` during normal operation, it cannot prevent other processes that do not use FileLock from accessing the lock file. If the execution of such processes is anticipated, it is recommended to avoid conflicts by changing the `lock directory`.
 
 [^2]: Although FileLock is designed to maintain a consistent lock file during normal operation, a corrupted lock file may remain due to events such as the forced termination of a process; therefore, it is recommended to delete the file only after confirming that no other locking processes are active.
 
-
-
-
-というわけで、話を戻して、FileLockだけど、まずは、壊れたファイルは、リトライしまくって、ロックできなかったという実装までを目指すよ。そして、テストもそのように書く。そして、次の段階で、オプションでそのようなファイルの対処法指定しるために、「invalidTtlMs」なるものを導入した実装にすすもうと思う。[^2]
-
-
 [^3]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。（参考：invalidLockFileTimeoutMs は、heartbeatTtlMs を主な参考値として、利用環境に応じて設定してください）　⇒　最小値は、heartbeatTtlMsだろうなぁ。
 
-## ストレステスト
-テストでは、100プロセス同実行（全同キー、全別キー）にて正常、または、想定通りのエラーですべて終了することを確認していますが、これを保証するものではありません。
-### ストレステスト実行環境： 
-#### オペレーティングシステム
+## Stress test
+Testing has confirmed that simultaneous execution of 100 processes (using either identical keys or unique keys for all processes) completes successfully or terminates with the expected errors; however, this does not constitute a guarantee.
+
+
+### Stress test execution environment: 
+
+#### Operating system
 ```
-エディション	Windows 11 Home
-バージョン	25H2
-インストール日	2024/12/16
-OS ビルド	26200.9457
-エクスペリエンス	Windows 機能エクスペリエンス パック 1000.26100.360.0
+Edition	Windows 11 Home
+Version	25H2
+Installation date	2024/12/16
+OS build	26200.9457
+Experience	Windows Feature Experience Pack 1000.26100.360.0
 ```
-#### デバイス情報
+
+#### Device Information
+
 ```
-プロセッサ	Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz (3.00 GHz)
-実装 RAM	16.0 GB
-グラフィックス カード	NVIDIA GeForce GTX 1080 (8 GB)
-ストレージ	使用領域 1.15 TB / 2.34 TB
-システムの種類	64 ビット オペレーティング システム、x64 ベース プロセッサ
+Processor	Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz (3.00 GHz)
+Installed RAM	16.0 GB
+Graphics Card	NVIDIA GeForce GTX 1080 (8 GB)
+Storage	Used space 1.15 TB / 2.34 TB
+System Type	64-bit operating system, x64-based processor
 ```
 
 ## Examples

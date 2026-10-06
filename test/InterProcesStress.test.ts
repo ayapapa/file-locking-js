@@ -143,25 +143,6 @@ describe('ストレステスト', () => {
 
     // 親のロックファイルが削除されていることを確認
    checkState(parentKey);
-
-    /*
-    Object.keys(children).forEach((key, i) => {
-      expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
-      const result = results[i+1];
-      if (result.status === 'rejected') {
-        // 破損系エラーではないことを確認する
-        const reason = ('reason' in result) ? result.reason as string : ''; 
-        //expect(reason.includes('AlreadyLocked') || reason.includes('TTLExceeded')).toBeTruthy();
-        expect(reason.includes('LockFileBroken') || reason.includes('LockCompromised')).toBeFalsy();
-      }
-      else {
-        expect(results[i+1]).toMatchObject({
-          status: 'fulfilled',
-          value: { code: 0, signal: null, }
-        });
-      }
-    });
-    */
   }
 
   it("すべて同じキーの複数のプロセスを同時に数個から5個起動し、いずれも、問題なく処理が正常終了する。（タイムアウトしない程度の設定でテストする）", async () => {

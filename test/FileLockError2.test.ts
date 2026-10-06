@@ -95,7 +95,7 @@ describe('FileLockError', () => {
 
   it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(FileLockError)", async () => {
-    const key = 'testKey_18465xx_unlink_LockFileBroken'
+    const key = 'testKey_18465xx_unlink_AlreadyLocked'
     await testWriteAndUnlinkError(key, 500, AlreadyLocked, {
       code: "EALREADYLOCKED",
       message: "Lock file already exists and may still be updating.",
@@ -849,8 +849,34 @@ describe('FileLockError', () => {
   });
 
 
-  // 以下、カバレッジ対応
-  // tmpオープンOK,ロックファイルオープン失敗、その後のunlink失敗　=>　spy（ロックファイルオープンエラー、unlinkエラー）でOK　　＃＃＃　ま、これは独自実装かな
+  /**
+   * テスト用ロック。
+   * 浸食エラーを割り込みと判定しないテストのためのクラス。
+   */
+  class TestLockNoInterrupt extends TestLock {
+
+    static getLock(key: string): TestLockNoInterrupt {
+      return new TestLockNoInterrupt(super["_getLock"](key));
+    }
+
+    constructor(lock?: FileLock) {
+      super(lock);
+    }
+
+    protected _interruptPromise(): { promise: Promise<unknown>; resolve: (v: unknown) => void; reject: (r?: unknown) => void; } | undefined {
+      return;
+    }
+  }
+
+  // カバレッジ対策のために追加
+  it("浸食エラーを割り込みと判定しない", async () => {
+    const key = 'noInterrupt';
+    const lock = TestLockNoInterrupt.getLock(key);
+
+    expect(lock["_interruptPromise"]()).toBeUndefined();
+
+    expect(await lock["withLock"](()=>{return 'complete'}, FileLock.getDefaultOptions())).toBe('complete');
+  });
   
 
 });

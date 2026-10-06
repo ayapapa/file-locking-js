@@ -135,7 +135,7 @@ describe('別プロセスとの競合テスト', () => {
       status: 'fulfilled',
       value: { code: 0, signal: null }
     });
-    console.log("★★★★", results[1]);
+
     expect(results[1]).toMatchObject({
       status: 'rejected',
       reason: {
@@ -147,7 +147,7 @@ describe('別プロセスとの競合テスト', () => {
     });
   });
 
-  async function testChildError(key: string, pPara: { sleep: number, timeout: number }, cPara: { sleep: number, ttl?: number }, childFirst: boolean, reason: string): Promise<void> {
+  async function testChildError(key: string, pPara: { sleep: number, timeout: number }, cPara: { sleep: number, timeOutMs?: number, waitAquired?: boolean, ttl?: number }, childFirst: boolean, reason: string): Promise<void> {
     const createParentPr = async () => FileLock.withLock(key, async () => {
         await sleepAsync(pPara.sleep);
         return 'completed'
@@ -155,7 +155,7 @@ describe('別プロセスとの競合テスト', () => {
       { timeoutMs: pPara.timeout }
     );
     const createChild = async () => {
-      const cOpts = { key, sleep: cPara.sleep, timeOutMs: 0, waitAquired: true } as Options;
+      const cOpts = { key, sleep: cPara.sleep, timeOutMs: cPara.timeOutMs ?? 0, waitAquired: cPara.waitAquired ?? true } as Options;
       if (cPara.ttl) cOpts.ttlMs = cPara.ttl;
       return execChild('lock', cOpts);
     };
@@ -181,7 +181,7 @@ describe('別プロセスとの競合テスト', () => {
   } 
 
   it("同じキーをつかい、親プロセスを先に起動し、子プロセスがタイムアウトエラーになる.", async () => {
-    await testChildError('mainKey008', { sleep: 1000, timeout: 500 }, { sleep: 150 }, false, 'AlreadyLocked');
+    await testChildError('mainKey008', { sleep: 1000, timeout: 500 }, { sleep: 150, waitAquired: false }, false, 'AlreadyLocked');
   });
 
   it("同じキーを使い、子プロセスを先に起動したがttlエラーになり、処理はキャンセル状態となったところで、親プロセスはロック処理が進む.", async () => {

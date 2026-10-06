@@ -585,6 +585,17 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
   /**
    * @internal
+   * Determines whether an error that has occurred is an expected error (an interruption). 
+   * This method is intended to be overridden in conjunction with the `_interruptPromise` method. (See the `_interruptPromise` method.)
+   * @param _err Error occurred
+   * @returns Returns `true` if it is an expected error, otherwise `false`.
+   */
+  protected override _isInterrupt(err: unknown): boolean {
+    return err instanceof LockCompromised;
+  }
+
+  /**
+   * @internal
    * Make advance preparations.
    * @param options Options
    */
@@ -1223,13 +1234,13 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     catch (err) {
       throw new LockCompromised(
         `Couldn't parse the lock file, it is probably broken.`,
-        {key: this._key, props: { path: options._filePath, contents, ownerId: options._ownerId } });
+        {key: this._key, props: { path: options._filePath, contents } });
     }
 
     VERIFY(checkOwner === false || options._ownerId == null || options._ownerId === meta.ownerId,
       'The lock file was overwritten by another lock.',
       LockCompromised,
-      { key: this._key, props: { path: options._filePath, key: this._key, ownerId: options._ownerId, lockFileOwnerId: meta.ownerId } }
+      { key: this._key, props: { path: options._filePath, ownerId: options._ownerId, lockFileOwnerId: meta.ownerId } }
     );
 
     // Check contents.
@@ -1406,6 +1417,26 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     };
 
     _add();
+  }
+
+  /**
+   * @interna
+   * @abstract
+   * Create a promise for interrupt detection.<br>
+   * This method is intended to be overridden in subclasses as needed.
+   * @returns A `promise` for detecting interrupt processing, along with its `resolve` and `reject` functions.
+   */
+  protected override _interruptPromise(): { promise: Promise<unknown>, resolve: (v: unknown) => void, reject: (r?: unknown) => void} | undefined {
+    let onResolve!: ((v: unknown) => void);
+    let onReject!: ((r?: unknown) => void);
+    return {
+      promise: new Promise((resolve, reject) => {
+        onResolve = resolve;
+        onReject  = reject;
+      }),
+      resolve: onResolve,
+      reject: onReject
+    };
   }
 
   /**

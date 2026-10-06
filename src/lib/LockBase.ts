@@ -7,7 +7,6 @@ import { type LockBaseRequiredOptions } from './LockBaseOptions.ts';
 import { type LockBaseInternalState } from './LockBaseInternalState.ts'
 import { defaultLockBaseConfig, type LockBaseConfig, type LogProvider } from './LockBaseConfig.ts'
 import { isEqualObjectType } from './Util.ts';
-import { LockCompromised } from './FileLockErrors.ts';
 import { type Monitor } from './LockMonitor.ts';
 
 const { ENSURE_DEBUG, REQUIRE_DEBUG } = Contracts;
@@ -85,26 +84,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     LockBase._onExitFns.forEach(fn => fn(code, signal));
   }
 
-  static #resolveConfig(config: LockBaseConfig): Required<LockBaseConfig> {
-    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
-      'The current configuration is invalid.', LockError, { code: 'EINVAL' });
-
-    const curConf = LockBase._config as Record<string, unknown>;
-    const newConf = config as Record<string, unknown>;
-    const rConf = { ...curConf } as Record<string, unknown>;
-    Object.keys(curConf).forEach(key => {
-      if (key in newConf) rConf[key] = newConf[key];
-    });
-    ENSURE_DEBUG((() => {
-      let ret = true;
-      const keys = Object.keys(defaultLockBaseConfig);
-      for (let i = 0; i < keys.length && (ret = keys[i] in rConf); i++);
-      return ret; 
-    })(), "Some required keys are missing.", LockError, { code: 'EINVAL' });
-    // Cast the value, as it has already been verified above.
-    return rConf as Required<LockBaseConfig>;
-  }
-
   /**
    * @internal
    * Statically holds the specified `config` (type: `LockBaseConfig`).
@@ -179,6 +158,31 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     return logger as Required<LogProvider>;
   }
 
+  /**
+   * @interface
+   * @param config  User-specified settings.
+   * @returns A required object for configuration properties.
+   */
+  static #resolveConfig(config: LockBaseConfig): Required<LockBaseConfig> {
+    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
+      'The current configuration is invalid.', LockError, { code: 'EINVAL' });
+
+    const curConf = LockBase._config as Record<string, unknown>;
+    const newConf = config as Record<string, unknown>;
+    const rConf = { ...curConf } as Record<string, unknown>;
+    Object.keys(curConf).forEach(key => {
+      if (key in newConf) rConf[key] = newConf[key];
+    });
+    ENSURE_DEBUG((() => {
+      let ret = true;
+      const keys = Object.keys(defaultLockBaseConfig);
+      for (let i = 0; i < keys.length && (ret = keys[i] in rConf); i++);
+      return ret; 
+    })(), "Some required keys are missing.", LockError, { code: 'EINVAL' });
+    // Cast the value, as it has already been verified above.
+    return rConf as Required<LockBaseConfig>;
+  }
+
   /** 
    * Instance fieilds. 
    */
@@ -225,7 +229,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * Function to report that an lock compromised error occurred during asynchronous processing.
    */
   //#onCompromisedReject: ((reason?: unknown) => void) | null = null;
-  #onCompromisedRejects: Record<string, ((reason?: unknown) => void)> = {};
+  #onInterruptRejects: Record<string, ((reason?: unknown) => void)> = {};
 
   /**
    *  Instance methods. 
@@ -377,6 +381,19 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     // Note: If this lock request succeeds in acquiring the lock (i.e., if the key is currently unlocked), 
     // `_sharerId` will be overwritten with this instance's owner ID(`this._ownerId`) upon acquisition.
   }
+
+  /**
+   * @internal
+   * @abstract
+   * Determines whether an error that has occurred is an expected error (an interruption). 
+   * This method is intended to be overridden in conjunction with the `_interruptPromise` method. (See the `_interruptPromise` method.)
+   * @param _err Error occurred
+   * @returns Returns `true` if it is an expected error, otherwise `false`.
+   */
+  // v8 ignore next 3
+  protected _isInterrupt(_err: unknown): boolean {
+    return false;
+  }
   
   /**
    * @internal
@@ -391,9 +408,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     if (this.#isAlreadyCancelled(options)) return;
     const code: string = (err instanceof Error && 'code' in err && err.code ? String(err.code) : codeIfNon);
     this.#setMonitor({ cancelled: true, reason: code, cause: err, operation}, options)
-    if (err instanceof LockCompromised && this.#onCompromisedRejects[options._sharerId]) {
-      this.#onCompromisedRejects[options._sharerId](err);
-      delete this.#onCompromisedRejects[options._sharerId];
+    if (this._isInterrupt(err) && this.#onInterruptRejects[options._sharerId]) {
+      this.#onInterruptRejects[options._sharerId](err);
+      delete this.#onInterruptRejects[options._sharerId];
     };
   }
 
@@ -425,6 +442,20 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   }
 
   /**
+   * @interna
+   * @abstract
+   * Create a promise for interrupt detection.<br>
+   * This method is intended to be overridden in subclasses as needed.
+   * If you override this, you must also override the `_isInterrupt` method to determine 
+   * whether the interrupt is the one expected. (See the `_isInterrupt` method.) 
+   * @returns A `promise` for detecting interrupt processing, along with its `resolve` and `reject` functions.
+   */
+  // v8 ignore next 3
+  protected _interruptPromise(): { promise: Promise<unknown>, resolve: (v: unknown) => void, reject: (r?: unknown) => void} | undefined {
+    return;
+  }
+
+  /**
    * @internal
    * A common method for executing a callback function while holding a lock.
    * @param onLockFn  Callback function to execute while locked.
@@ -439,25 +470,34 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     await aquire();
 
     // Created promises.
-    const ttlTimer = this.#createTtlTimer(options);
+    const ttlTimer      = this.#createTtlTimer(options);
     const onExitPromise = this.#onExitPromise();
-    const onCompromised = this.#onCompromised();
-    const cbPromise = this.#execCallback(onLockFn, options);
-
+    //const onCompromised = this.#onCompromised();
+    const cbPromise     = this.#execCallback(onLockFn, options);
+    const racePrs = [cbPromise, ttlTimer.promise, onExitPromise.promise];
     // Register reject functions.
     this.#onExitRejects[options._sharerId] = onExitPromise.onExitReject;
-    this.#onCompromisedRejects[options._sharerId] = onCompromised.onCompromisedReject;
+
+    // If there is an interrupt promise in the inheriting class, 
+    // have it participate in the promise race described below.
+    const interruptPromise = this._interruptPromise();
+    if (interruptPromise) {
+      racePrs.push(interruptPromise.promise);
+      this.#onInterruptRejects[options._sharerId] = interruptPromise.reject;
+    }
 
     // A race between callback processing and the TTL timer.
     try {
-      return await Promise.race([cbPromise, ttlTimer.promise, onExitPromise.promise, onCompromised.promise])
+      return await Promise.race(racePrs)
         .finally(() => { // In any case, turn off the timer.
           // Avoid if statements as a measure against coverage issue
           ttlTimer.id && clearTimeout(ttlTimer.id);
           onExitPromise.onExitResolve('No forced termination');
           delete this.#onExitRejects[options._sharerId];
-          onCompromised.onCompromisedResolve('No compromised');
-          delete this.#onCompromisedRejects[options._sharerId];
+          if (interruptPromise) {
+            interruptPromise.resolve('Ok');
+            delete this.#onInterruptRejects[options._sharerId];
+          }
         }
       );
     }
@@ -518,24 +558,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       }),
       onExitResolve,
       onExitReject
-    };
-  }
-
-  /**
-   * @internal
-   * Create a promise to handle potential interruption during processing, 
-   * set the reject function to `this`, and return the promise and the `resolve` function.
-   */
-  #onCompromised() {
-    let onCompromisedResolve!: ((v: unknown) => void);
-    let onCompromisedReject!: ((r: unknown) => void);
-    return {
-      promise: new Promise((resolve, reject) => {
-        onCompromisedResolve = resolve;
-        onCompromisedReject = reject;
-      }),
-      onCompromisedResolve,
-      onCompromisedReject
     };
   }
 

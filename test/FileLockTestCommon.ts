@@ -184,7 +184,7 @@ export async function execChild(command: 'lock' | 'sleep', options: Options) {
     });
   });
 
-  if (command === 'lock' && options.waitAquired) {
+  if (options.waitAquired && command === 'lock') {
     const cStart = Date.now();
     // 子プロセスのロック処理突入を確認
     while(locked === false && (Date.now() - cStart) <= options.sleep + 110/** マージンが必要なようだ、、そうでないと先をこされる*/) {
@@ -201,10 +201,6 @@ export async function execChild(command: 'lock' | 'sleep', options: Options) {
  */
 // @ts-expect-error constructor of `FileLock` is private.
 export class TestLock extends FileLock {
-  constructor(lock?: FileLock) {
-    super("TestLock_Key");
-    Object.assign(this, lock);
-  }
 
   static getExitFuncs() {
     return super["_onExitFns"];
@@ -255,6 +251,16 @@ export class TestLock extends FileLock {
     return FileLock.getHistoryInfo().historyPath;
   }
 
+
+  static testAddOnExit(fn: (code: unknown, signal: unknown)=>void): void {
+    super._addOnExit(fn);
+  }
+
+  constructor(lock?: FileLock) {
+    super("TestLock_Key");
+    Object.assign(this, lock);
+  }
+
   getReentrantContext() {
     return super["_getReentrantContext"]();
   }
@@ -262,15 +268,11 @@ export class TestLock extends FileLock {
   async testWithLockEmptyOptions(cb: () => unknown): Promise<unknown> {
     return super["withLock"](cb, {} as FileLockRequiredOptions);
   }
-
-  static testAddOnExit(fn: (code: unknown, signal: unknown)=>void): void {
-    super._addOnExit(fn);
-  }
-
   debugLog(...args: unknown[]) {
     this._debugLog(...args);
   }
 
 }
+
 
 FileLock.setConfig({ logger, history: true, _debug: true });
