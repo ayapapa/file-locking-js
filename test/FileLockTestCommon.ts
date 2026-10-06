@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { PrettyConsole, type LogEntry } from '@ayapapa-npm/pretty-console-js';
+import { PrettyConsole, type Config as PrettyCOnfig,  type LogEntry } from '@ayapapa-npm/pretty-console-js';
 import { pino } from 'pino'
 import { createStream } from 'rotating-file-stream'
 
@@ -13,60 +13,70 @@ export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const logDir = path.resolve('./logs')
-fs.mkdirSync(logDir, { recursive: true })
+const isCI = process.env.CI === 'true';
 
-/*
-const stream = Pino.transport({
-  target: 'pino/file',
-  options: {
-    destination: './logs/file-lock.log',
-    frequency: 'daily',
-    size: '5m',
-    mkdir: true,
-  },
-});
-*/
+const config = { level: 'debug', compact: true } as PrettyCOnfig;
 
-const stream = createStream((time: Date | number) => {
-  if (!time) return 'file-lock.log'
-  const date = new Date(time);
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `file-lock-${yyyy}-${mm}-${dd}.log`
-}, {
-  path: logDir,
-  interval: '1d',
-  intervalBoundary: true,
-  initialRotation: true,
-  maxFiles: 14
-});
+// CIの時は、ファイルログは出力しない（CIエラー対策）
+if (isCI === false) {
+  const logDir = path.resolve('./logs')
+  fs.mkdirSync(logDir, { recursive: true })
 
-const pinoLogger = pino(
-  {
-    level: 'trace',
-    timestamp: pino.stdTimeFunctions.isoTime,
-    formatters: {
-      level: label => ({ level: label.toUpperCase() }),
+  /*
+  const stream = Pino.transport({
+    target: 'pino/file',
+    options: {
+      destination: './logs/file-lock.log',
+      frequency: 'daily',
+      size: '5m',
+      mkdir: true,
     },
-  },
-  stream,
-);
+  });
+  */
 
-const onPrettyLog = ( logEntry: LogEntry ) => {
-  const method = logEntry.method === 'log' ? 'info' : logEntry.method;
-  const err = logEntry.args.find(arg => arg instanceof Error);
-  if (err) {
-    // Pino's type definition expects the second argument to be a string.
-    // Use Reflect.apply to pass the arguments as-is.
-    Reflect.apply(pinoLogger[method], pinoLogger, [err, logEntry.args]);    }
-  else {
-    pinoLogger[method](logEntry.args);
+  const stream = createStream((time: Date | number) => {
+    if (!time) return 'file-lock.log'
+    const date = new Date(time);
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `file-lock-${yyyy}-${mm}-${dd}.log`
+  }, {
+    path: logDir,
+    interval: '1d',
+    intervalBoundary: true,
+    initialRotation: true,
+    maxFiles: 14
+  });
+
+  const pinoLogger = pino(
+    {
+      level: 'trace',
+      timestamp: pino.stdTimeFunctions.isoTime,
+      formatters: {
+        level: label => ({ level: label.toUpperCase() }),
+      },
+    },
+    stream,
+  );
+
+  const onPrettyLog = ( logEntry: LogEntry ) => {
+    const method = logEntry.method === 'log' ? 'info' : logEntry.method;
+    const err = logEntry.args.find(arg => arg instanceof Error);
+    if (err) {
+      // Pino's type definition expects the second argument to be a string.
+      // Use Reflect.apply to pass the arguments as-is.
+      Reflect.apply(pinoLogger[method], pinoLogger, [err, logEntry.args]);    }
+    else {
+      pinoLogger[method](logEntry.args);
+    }
   }
+
+  config.onLog = onPrettyLog;
+
 }
 
-export const logger = new PrettyConsole({ onLog: onPrettyLog, level: 'debug', compact: true });
+export const logger = new PrettyConsole(config);
 
 export function getLockMetaPath(key: string): string {
   return path.join(TestLock.getLockDirPath(), key + '.json');
