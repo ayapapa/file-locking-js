@@ -451,6 +451,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
+*/
   it("ロック共有者のリスト取得失敗", async () => {
     const key = 'Key_readdirSyncErr';
     const targetPath: string = getLockSharerDir(key);
@@ -486,7 +487,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
-*/
   //removeSharer unlinkSync
   it("ロック共有者削除エラー", async () => {
     const key = 'Key_unlinkSyncErr';
