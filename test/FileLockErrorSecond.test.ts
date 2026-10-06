@@ -77,6 +77,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       catch(_err) {};
     }
     const state = TestLock.isReleasedStateDetail(key);
+    console.log(state);
     expect(state.lockSharersDir_removed).toBe('ok')
     expect(state.lock_acquired).toBe('ok')
     expect(state.lock_heartbeatTimer).toBe('ok')
