@@ -353,6 +353,8 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
+  */
+
   it("Failed to delete an invalid lock file, but subsequently succeeded in acquiring the lock.", async () => {
     const key = "testKey_staleMeta_unlinkFailed_lockOK";
 
@@ -375,7 +377,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
-*/
    it("ロック共有ディレクトリのロック失敗（IOエラーによる）", async () => {
     const key = "testKey_sharer_lock";
     await testSpyIO(
