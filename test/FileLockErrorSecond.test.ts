@@ -375,6 +375,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
+*/
    it("ロック共有ディレクトリのロック失敗（IOエラーによる）", async () => {
     const key = "testKey_sharer_lock";
     await testSpyIO(
@@ -410,7 +411,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
-*/
   it("ロック共有者の削除失敗", async () => {
     const key = 'lock_sharer_remove_fail';
     await testSpyIO(
