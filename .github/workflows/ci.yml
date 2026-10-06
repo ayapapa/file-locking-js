@@ -5,6 +5,12 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      test_file:
+        description: '例 test\FileLockError2.test.ts'
+        required: false
+        type: string
 
 jobs:
   build:
