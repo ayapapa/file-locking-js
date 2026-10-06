@@ -66,16 +66,23 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(err).toMatchObject(matchObj);
     }
     finally {
-      writeSpy.mockRestore();
-      unlinkSpy.mockRestore();
+      //writeSpy.mockRestore();
+      //unlinkSpy.mockRestore();
+      vi.restoreAllMocks();
+
       // 作りかけのファイルが残っているので、削除する。
-      const tmpPath = getLockMetaPath(key) + '.tmp';
+      const filePath = getLockMetaPath(key);
+      const tmpPath = filePath + '.tmp';
 
       const state = TestLock.isReleasedStateDetail(key);
       console.log(state);
 
       try {
-        fs.unlinkSync(tmpPath);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      catch(_err) {};
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
       }
       catch(_err) {};
     }
