@@ -70,14 +70,17 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       unlinkSpy.mockRestore();
       // 作りかけのファイルが残っているので、削除する。
       const tmpPath = getLockMetaPath(key) + '.tmp';
-      
+
+      const state = TestLock.isReleasedStateDetail(key);
+      console.log(state);
+
       try {
         fs.unlinkSync(tmpPath);
       }
       catch(_err) {};
     }
     const state = TestLock.isReleasedStateDetail(key);
-    console.log(state);
+    //console.log(state);
     expect(state.lockSharersDir_removed).toBe('ok')
     expect(state.lock_acquired).toBe('ok')
     expect(state.lock_heartbeatTimer).toBe('ok')
