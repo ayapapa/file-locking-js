@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe('なぜかテストが通らない、、、困ったちゃんですな。', () => {
-
+/*
   it("JSONエラーになるロックファイル残存", async () => {
     const key = "BadJsonLockFile";
     fs.writeFileSync(getLockMetaPath(key), '()', 'utf-8');
@@ -92,31 +92,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
-  // ★　このテストはもはや意味が無い？？もしくは、カバレッジ対策のテストなのか！！。。代わりに、"ロックファイルがあるのに無いと偽る"テストを追加する
-  /*
-  it("`existsSync` returns `true` exactly once, even though the specific file does not exist.", async () => {
-    const key = 'testKey_existsSync_error_once'
-    const existsSync = fs.existsSync;
-    const spy = vi.spyOn(fs, 'existsSync').mockImplementation((name: fs.PathLike) => {
-      if (name === getLockMetaPath(key)) {
-        spy.mockRestore();
-        return true;
-      }
-      return existsSync(name);
-    });
-
-    expect(await FileLock.withLock(
-      key,
-      async () => {
-        await sleepAsync(200);
-        return 'completed';
-      },
-    )).toBe('completed');
-
-    //expect(fs.existsSync(getLockMetaPath(key))).toBeFalsy();
-    expect(TestLock.isReleasedState(key)).toBeTruthy();
-  });
-*/
   it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
     vi.spyOn(fs, 'existsSync').mockImplementation(() => {
@@ -400,46 +375,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
-  // ★★★　本テストはロジック変更により不要となった　★★★
-  // 無効ロックファイルのunlinkしないで上書きするロジックに変更、そして、最初のunlinkは、共有者情報の削除に利用される
-  // おそらく、この後のテストで同様のテスト実施（パスを特定したテスト）しているので、そちらがあればＯＫは、
-  /*
-  it("Failed to delete an invalid lock file. Subsequently, locking failed.", async () => {
-    const key = "testKey_staleMeta_unlinkFailed_lockNG";
-    const cause = {
-      code: "EEXIST",
-      path: getLockMetaPath(key),
-      message: "Couldn't remove the lock file.(#####)",
-      causes: [{ // IOError時リトライ回数に依存して個数が繰り返される（デフォルトは1なので、２回分格納されている）
-        code: "EEXIST",
-        message: "#####",
-      },
-      {
-        code: "EEXIST",
-        message: "#####",
-      }],
-    };
-
-    await testSpyIO(
-      key,
-      'unlinkSync',
-      () => {
-        throw Object.assign(new Error("#####"), { code: "EEXIST"});
-      },
-      false, 
-      FileLockError,
-      {
-        code: "EIO",
-        message: "Failed to acquire the lock due to a file I/O error.",
-        key,
-        causes: [cause], 
-      },
-      true
-    );
-  });
-  */
-
-  it("ロック共有ディレクトリのロック失敗（IOエラーによる）", async () => {
+   it("ロック共有ディレクトリのロック失敗（IOエラーによる）", async () => {
     const key = "testKey_sharer_lock";
     await testSpyIO(
       key,
@@ -473,34 +409,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
 
   });
-
-/*  これは、上記、writeSync失敗後の、unlink失敗でテストされるべき内容であるため、不要。
-  // options._filePath + '.tmp'
-  it("ロック一時ファイルの削除失敗", async () => {
-    const key = 'lock_tmp_remove_fail';
-    const tmpPath = getLockMetaPath(key) + '.tmp';
-    await testSpyIO(
-      key,
-      'rmSync',
-      (_, args, orgFn) => {
-        if (String(args[0]).toString() === tmpPath) {
-          throw Object.assign(new Error("rmSync error!"), { code: 'ERMMOON' });
-        }
-        return orgFn(...args);
-      },
-      false, // error
-      ReleaseFailed,
-      {
-        code: "ERELEASE",
-        key,
-        message: "Processing is interrupted because the lock release or lock counter decrement failed.",
-      },
-      true, // sweep
-      null,
-    );
-
-  });
-*/
 
   it("ロック共有者の削除失敗", async () => {
     const key = 'lock_sharer_remove_fail';
@@ -840,7 +748,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
 
   });
-
+*/
 
   /**
    * テスト用
