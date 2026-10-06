@@ -268,7 +268,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
-
+*/
   // 不正ロックファイルを故意に作成し、ファイルIOエラーを故意に引き起こすテスト
   async function testSpyIO(
     key: string, 
@@ -317,7 +317,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
   }
-
+/*
   it("When an invalid lock file exists, an exclusive open attempt fails after the file is deleted. A subsequent lock succeeds.", async () => {
     const key = "testKey_staleMeta_reopenFailed_lockOK";
     await testSpyIO(
@@ -718,6 +718,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
   });
 
+*/
 
   it("一時ロックファイル作成失敗", async () => {
     const key = "createTmpFailed";
@@ -748,7 +749,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
 
   });
-*/
 
   /**
    * テスト用
