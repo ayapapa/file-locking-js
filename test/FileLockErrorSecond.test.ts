@@ -92,6 +92,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+*/
   it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
     vi.spyOn(fs, 'existsSync').mockImplementation(() => {
@@ -124,7 +125,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
   });
 
-*/
   it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
     const key = 'testKey_18465xx'
     expect.assertions(4);
