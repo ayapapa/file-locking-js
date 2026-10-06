@@ -13,7 +13,7 @@ export async function sleepAsync(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const isCI = process.env.CI === 'true';
+export const isCI = process.env.CI === 'true';
 
 const config = { level: 'debug', compact: true } as PrettyCOnfig;
 

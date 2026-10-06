@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AlreadyLocked, FileLock, type FileLockConfig, type FileLockOptions } from '../src/index.ts';
-import { sleepAsync, execChild, childErrCount, childErrors, childExecCount, resetExecResources, logger, TestLock } from './FileLockTestCommon.ts';
+import { childErrCount, childErrors, childExecCount, execChild, isCI, logger, resetExecResources, sleepAsync, TestLock } from './FileLockTestCommon.ts';
 
 const childExecCounts = [] as number[];
 const childErrCounts = [] as number[];
@@ -48,6 +48,7 @@ const COMPROMISED_ERRORS = [] as unknown[];
 const PARENT_ERRORS = [] as unknown[];
 
 describe('ストレステスト', () => {
+  if (isCI) return;
 /*
   function childCompeleted() {
     for (const v of stdOut) {

@@ -97,7 +97,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     });
   });
 
-/*
   it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(AlreadyLocked)", async () => {
     const key = 'testKey_18465xx_unlink_AlreadyLocked'
@@ -110,7 +109,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     //expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
-*/
   it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
     vi.spyOn(fs, 'existsSync').mockImplementation(() => {
