@@ -332,6 +332,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       {}
     );
   });
+  */
 
   it("An invalid lock file exists; the initial attempt to open exclusively failed, determin that it is invalid; " +
      "a subsequent attempt to open the temporary lock file exclusively also failed; consequently, the locking operation fails..", async () => {
@@ -352,8 +353,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       }
     );
   });
-
-  */
 
   it("Failed to delete an invalid lock file, but subsequently succeeded in acquiring the lock.", async () => {
     const key = "testKey_staleMeta_unlinkFailed_lockOK";
