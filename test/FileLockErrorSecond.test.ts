@@ -549,6 +549,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   });
 
+*/
   it("前段ロックファイルがあるので、排他オープンに失敗するが、そのファイルの存在を確認すると、無いと言われる。", async () => {
     const key = 'Key_existsSync_false';
     const targetPath = getLockMetaPath(key);
@@ -573,7 +574,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
-*/
   it("Circular deadlock. The one that did not time out first succeeds.", async () => {
     const key1 = "testKey_circular_deadlock_001";
     const key2 = "testKey_circular_deadlock_002";
