@@ -43,6 +43,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       })
     }
     finally {
+      vi.restoreAllMocks();
       fs.unlinkSync(getLockMetaPath(key));
       expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
