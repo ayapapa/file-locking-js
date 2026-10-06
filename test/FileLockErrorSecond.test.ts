@@ -573,6 +573,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     );
   });
 
+*/
   it("Circular deadlock. The one that did not time out first succeeds.", async () => {
     const key1 = "testKey_circular_deadlock_001";
     const key2 = "testKey_circular_deadlock_002";
@@ -600,7 +601,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     expect(TestLock.isReleasedState(key2)).toBeTruthy();
   });
 
-*/
 
 it("不正なロックファイルを故意に作成し、エラーとなることを確認する", async () => {
     const key = "invalid_locklfile_error";
