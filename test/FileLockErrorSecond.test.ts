@@ -19,10 +19,11 @@ afterEach(() => {
 });
 
 describe('なぜかテストが通らない、、、困ったちゃんですな。', () => {
-/*
+
   it("JSONエラーになるロックファイル残存", async () => {
     const key = "BadJsonLockFile";
     fs.writeFileSync(getLockMetaPath(key), '()', 'utf-8');
+    expect.assertions(3);
     try {
       await FileLock.withLock(key, () => {}, { timeoutMs: 0 });
     }
@@ -43,9 +44,11 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     finally {
       fs.unlinkSync(getLockMetaPath(key));
+      expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
   });
 
+/*
   async function testWriteAndUnlinkError(key: string, timeoutMs: number, ErrorClass: new(...args: any[]) => Error, matchObj: object) {
     const orgUnlink = fs.unlinkSync;
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
