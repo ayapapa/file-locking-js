@@ -437,13 +437,16 @@ describe('FileLockError2', () => {
   });
   */
 
-  it("ロック共有ディレクトリのロックがかかった状態を故意につくってロックを掛ける", async () => {
+  it("ロック共有ディレクトリのロック失敗（IOエラーによる）", async () => {
     const key = "testKey_sharer_lock";
     await testSpyIO(
       key,
       'openSync',
       (_, args, orgFn) => {
-        if (String(args[0]).includes(".sharer\\.lock") ) throw Object.assign(new Error("openSync error!"), { code: 'EOMOON' });
+        const filePath = args[0] as string;
+        const parent = path.basename(path.dirname(filePath))
+        const name = path.basename(filePath)
+        if (parent.endsWith('.sharer') && name === '.lock') throw Object.assign(new Error("openSync error!"), { code: 'EOMOON' });
         return orgFn(...args);
       },
       false, // error
@@ -503,7 +506,10 @@ describe('FileLockError2', () => {
       key,
       'rmSync',
       (_, args, orgFn) => {
-        if (String(args[0]).toString().includes(".sharer\\.lock") ) {
+        const filePath = args[0] as string;
+        const parent = path.basename(path.dirname(filePath))
+        const name = path.basename(filePath)
+        if (parent.endsWith('.sharer') && name === '.lock') {
           throw Object.assign(new Error("rmSync error!"), { code: 'ERMMOON' });
         }
         return orgFn(...args);
@@ -590,7 +596,7 @@ describe('FileLockError2', () => {
       key,
       'unlinkSync',
       (_, args, orgFn) => {
-        if (String(args[0]).includes(targetDir) === true && String(args[0]).includes(targetDir + '\\.lock') === false) {
+        if (String(args[0]).includes(targetDir) === true && String(args[0]).endsWith('.lock') === false) {
           throw Object.assign(new Error('unlinkSync error'), { code: 'EULMOON' });
         }
         return orgFn(...args);
