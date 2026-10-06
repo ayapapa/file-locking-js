@@ -844,6 +844,7 @@ describe('FileLockError2', () => {
    * テスト用ロック。
    * 浸食エラーを割り込みと判定しないテストのためのクラス。
    */
+  /*
   class TestLockNoInterrupt extends TestLock {
 
     static getLock(key: string): TestLockNoInterrupt {
@@ -868,7 +869,7 @@ describe('FileLockError2', () => {
 
     expect(await lock["withLock"](()=>{return 'complete'}, FileLock.getDefaultOptions())).toBe('complete');
   });
-  
+  */
 
 });
 

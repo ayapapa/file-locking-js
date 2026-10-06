@@ -586,5 +586,31 @@ describe('FileLockError', () => {
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
+
+  class TestLockNoInterrupt extends TestLock {
+
+    static getLock(key: string): TestLockNoInterrupt {
+      return new TestLockNoInterrupt(super["_getLock"](key));
+    }
+
+    constructor(lock?: FileLock) {
+      super(lock);
+    }
+
+    protected _interruptPromise(): { promise: Promise<unknown>; resolve: (v: unknown) => void; reject: (r?: unknown) => void; } | undefined {
+      return;
+    }
+  }
+
+  // カバレッジ対策のために追加
+  it("浸食エラーを割り込みと判定しない", async () => {
+    const key = 'noInterrupt';
+    const lock = TestLockNoInterrupt.getLock(key);
+
+    expect(lock["_interruptPromise"]()).toBeUndefined();
+
+    expect(await lock["withLock"](()=>{return 'complete'}, FileLock.getDefaultOptions())).toBe('complete');
+  });
+  
 });
 
