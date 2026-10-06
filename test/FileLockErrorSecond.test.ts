@@ -48,7 +48,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
   });
 
-/*
   async function testWriteAndUnlinkError(key: string, timeoutMs: number, ErrorClass: new(...args: any[]) => Error, matchObj: object) {
     const orgUnlink = fs.unlinkSync;
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
@@ -83,6 +82,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     });
   });
 
+/*
   it("The generation (writing) of the lock file fails when the preliminary lock is not held, " +
      "and the subsequent attempt to delete the empty file also fails.(AlreadyLocked)", async () => {
     const key = 'testKey_18465xx_unlink_AlreadyLocked'
