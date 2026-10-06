@@ -124,6 +124,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
   });
 
+*/
   it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
     const key = 'testKey_18465xx'
     expect.assertions(4);
@@ -154,7 +155,6 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
-*/
   it("If a corrupted metafile is encountered, it is possible that the file is still being created; " +
      "consequently, repeated retries should eventually result in a timeout error.", async () => {
     const key = 'testKey_18465xx'
