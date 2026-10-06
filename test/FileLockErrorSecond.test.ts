@@ -317,7 +317,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(TestLock.isReleasedState(key)).toBeTruthy();
     }
   }
-/*
+
   it("When an invalid lock file exists, an exclusive open attempt fails after the file is deleted. A subsequent lock succeeds.", async () => {
     const key = "testKey_staleMeta_reopenFailed_lockOK";
     await testSpyIO(
@@ -332,8 +332,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       {}
     );
   });
-  */
-
+  
   it("An invalid lock file exists; the initial attempt to open exclusively failed, determin that it is invalid; " +
      "a subsequent attempt to open the temporary lock file exclusively also failed; consequently, the locking operation fails..", async () => {
     const key = "testKey_staleMeta_reopenFailed_lockNg"
