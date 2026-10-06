@@ -230,6 +230,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
+*/
   // FileLock.onExit
   it("FileLock.onExit", async () => {
     const key = 'OnExitTest';
@@ -268,7 +269,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
-*/
+
   // 不正ロックファイルを故意に作成し、ファイルIOエラーを故意に引き起こすテスト
   async function testSpyIO(
     key: string, 
