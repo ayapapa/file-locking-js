@@ -53,7 +53,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { 
       throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { throw Object.assign(new Error("unlinkSync error!"), { code: 'EUNLINK' }); });
-    expect.assertions(3);
+    // ★expect.assertions(3);
     try {
       await FileLock.withLock(
         key,
@@ -76,6 +76,13 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       }
       catch(_err) {};
     }
+    const state = TestLock.isReleasedStateDetail(key);
+    expect(state.lockSharersDir_removed).toBe('ok')
+    expect(state.lock_acquired).toBe('ok')
+    expect(state.lock_heartbeatTimer).toBe('ok')
+    expect(state.lockfile_removed).toBe('ok')
+    expect(state.lockfile_tmp_removed).toBe('ok')
+
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
