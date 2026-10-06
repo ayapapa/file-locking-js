@@ -16,7 +16,7 @@ afterEach(() => {
   FileLock.setConfig(orgConfig);
 });
 
-describe('FileLockError', () => {
+describe('FileLockError2', () => {
 
   it("JSONエラーになるロックファイル残存", async () => {
     const key = "BadJsonLockFile";
