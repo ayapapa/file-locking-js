@@ -48,6 +48,13 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    */
   protected static _lastOptions: FileLockRequiredOptions | null = null;
 
+  /**
+   * @internal
+   * FileLock instance cache associated with a key. 
+   * Uses `LRUCache`, providing features to set a maximum cache size and prune (remove) infrequently accessed elements.
+   */
+  static #cache: LRUCache<string, FileLock> | null;
+
   /** 
    * @internal
    * Current configurations.
@@ -56,16 +63,9 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
   /**
    * @internal
-   * FileLock instance cache associated with a key. 
-   * Uses `LRUCache`, providing features to set a maximum cache size and prune (remove) infrequently accessed elements.
+   * The history directory path.
    */
-  static #cache: LRUCache<string, FileLock> | null;
-
-  /**
-   * @internal
-   * The lock directory
-   */
-  static #lockDir = FileLock._getLockDirPath();
+  static #historyDir = path.join(FileLock._getLockDirPath(), 'history');
 
   /**
    * @internal
@@ -81,15 +81,15 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
   /**
    * @internal
-   * The history directory path.
-   */
-  static #historyDir = path.join(FileLock.#lockDir, 'history');
-
-  /**
-   * @internal
    * The history file path.
    */
   static #historyPath = path.join(FileLock.#historyDir, FileLock.#historyName);
+
+  /**
+   * @internal
+   * The lock directory
+   */
+  static #lockDir = FileLock._getLockDirPath();
 
   /** 
    * Static methods
@@ -102,6 +102,47 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
   public static _initialize() {
     FileLock.resetConfig();
     FileLock._addOnExit(FileLock.#onExitFn);
+  }
+
+  /** Get current configurations. */
+  public static getConfig(): Required<FileLockConfig> {
+    return FileLock._copyConfig(FileLock.#config);
+  }
+
+  /** Get default configurations. */
+  public static getDefaultConfig(): Required<FileLockConfig> {
+    return FileLock._copyConfig(defaultFileLockConfig);
+  }
+
+  /**
+   * Get default options(`FileLockOptions`).
+   * @returns Deault options.
+   */
+  public static getDefaultOptions(): FileLockRequiredOptions {
+    return { ...defaultFileLockOptions };
+  }
+
+  /**
+   * Get the history informations.
+   * @returns 
+   */
+  public static getHistoryInfo(): Readonly<{
+    historyEnabled: boolean, 
+    historyId: string, 
+    historyPath: string, 
+    processId: number 
+  }> {
+    return {
+      historyEnabled: FileLock.#config.history,
+      historyId: FileLock.#historyId,
+      historyPath: FileLock.#historyPath,
+      processId: process.pid,
+    }
+  }
+
+  /** Resets the current settings to their default values. */
+  public static resetConfig(): void {
+    FileLock.setConfig(FileLock.getDefaultConfig());
   }
 
   /**
@@ -151,21 +192,6 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     FileLock.#historyPath =  path.join(FileLock.#historyDir, FileLock.#historyName);
   }
 
-  /** Resets the current settings to their default values. */
-  public static resetConfig(): void {
-    FileLock.setConfig(FileLock.getDefaultConfig());
-  }
-
-  /** Get current configurations. */
-  public static getConfig(): Required<FileLockConfig> {
-    return FileLock._copyConfig(FileLock.#config);
-  }
-
-  /** Get default configurations. */
-  public static getDefaultConfig(): Required<FileLockConfig> {
-    return FileLock._copyConfig(defaultFileLockConfig);
-  }
-
   /**
    * Acquires a lock for the specified key, executes the function `onLockFn` under exclusive control, 
    * and returns a Promise that resolves with the return value of `onLockFn` after the lock is released. 
@@ -192,41 +218,12 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
   }
 
   /**
-   * Get default options(`FileLockOptions`).
-   * @returns Deault options.
-   */
-  public static getDefaultOptions(): FileLockRequiredOptions {
-    return { ...defaultFileLockOptions };
-  }
-
-  /**
-   * Get the history informations.
-   * @returns 
-   */
-  public static getHistoryInfo(): Readonly<{
-    historyEnabled: boolean, 
-    historyId: string, 
-    historyPath: string, 
-    processId: number 
-  }> {
-    return {
-      historyEnabled: FileLock.#config.history,
-      historyId: FileLock.#historyId,
-      historyPath: FileLock.#historyPath,
-      processId: process.pid,
-    }
-  }
-
-  /**
    * @internal
-   * Termination processing. 
-   * On Windows, this is not called upon forced termination (process.kill()), but the implementation is retained.
-   * @param code 
-   * @param signal 
+   * Get `cache` instance. <br>
+   * It is set to `private` for testing purposes.
    */
-  static #onExitFn(code: number | null | undefined, signal: NodeJS.Signals | null) {
-    FileLock._logger.trace("Exited by", { code, signal });
-    FileLock.#cache?.forEach( lock => lock.#onExit(code, signal));
+  private static _getCache(): LRUCache<string, FileLock> | null {
+    return FileLock.#cache;
   }
 
   /**
@@ -245,15 +242,6 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     return lock;
   }
   
-  /**
-   * @internal
-   * Get `cache` instance. <br>
-   * It is set to `private` for testing purposes.
-   */
-  private static _getCache(): LRUCache<string, FileLock> | null {
-    return FileLock.#cache;
-  }
-
   /**
    * @internal
    * Get a directory path for storing files containing lock information.<br>
@@ -333,6 +321,15 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
   /**
    * @internal
+   *  Clear `lock` instance cache. 
+   */
+  static #clearCache() {
+    const cache = FileLock._getCache();
+    if (cache) cache.clear();
+  }
+
+  /**
+   * @internal
    * Whether the instance corresponding to `key` is cached. 
    * @param key Lock key. 
    */
@@ -343,11 +340,14 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
   /**
    * @internal
-   *  Clear `lock` instance cache. 
+   * Termination processing. 
+   * On Windows, this is not called upon forced termination (process.kill()), but the implementation is retained.
+   * @param code 
+   * @param signal 
    */
-  static #clearCache() {
-    const cache = FileLock._getCache();
-    if (cache) cache.clear();
+  static #onExitFn(code: number | null | undefined, signal: NodeJS.Signals | null) {
+    FileLock._logger.trace("Exited by", { code, signal });
+    FileLock.#cache?.forEach( lock => lock.#onExit(code, signal));
   }
 
   /**
@@ -384,6 +384,40 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     super(key, FileLock.#config);
   }
 
+  async #addSharer(options: AllOptions, msg: string = "Failed to add the lock request to lock sharers.") {
+    const sharerPath = path.join(options._sharerDir, options._sharerId);
+    try {
+      await this.#share(() => this.#writeFileSync(sharerPath, '', options), options);
+    }
+    catch (err) {
+      throw new FileLockError(msg, {
+        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
+      });
+    }
+  }
+
+  async #removeInvalidSharers(options: AllOptions, msg: string = "Failed to remove old lock sharers.") {
+    const sharers = this.#listSharer(options, "Failed to retrieve the list of lock sharers.");
+    try {
+      return await this.#share(() => {
+        sharers.forEach(path => this.#unlinkSync(path, options));
+      }, options, false);
+    }
+    catch (err) {
+      throw new FileLockError(msg, {
+        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
+      });
+    }
+  }
+
+  /**
+   * @interenal
+   * Share the lock. <br>
+   * It is intended to be called when the lock is acquired by the owner and when the lock is re-acquired.
+   * @param op 
+   * @param options 
+   * @param withLock 
+   */
   async #share(op: () => void, options: AllOptions, withLock: boolean = true): Promise<void> {
     const lockPath = path.join(options._sharerDir, '.lock');
 
@@ -421,32 +455,6 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
       */
      // force: trueで、存在しない場合はエラーにならない
      this.#rmSync(lockPath, options, { force: true });
-    }
-  }
-
-  async #removeInvalidSharers(options: AllOptions, msg: string = "Failed to remove old lock sharers.") {
-    const sharers = this.#listSharer(options, "Failed to retrieve the list of lock sharers.");
-    try {
-      return await this.#share(() => {
-        sharers.forEach(path => this.#unlinkSync(path, options));
-      }, options, false);
-    }
-    catch (err) {
-      throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
-      });
-    }
-  }
-
-  async #addSharer(options: AllOptions, msg: string = "Failed to add the lock request to lock sharers.") {
-    const sharerPath = path.join(options._sharerDir, options._sharerId);
-    try {
-      await this.#share(() => this.#writeFileSync(sharerPath, '', options), options);
-    }
-    catch (err) {
-      throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
-      });
     }
   }
 
@@ -622,7 +630,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @return A Promise that resolves with the return value of onLockFn.
    */
   private async withLock(onLockFn: CallbackOnLock, userOpts: FileLockRequiredOptions): Promise<unknown> {
-    REQUIRE_DEBUG(includesAllKeysOf(userOpts, FileLock.getDefaultOptions()), 
+    REQUIRE_DEBUG(() => includesAllKeysOf(userOpts, FileLock.getDefaultOptions()), 
       "The option remains unresolved.", InvalidOptions, { name: 'userOpts', props: { options: userOpts } } );
 
     // Reconstructs the options by combining the specified options with the internal state.
@@ -856,7 +864,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param options Options.
    */
   #startHeartbeat(options: AllOptions): void {
-    REQUIRE_DEBUG(this._heartbeatTimer === null, 
+    REQUIRE_DEBUG(this._heartbeatTimer == null, 
       'Heartbeat multiple startup error. Possible bug.', 
       FileLockError, { code: 'EFILELOCK', props: { options } });
 

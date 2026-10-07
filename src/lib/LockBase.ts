@@ -90,19 +90,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param config  Configurations. 
    */
   protected static setConfig(config: LockBaseConfig): void {
-    const rConf = LockBase.#resolveConfig(config);
-    /*
-    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
-      'The current configuration is invalid.', LockError, { code: 'EINVAL' });
-
-    // Since the type has been verified, perform a type cast.
-    const curConf = LockBase._config as Record<string, unknown>;
-    const newConf = config as Record<string, unknown>;
-    Object.keys(curConf).forEach(key => {
-      if (key in newConf) curConf[key] = newConf[key];
-    });
-    */
-    LockBase._config = rConf;
+    LockBase._config = LockBase.#resolveConfig(config);
 
     // logger
     LockBase._logger = LockBase._resolveLogger(LockBase._config);
@@ -164,7 +152,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @returns A required object for configuration properties.
    */
   static #resolveConfig(config: LockBaseConfig): Required<LockBaseConfig> {
-    REQUIRE_DEBUG(isEqualObjectType(LockBase._config, defaultLockBaseConfig),
+    REQUIRE_DEBUG(() => isEqualObjectType(LockBase._config, defaultLockBaseConfig),
       'The current configuration is invalid.', LockError, { code: 'EINVAL' });
 
     const curConf = LockBase._config as Record<string, unknown>;
@@ -173,12 +161,12 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     Object.keys(curConf).forEach(key => {
       if (key in newConf) rConf[key] = newConf[key];
     });
-    ENSURE_DEBUG((() => {
+    ENSURE_DEBUG(() => {
       let ret = true;
       const keys = Object.keys(defaultLockBaseConfig);
       for (let i = 0; i < keys.length && (ret = keys[i] in rConf); i++);
       return ret; 
-    })(), "Some required keys are missing.", LockError, { code: 'EINVAL' });
+    }, "Some required keys are missing.", LockError, { code: 'EINVAL' });
     // Cast the value, as it has already been verified above.
     return rConf as Required<LockBaseConfig>;
   }

@@ -21,7 +21,7 @@ afterEach(() => {
   FileLock.setConfig(orgConfig);
 });
 
-describe('FileLock', () => {
+describe('FileLock.Config', () => {
 
   it("`FileLock.setConfig()` works correctly.", () => {
     expect.assertions(3);
@@ -36,8 +36,6 @@ describe('FileLock', () => {
     FileLock.setConfig(config);
     expect(JSON.stringify(FileLock.getConfig())).toBe(JSON.stringify(config));
   });
-
-  //class TestLock extends (FileLock as any) {};
 
   it("In `setConfig()`, if a value lower than the minimum is specified " +
     "for a numeric property among the default options, " +
@@ -350,7 +348,7 @@ describe('FileLock', () => {
     testConfigMinVal('maxHistoryFiles', 101, 101);
   });
 
-  it("最大ヒストリーファイル数を0に設定すると、ヒストリーファイルは生成されない。", async () => {
+  it("Set the maximum number of history files to 0.", async () => {
     const key = "MaxHisFiles_0";
 
     FileLock.setConfig({ maxHistoryFiles: 0 });
