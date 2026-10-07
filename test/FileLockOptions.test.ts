@@ -36,7 +36,7 @@ describe('FileLockOptions test.', () => {
     expect(opts.heartbeatIntervalSec).toBeUndefined();
     expect(opts.heartbeatIntervalMs).toBe(1000);
     expect(opts.heartbeatTtlSec).toBeUndefined();
-    expect(opts.heartbeatTtlMs).toBe(2000);
+    expect(opts.heartbeatTtlMs).toBe(5000);
     expect(opts.retriesOnIOErr).toBe(1);
     expect(opts.retryIntervalSec).toBeUndefined();
     expect(opts.retryIntervalMs).toBe(100);

@@ -17,17 +17,17 @@ import { getCallStack, includesAllKeysOf, sleepAsync, sleepSync, typedKeys } fro
 import { type FileLockMeta } from './FileLockMeta.ts'
 import { AlreadyLocked, InvalidOptions, ReleaseFailed } from './LockBaseErrors.ts';
 
-/**
- * @ internal
- * The options actually used within FileLockOptions. 
- */
-type FileLockAllOptions = FileLockRequiredOptions & Pick<FileLockOptions, 'invalidTtlMs'>
-
 /** 
  * @ internal
  * All options type.
  */
 type AllOptions = AllOptionsT<FileLockAllOptions, FileLockInternalState>;
+
+/**
+ * @ internal
+ * The options actually used within FileLockOptions. 
+ */
+type FileLockAllOptions = FileLockRequiredOptions & Pick<FileLockOptions, 'invalidTtlMs'>
 
 /**
 * File locking. 

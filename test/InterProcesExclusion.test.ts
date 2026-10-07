@@ -190,7 +190,7 @@ describe('別プロセスとの競合テスト', () => {
 
   it("子プロセスを先に起動したが、実行中に、強制的にプロセスをキルする。親プロセスは、ロック情報の無効化を確認後ロック処理が進む.", async () => {
     const key = 'subKey0031';
-    const child = await execChild('lock', { key, sleep: 1000, ttlMs: 1100, waitAquired: true });
+    const child = await execChild('lock', { key, sleep: 1000, ttlMs: 1100, heartbeatTtlMs: 2000, waitAquired: true });
 
     //await sleepAsync(500);
     child.cid.kill();

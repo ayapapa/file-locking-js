@@ -21,6 +21,7 @@ const instruction = {
     let sleepTime = Number(args[2]);
     const timeoutMs = args[3] ? Number(args[3]) : 5000;
     const ttlMs = args[4] ? Number(args[4]) : 2000;
+    const heartbeatTtlMs = args[4] ? Number(args[4]) : 5000;
     let monitor: LockMonitor;
     await FileLock.withLock(
       key, async (mon) => {
@@ -34,7 +35,7 @@ const instruction = {
           }
         }
       },
-      { timeoutMs, ttlMs }
+      { timeoutMs, ttlMs, heartbeatTtlMs }
     );
     console.log('lock completed.')
   },

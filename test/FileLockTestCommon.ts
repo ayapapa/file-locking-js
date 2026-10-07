@@ -123,6 +123,7 @@ export interface Options {
   sleep: number, 
   timeOutMs?: number, // default is 5000 
   ttlMs?: number, // default is 2000
+  heartbeatTtlMs?: number, // default is 5000
   waitAquired?: boolean, // default is false
 };
 
@@ -149,7 +150,8 @@ export async function execChild(command: 'lock' | 'sleep', options: Options) {
     options.key, 
     String(options.sleep), 
     String(options.timeOutMs ?? 5000), 
-    String(options.ttlMs ?? 2000)
+    String(options.ttlMs ?? 2000),
+    String(options.heartbeatTtlMs ?? 5000),
   ];
   
   // tnode 20.xのバグで、パスに空白が入っていると、spawnそのものが失敗し、子プロセス起動ができない。

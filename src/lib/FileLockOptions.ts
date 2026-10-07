@@ -106,7 +106,7 @@ export const defaultFileLockOptions : Readonly<FileLockRequiredOptions> = {
   ...defaultLockBaseOptions,
   pollIntervalMs:       100,
   heartbeatIntervalMs:  1000,
-  heartbeatTtlMs:       2000,
+  heartbeatTtlMs:       5000,
   retriesOnIOErr:       1,
   retryIntervalMs:      100,
 };
