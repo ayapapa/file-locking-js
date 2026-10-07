@@ -1,12 +1,12 @@
-[**@ayapapa-npm/file-locking-js**](../README.md)
+[**@ayapapa-npm/file-locking-js**](../api.md)
 
 ***
 
-[@ayapapa-npm/file-locking-js](../README.md) / LockMonitor
+[@ayapapa-npm/file-locking-js](../api.md) / LockMonitor
 
 # Interface: LockMonitor
 
-Defined in: [src/lib/LockMonitor.ts:2](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L2)
+Defined in: [src/lib/LockMonitor.ts:2](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L2)
 
 Monitoring object passed to the callback function executed after acquiring the lock.
 
@@ -16,7 +16,7 @@ Monitoring object passed to the callback function executed after acquiring the l
 
 > **cancelled**: `boolean`
 
-Defined in: [src/lib/LockMonitor.ts:4](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L4)
+Defined in: [src/lib/LockMonitor.ts:4](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L4)
 
 Whether the operation was cancelled.
 
@@ -26,7 +26,7 @@ Whether the operation was cancelled.
 
 > `optional` **cause?**: `unknown`
 
-Defined in: [src/lib/LockMonitor.ts:13](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L13)
+Defined in: [src/lib/LockMonitor.ts:13](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L13)
 
 The object actually caught by the try-catch block. <br>
 In many cases, it is an instance of an error class (or a subclass thereof).
@@ -37,7 +37,7 @@ In many cases, it is an instance of an error class (or a subclass thereof).
 
 > `optional` **id?**: `string`
 
-Defined in: [src/lib/LockMonitor.ts:19](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L19)
+Defined in: [src/lib/LockMonitor.ts:19](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L19)
 
 Monitor ID.
 
@@ -47,7 +47,7 @@ Monitor ID.
 
 > `optional` **operation?**: `string`
 
-Defined in: [src/lib/LockMonitor.ts:16](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L16)
+Defined in: [src/lib/LockMonitor.ts:16](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L16)
 
 Operation cancelled.
 
@@ -57,6 +57,6 @@ Operation cancelled.
 
 > `optional` **reason?**: `string`
 
-Defined in: [src/lib/LockMonitor.ts:7](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockMonitor.ts#L7)
+Defined in: [src/lib/LockMonitor.ts:7](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockMonitor.ts#L7)
 
 The reason for cancellation determined by FileLock.

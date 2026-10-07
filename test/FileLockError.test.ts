@@ -484,11 +484,12 @@ describe('FileLockError', () => {
   it("File read error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
     expect.assertions(3);
+    let spy!: object;
     try {
       await FileLock.withLock(
         key,
         async () => {
-          vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error("readFileSync error!"), { code: 'ERMOON' }); });
+          spy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error("readFileSync error!"), { code: 'ERMOON' }); });
 
           await FileLock.withLock(
             key,
@@ -512,21 +513,27 @@ describe('FileLockError', () => {
       });
     }
     finally {
+      // @ts-expect-error : this is spy
+      if (spy) spy.mockRestore();
       // Since the read operation fails, the contents of the lock file cannot be verified, preventing it from being deleted normally—meaning other locks will perceive it as still locked.
       // Therefore, the file is forcibly deleted here.
-      removeLockFiles(key);
-    }
+      try {
+        removeLockFiles(key);
+      }
+      catch (_e) {;}
+    };
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("File write error occurred during reentrant lock processing.", async () => {
     const key = 'testKey_18465x'
     expect.assertions(3);
+    let spy!: unknown;
     try {
       await FileLock.withLock(
         key,
         async () => {
-          vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
+          spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
 
           await FileLock.withLock(
             key,
@@ -549,13 +556,17 @@ describe('FileLockError', () => {
         }],
       });
     }
+    finally {
+      // @ts-expect-error : this is a spy.
+      if (spy) spy.mockRestore();
+    }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("File write error occurred during lock processing.", async () => {
     const key = 'testKey_18465xx'
     expect.assertions(3);
-    vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
+    const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw Object.assign(new Error("writeFileSync error!"), { code: 'EWMOON' }); });
     try {
       await FileLock.withLock(
         key,
@@ -583,6 +594,9 @@ describe('FileLockError', () => {
         message: "Failed to acquire the lock due to a file I/O error.",
         causes: [cause],
       });
+    }
+    finally {
+      spy.mockRestore();
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   });

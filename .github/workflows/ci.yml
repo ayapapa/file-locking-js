@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22, 24]
+        node-version: [22.x, 24.x]
 
     permissions:
       contents: write
@@ -39,6 +39,7 @@ jobs:
         run: npm run build --if-present
 
       - name: Test
+        if: matrix.node-version != '24.x'
         env:
           TZ: UTC
           CI: true
@@ -50,11 +51,16 @@ jobs:
           fi
 
       - name: Run coverage
-        if: matrix.node-version == 24
+        if: matrix.node-version == '24.x'
         env:
           TZ: UTC
           CI: true
-        run: npm run coverage
+        run: |
+          if [ -n "${{ inputs.test_file }}" ]; then
+            npx vitest run --coverage "${{ inputs.test_file }}"
+          else
+            npm run coverage
+          fi
 
       - name: Generate coverage badges
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.node-version == 24

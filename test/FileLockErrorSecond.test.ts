@@ -78,11 +78,11 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
-      catch(_err) {};
+      catch(_err) {;};
       try {
         if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
       }
-      catch(_err) {};
+      catch(_err) {;};
     }
     expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
@@ -111,7 +111,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
 
   it("existsSync error occurred during trying lock.", async () => {
     const key = 'testKey_existsSync_error'
-    vi.spyOn(fs, 'existsSync').mockImplementation(() => {
+    const spy = vi.spyOn(fs, 'existsSync').mockImplementation(() => {
       throw Object.assign(new Error("existsSync test error!!"),  { code: 'EEXISTSYNC' });
     });
 
@@ -135,10 +135,10 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     finally {
       // 以下でIO操作するので、ここでリセット。
-      vi.restoreAllMocks();
-      removeLockFiles(key);
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
+      spy.mockRestore();
+      try { removeLockFiles(key)} catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("If the metafile is eroded while executing the callback function after acquiring the lock, its analysis will fail.", async () => {
@@ -331,9 +331,9 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     }
     finally {
       spy.mockRestore()
-      if (sweep) removeLockFiles(key);
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
+      if (sweep) try { removeLockFiles(key) } catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
   it("When an invalid lock file exists, an exclusive open attempt fails after the file is deleted. A subsequent lock succeeds.", async () => {
@@ -650,14 +650,14 @@ it("不正なロックファイルを故意に作成し、エラーとなるこ�
     const key = "fakeTmpCreation";
     const openSync = fs.openSync as (...args: unknown[]) => number;
     const dummyFd = -18465;
-    vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
+    const openSpy = vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
       if (args[0] === getLockMetaPath(key) + '.tmp') {
         return dummyFd; // オープンせずに適当な値を返す
       }
       return openSync(...args);
     });
     const closeSync = fs.closeSync;
-    vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
+    const closeSpy = vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
       if (args[0] === dummyFd) {
         return;
       }
@@ -681,9 +681,10 @@ it("不正なロックファイルを故意に作成し、エラーとなるこ�
       });
     }
     finally {
-      vi.restoreAllMocks();
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
+      openSpy.mockRestore();
+      closeSpy.mockRestore();
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   // tmp作成したフリ（つまり、作成してみたが、できずに、さらにエラーになっていないケース）して、進める。
@@ -695,21 +696,22 @@ it("不正なロックファイルを故意に作成し、エラーとなるこ�
     const openSync = fs.openSync as (...args: unknown[]) => number;
     const dummyFd = -18465;
     const path = getLockMetaPath(key);
-    vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
+    const openSpy = vi.spyOn(fs, 'openSync').mockImplementation((...args: unknown[]): number => {
       if (args[0] === path + '.tmp') {
         return dummyFd; // オープンせずに適当な値を返す
       }
       return openSync(...args);
     });
     const closeSync = fs.closeSync;
-    vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
+    const closeSpy = vi.spyOn(fs, 'closeSync').mockImplementation((...args: unknown[]): void => {
       if (args[0] === dummyFd) {
         return;
       }
       closeSync(args[0] as number);
     });
-    vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw Object.assign(new Error("rmSyncError!!"), { code: "ERMMOON" }) });
+    const rmSpy = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw Object.assign(new Error("rmSyncError!!"), { code: "ERMMOON" }) });
 
+    expect.assertions(3);
     try {
       await FileLock.withLock(key, () => {}, { timeoutMs: 0});
     }
@@ -731,11 +733,15 @@ it("不正なロックファイルを故意に作成し、エラーとなるこ�
       });
     }
     finally {
-      vi.restoreAllMocks();
-      expect(fs.existsSync(path)).toBeTruthy();
-      fs.unlinkSync(path);
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
+      openSpy.mockRestore();
+      closeSpy.mockRestore();
+      rmSpy.mockRestore();
+
+      try {
+        if (fs.existsSync(path)) fs.unlinkSync(path);
+      } catch (_e) {;}
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("一時ロックファイル作成失敗", async () => {

@@ -135,9 +135,14 @@ describe('LockBase and Util', () => {
   });
 
   it("If `stack` is undefined, return `Call stack: couldn't get.`", () => {
-    vi.spyOn(Error, 'captureStackTrace').mockImplementation(() => {});
+    const spy = vi.spyOn(Error, 'captureStackTrace').mockImplementation(() => {});
 
-    expect(getCallStack()).toBe(`Call stack: couldn't get.`);
+    try {
+      expect(getCallStack()).toBe(`Call stack: couldn't get.`);
+    }
+    finally {
+      spy.mockRestore();
+    }
   });
 
   it("isEqualObjectType error", () => {
@@ -165,9 +170,14 @@ describe('LockBase and Util', () => {
   it("debugLog", () => {
     FileLock.setConfig({ logger: console });
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    const lock = TestLock.getLock("debugLog");
-    lock.debugLog("TEST!!!");
-    expect(spy).toHaveBeenCalledWith("TEST!!!");
+    try {
+      const lock = TestLock.getLock("debugLog");
+      lock.debugLog("TEST!!!");
+      expect(spy).toHaveBeenCalledWith("TEST!!!");
+    }
+    finally {
+      spy.mockRestore();
+    }
   });
 
 });

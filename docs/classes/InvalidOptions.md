@@ -1,12 +1,12 @@
-[**@ayapapa-npm/file-locking-js**](../README.md)
+[**@ayapapa-npm/file-locking-js**](../api.md)
 
 ***
 
-[@ayapapa-npm/file-locking-js](../README.md) / InvalidOptions
+[@ayapapa-npm/file-locking-js](../api.md) / InvalidOptions
 
 # Class: InvalidOptions
 
-Defined in: [src/lib/LockBaseErrors.ts:80](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockBaseErrors.ts#L80)
+Defined in: [src/lib/LockBaseErrors.ts:80](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L80)
 
 Invalid options error.
 
@@ -20,7 +20,7 @@ Invalid options error.
 
 > **new InvalidOptions**(`msg`, `params?`): `InvalidOptions`
 
-Defined in: [src/lib/LockBaseErrors.ts:86](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockBaseErrors.ts#L86)
+Defined in: [src/lib/LockBaseErrors.ts:86](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L86)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/9a949eac5097823c67587f5274da1b52f5806baf/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 

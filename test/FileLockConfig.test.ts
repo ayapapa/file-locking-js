@@ -122,14 +122,14 @@ describe('FileLock', () => {
   {
     const eCode = 'EHOGEHOGE';
     const eMsg = 'Hogehoge error!!';
-    vi.spyOn(fs, spyOnFnName).mockImplementation(() => {
+    const spy = vi.spyOn(fs, spyOnFnName).mockImplementation(() => {
       const err = Object.assign(new Error(eMsg), { code: eCode });
       throw err;
     });
-    expect.assertions(2);
+    expect.assertions(3);
+    const key = "testFsErrorBySpyOn_"+ String(count++).padStart(2, '0');
     try {
       FileLock.setConfig({ ...config, logger });
-      const key = "testFsErrorBySpyOn_"+ String(count++).padStart(2, '0');
       const retVal = key;
       await FileLock.withLock(key, 
         async () => {
@@ -145,6 +145,10 @@ describe('FileLock', () => {
         fsErrMsg: eMsg,
       });
     }
+    finally {
+      spy.mockRestore();
+    }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   }
 
   it("An error occurs because the existence of the lock directory path cannot be verified (fs.statSync() error).", async () => {

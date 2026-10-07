@@ -43,7 +43,7 @@ Internally, it creates a `File` associated with the specified `Key` within a dir
 Users simply call it like this:
   ```js
   const ret = await FileLock.withLock('lock key', () => { 'process to run while locked'; return result; }, options);
-  // Of course, you can retrieve return values ​​from the callback function.
+  // ret === result
   ```
   This eliminates the risk of forgetting to release the lock—a design choice that prioritizes user convenience.
 * **Prevents self-deadlocks within the same process.**<br>
