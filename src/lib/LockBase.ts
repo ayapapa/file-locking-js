@@ -11,10 +11,11 @@ import { type Monitor } from './LockMonitor.ts';
 
 const { ENSURE_DEBUG, REQUIRE_DEBUG } = Contracts;
 
-export type MaybePromise = unknown | PromiseLike<unknown>;
-
 /** Definition of the callback function to be executed after acquiring the lock. */
 export type CallbackOnLock = (monitor: Monitor) => MaybePromise;
+
+/** Definition of the return type of callback function to be executed after acquiring the lock. */
+export type MaybePromise = unknown | PromiseLike<unknown>;
 
 /** 
  * @internal
@@ -86,19 +87,15 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Statically holds the specified `config` (type: `LockBaseConfig`).
-   * @param config  Configurations. 
+   * Register an additional handler for the termination event.
+   * @param fn  The termination callback function to register.
+   * @returns 
    */
-  protected static setConfig(config: LockBaseConfig): void {
-    LockBase._config = LockBase.#resolveConfig(config);
-
-    // logger
-    LockBase._logger = LockBase._resolveLogger(LockBase._config);
-
-    // debug
-    Contracts.setConfig({ debug: LockBase._config._debug, logger: LockBase._logger });
+  protected static _addOnExit(fn: (code: number | null | undefined, signal: NodeJS.Signals | null) => void): void {
+    if (LockBase._onExitFns.find(f => f === fn)) return;
+    LockBase._onExitFns.push(fn);
   }
-  
+
   /**
    * @internal
    * Copy config. 
@@ -119,17 +116,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Register an additional handler for the termination event.
-   * @param fn  The termination callback function to register.
-   * @returns 
-   */
-  protected static _addOnExit(fn: (code: number | null | undefined, signal: NodeJS.Signals | null) => void): void {
-    if (LockBase._onExitFns.find(f => f === fn)) return;
-    LockBase._onExitFns.push(fn);
-  }
-
-  /**
-   * @internal
    * Get a logger where all methods are mandatory.
    * @param config 
    * @returns A logger where all methods are mandatory.
@@ -146,6 +132,19 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     return logger as Required<LogProvider>;
   }
 
+  /**
+   * @internal
+   * Statically holds the specified `config` (type: `LockBaseConfig`).
+   * @param config  Configurations. 
+   */
+  protected static setConfig(config: LockBaseConfig): void {
+    LockBase._config = LockBase.#resolveConfig(config);
+    LockBase._logger = LockBase._resolveLogger(LockBase._config);
+
+    // Set configurations of `Contrats`.
+    Contracts.setConfig({ debug: LockBase._config._debug, logger: LockBase._logger });
+  }
+  
   /**
    * @interface
    * @param config  User-specified settings.
@@ -236,9 +235,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * @abstract
    * Acquire the lock.
    * @param options Lock options.
-   * @abstract
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   protected async _acquire(options: AllOptions<O, I>): Promise<void> {
@@ -249,6 +248,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @internal
    * Outputs a debug log.<br>
    * Outputs via `logger.log()` only when `_debug` in the configuration (the `config` constructor argument) is set to `true`.
+   * Headers (such as [DEBUG]) are not automatically added.
    * @param args The arguments passed to `logger.log()`.
    */
   protected _debugLog(...args: unknown[]): void {
@@ -257,9 +257,9 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * @abstract
    * Decrement the re-entry lock counter.
    * @param options Lock options.
-   * @abstract
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   protected async _decReantryCount(options: AllOptions<O, I>): Promise<void> {
@@ -268,13 +268,27 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
  /**
    * @internal
+   * @abstract
    * Increment the re-entry lock counter.
    * @param options Lock options.
-   * @abstract
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   protected async _incReantryCount(options: AllOptions<O, I>): Promise<void> {
     throw new LockError(`Implement this in the subclass.`, { code: 'ENOIMPL', props: { options } });
+  }
+
+  /**
+   * @interna
+   * @abstract
+   * Create a promise for interrupt detection.<br>
+   * This method is intended to be overridden in subclasses as needed.
+   * If you override this, you must also override the `_isInterrupt` method to determine 
+   * whether the interrupt is the one expected. (See the `_isInterrupt` method.) 
+   * @returns A `promise` for detecting interrupt processing, along with its `resolve` and `reject` functions.
+   */
+  // v8 ignore next 3
+  protected _interruptPromise(): { promise: Promise<unknown>, resolve: (v: unknown) => void, reject: (r?: unknown) => void} | undefined {
+    return;
   }
 
   /**
@@ -292,12 +306,12 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   
   /**
    * @internal
+   * @abstract
    * Handle errors that occur while locked.
    * @param err       Error instance.
    * @param operation Operation description
    * @param options   Lock options.
    * @param codeIfNon Error code.
-   * @abstract
    */
   protected _onError(err: unknown, operation: string, options: AllOptions<O, I>, codeIfNon: string = 'ELOCK') {
     if (this.#isAlreadyCancelled(options)) return;
@@ -311,11 +325,11 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * @abstract
    * Execute termination processing.<br>
    * In the Windows version, this is not called upon forced termination (process.kill()), but the implementation is being retained.
    * @param code    Exit code.
    * @param signal  Recieved signal.
-   * @abstract
    */
   protected _onExit(code: number | null | undefined, signal: NodeJS.Signals | null) {
     // If `onExitReject` (the Promise's reject function) is non-null, 
@@ -328,34 +342,27 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       }));
       delete this.#onExitRejects[key];
     });
-    /*
-    this.#onExitReject && 
-      this.#onExitReject(new LockError("Forced termination.", {
-        code: 'ETERM',
-        props: { reason: { code, signal } }
-      }));
-    this.#onExitReject = null;
-    */
   }
 
   /** 
    * @internal
+   * @abstract
    * Make preparations for the lock.
    * @param options Lock options.
-   * @abstract
    */
   protected _prepare(options: AllOptions<O, I>): void {
     this.#newMonitor(options);
     options._sharerId = crypto.randomUUID();
-    // Note: If this lock request succeeds in acquiring the lock (i.e., if the key is currently unlocked), 
-    // `_sharerId` will be overwritten with this instance's owner ID(`this._ownerId`) upon acquisition.
+    // Note: This ID is a unique identifier assigned to each lock request.
+    // If the lock is successfully acquired via the request (i.e., the key is not currently locked),
+    // `_sharerId` is set to match this instance's owner ID (`this._ownerId`) upon acquisition.
   }
 
   /**
    * @internal
+   * @abstract
    * Release the lock.
    * @param options Lock options.
-   * @abstract
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   protected async _release(options: AllOptions<O, I>): Promise<void> {
@@ -364,6 +371,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
+   * @abstract
    * Acquires a lock for the specified key,
    * executes the function `onLockFn` under exclusive control, 
    * and returns a Promise that resolves with the return value of `onLockFn` after the lock is released.
@@ -371,9 +379,8 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    * @param onLockFn  A user-specified callback function to be executed after acquiring the lock.
    * @param options   Lock options.
    * @returns A `Promise` that resolves with the return value of `onLockFn`.
-   * @abstract
    */
-  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>):Promise<unknown> {
+  protected async _withLock(onLockFn: CallbackOnLock, options: AllOptions<O, I>): Promise<unknown> {
     REQUIRE_DEBUG(onLockFn && typeof onLockFn === 'function', 'Invalid onLockFn.', LockError, {code: 'EINVAL'});
 
     const whithLockInContext = async (): Promise<unknown> => {
@@ -398,16 +405,16 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       return this.#execWithLock(onLockFn, options);
     }
 
-    // ★★★　ここでawaitしない方向で再検討せよ！！
-    // そうすると、ここはプロミスを返すだけにして、try-chatchはしない！　つまり、トレースもしない
-    // トレースするなら、この先でどうぞ！！
-    try {
-      return await whithLockInContext();
-    }
-    catch (err) {
-      this._logger.trace('Error occurred.', err);
-      throw err;
-    }
+    return whithLockInContext();
+  }
+
+  /** 
+   * @internal
+   * Retrieve the current context. <br>
+   * It is set to `private` for testing purposes.
+   */
+  private _getReentrantContext() : ReentrantContext | undefined {
+    return LockBase._als.getStore();
   }
 
   /**
@@ -428,17 +435,32 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
   }
 
   /**
-   * @interna
-   * @abstract
-   * Create a promise for interrupt detection.<br>
-   * This method is intended to be overridden in subclasses as needed.
-   * If you override this, you must also override the `_isInterrupt` method to determine 
-   * whether the interrupt is the one expected. (See the `_isInterrupt` method.) 
-   * @returns A `promise` for detecting interrupt processing, along with its `resolve` and `reject` functions.
+   * @internal
+   * Execute callback function in child context (for reentrant lock detection).
+   * @param onLockFn  A user-specified function called during the lock.
+   * @param options   Lock options.
+   * @returns A `Promise` that resolves to the return value of onLockFn.
    */
-  // v8 ignore next 3
-  protected _interruptPromise(): { promise: Promise<unknown>, resolve: (v: unknown) => void, reject: (r?: unknown) => void} | undefined {
-    return;
+  async #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>): Promise<unknown> {
+    REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
+    const parent = this._getReentrantContext();
+    REQUIRE_DEBUG(parent !== undefined, 're-entrant context is undefined!', LockError, { code: 'EINVAL' });
+    let child: ReentrantContext;
+    let monitor: Monitor = options._monitor as Monitor; // Type-cast it, as it has already been checked via a precondition.
+    const contextId: string = options._contextId;
+    if (parent?.heldLocks.has(contextId)) {
+      // Share the parent's monitor to share process interruption information between them.
+      options._monitor = monitor = parent.heldLocks.get(contextId)!.monitor;
+      child = parent;
+    }
+    else {
+      child = { heldLocks: new Map(parent?.heldLocks) };
+      child.heldLocks.set(contextId, { monitor });
+    }
+
+    // 'async' is intentional to treat synchronous exceptions as Promise rejections. 
+    // eslint-disable-next-line @typescript-eslint/require-await
+    return LockBase._als.run(child, async () => onLockFn(monitor));
   }
 
   /**
@@ -458,11 +480,10 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     // Created promises.
     const ttlTimer      = this.#createTtlTimer(options);
     const onExitPromise = this.#onExitPromise();
-    //const onCompromised = this.#onCompromised();
     const cbPromise     = this.#execCallback(onLockFn, options);
     const racePrs = [cbPromise, ttlTimer.promise, onExitPromise.promise];
     // Register reject functions.
-    this.#onExitRejects[options._sharerId] = onExitPromise.onExitReject;
+    this.#onExitRejects[options._sharerId] = onExitPromise.reject;
 
     // If there is an interrupt promise in the inheriting class, 
     // have it participate in the promise race described below.
@@ -478,7 +499,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
         .finally(() => { // In any case, turn off the timer.
           // Avoid if statements as a measure against coverage issue
           ttlTimer.id && clearTimeout(ttlTimer.id);
-          onExitPromise.onExitResolve('No forced termination');
+          onExitPromise.resolve('No forced termination');
           delete this.#onExitRejects[options._sharerId];
           if (interruptPromise) {
             interruptPromise.resolve('Ok');
@@ -529,24 +550,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     );
   }
 
-  /**
-   * @internal
-   * Create a promise for the termination process, set the `reject` function to `this`, 
-   * and return the promise and the `resolve` function.
-   */
-  #onExitPromise() {
-    let onExitResolve!: ((v: unknown) => void);
-    let onExitReject!: ((r: unknown) => void);
-    return {
-      promise: new Promise((resolve, reject) => {
-        onExitResolve = resolve;
-        onExitReject = reject;
-      }),
-      onExitResolve,
-      onExitReject
-    };
-  }
-
    /**
    * @internal
    * Check whether it has been cancelled.
@@ -555,44 +558,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
    */
   #isAlreadyCancelled(options: AllOptions<O, I>): boolean {
     return options._monitor?.cancelled as boolean;
-  }
-
-  /** 
-   * @internal
-   * Retrieve the current context. <br>
-   * It is set to `private` for testing purposes.
-   */
-  private _getReentrantContext() : ReentrantContext | undefined {
-    return LockBase._als.getStore();
-  }
-
-  /**
-   * @internal
-   * Execute callback function in child context (for reentrant lock detection).
-   * @param onLockFn  A user-specified function called during the lock.
-   * @param options   Lock options.
-   * @returns A `Promise` that resolves to the return value of onLockFn.
-   */
-  async #execCallback(onLockFn: CallbackOnLock, options: AllOptions<O, I>): Promise<unknown> {
-    REQUIRE_DEBUG(options._monitor !== undefined, 'options._monitor is undefined!', LockError, { code: 'EINVAL' });
-    const parent = this._getReentrantContext();
-    REQUIRE_DEBUG(parent !== undefined, 're-entrant context is undefined!', LockError, { code: 'EINVAL' });
-    let child: ReentrantContext;
-    let monitor: Monitor = options._monitor as Monitor; // Type-cast it, as it has already been checked via a precondition.
-    const contextId: string = options._contextId;
-    if (parent?.heldLocks.has(contextId)) {
-      // Share the parent's monitor to share process interruption information between them.
-      options._monitor = monitor = parent.heldLocks.get(contextId)!.monitor;
-      child = parent;
-    }
-    else {
-      child = { heldLocks: new Map(parent?.heldLocks) };
-      child.heldLocks.set(contextId, { monitor });
-    }
-
-    // 'async' is intentional to treat synchronous exceptions as Promise rejections. 
-    // eslint-disable-next-line @typescript-eslint/require-await
-    return LockBase._als.run(child, async () => onLockFn(monitor));
   }
 
   /**
@@ -606,17 +571,6 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
 
   /**
    * @internal
-   * Create a new context and execute the function `fn` within the context.
-   * @param {function} fn Callback function to be called within the context.
-   * @returns 
-   */
-  #runInNewContext(fn: () => unknown) {
-    const initialContext: ReentrantContext = { heldLocks: new Map() };
-    return LockBase._als.run(initialContext, () => fn());
-  }
-
-  /**
-   * @internal
    * Create a new monitor and set it in `options`.
    * @param options   Lock options.
    * @returns Created new monitor.
@@ -626,6 +580,35 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
       cancelled:false, 
       id: Math.random().toString(36).slice(2)
     };
+  }
+
+  /**
+   * @internal
+   * Create a promise for the termination process, set the `reject` function to `this`, 
+   * and return the promise and the `resolve` function.
+   */
+  #onExitPromise() {
+    let onExitResolve!: ((v: unknown) => void);
+    let onExitReject!: ((r: unknown) => void);
+    return {
+      promise: new Promise((resolve, reject) => {
+        onExitResolve = resolve;
+        onExitReject = reject;
+      }),
+      resolve: onExitResolve,
+      reject: onExitReject
+    };
+  }
+
+  /**
+   * @internal
+   * Create a new context and execute the function `fn` within the context.
+   * @param {function} fn Callback function to be called within the context.
+   * @returns 
+   */
+  #runInNewContext(fn: () => unknown) {
+    const initialContext: ReentrantContext = { heldLocks: new Map() };
+    return LockBase._als.run(initialContext, () => fn());
   }
 
   /**

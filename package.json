@@ -5,6 +5,8 @@
     "node",
     "javascript",
     "typescript",
+    "sdk",
+    "api", 
     "utility",
     "key-based lock",
     "file-based lock",

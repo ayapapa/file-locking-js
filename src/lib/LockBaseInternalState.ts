@@ -12,6 +12,9 @@ export interface LockBaseInternalState {
    * Lock sharer id. <br>
    * An identifier asserted when sharing a lock. This ID is a unique identifier 
    * assigned for each option (i.e., for each lock request).
+   * Note: This ID is a unique identifier assigned to each lock request. 
+   *  But if the lock is successfully acquired via the request (i.e., the key is not currently locked), 
+   *  this is set to match this `lock` instance's owner ID upon acquisition.
    */
   _sharerId: string;
 
