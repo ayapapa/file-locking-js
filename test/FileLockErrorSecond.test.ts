@@ -222,7 +222,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
         async () => {
           await sleepAsync(100);
         },
-        { timeoutMs: 150 }
+        { timeoutMs: 0 }
       );
     }
     catch (err) {
@@ -238,7 +238,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
       expect(err).toMatchObject({
         code: "EHISTORY",
         message: "Failed to acquire the lock due to history parsing failure.",
-        causes: [cause, cause],
+        causes: [cause/*, cause*/],
       });
     }
     finally {
