@@ -108,7 +108,7 @@ Additionally, users can specify a maximum number of cache entries, allowing for 
 [^3]: 破損したロックファイルの自動削除は、実行中のロック所有者が存在しないことを保証するものではありません。設定する場合は、ユーザーの責任において適切な値を指定してください。（参考：invalidLockFileTimeoutMs は、heartbeatTtlMs を主な参考値として、利用環境に応じて設定してください）　⇒　最小値は、heartbeatTtlMsだろうなぁ。
 
 ## Stress test
-Testing has confirmed that simultaneous execution of 100 processes (using either identical keys or unique keys for all processes) completes successfully or terminates with the expected errors; however, this does not constitute a guarantee.
+Test results confirmed that when 100 processes were executed simultaneously—whether using the same key across all processes or unique keys for each—the operations either completed successfully or terminated with the expected errors, leaving no `lock file` or other intermediate files behind. However, this does not guarantee identical behavior in all environments. The environment used for the stress test is as follows:
 
 
 ### Stress test execution environment: 
