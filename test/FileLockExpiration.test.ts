@@ -22,7 +22,7 @@ describe('FileLock', () => {
     const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 1000, heartbeatTtlMs:5000, lastHeartbeatAt: Date.now()};
     setLockMeta(key, meta);
 
-    expect.assertions(1);
+    expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
@@ -36,8 +36,9 @@ describe('FileLock', () => {
       expect(err).instanceOf(AlreadyLocked);
     }
     finally {
-      removeLockFiles(key);
+      try { removeLockFiles(key); } catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("If `expirationTime` is valid but heartbeat is disabled, the lock cannot be acquired.", async () => {
@@ -45,7 +46,7 @@ describe('FileLock', () => {
     const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() + 5000, heartbeatTtlMs:1000, lastHeartbeatAt: Date.now() - 2000};
     setLockMeta(key, meta);
 
-    expect.assertions(1);
+    expect.assertions(2);
     try {
       await FileLock.withLock(
         key,
@@ -59,8 +60,9 @@ describe('FileLock', () => {
       expect(err instanceof AlreadyLocked).toBe(true);
     }
     finally {
-      removeLockFiles(key);
+      try { removeLockFiles(key); } catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("If both `expirationTime` and the heartbeat are disabled, the lock can be acquired.", async () => {
@@ -68,7 +70,7 @@ describe('FileLock', () => {
     const meta = {ownerId: "hoge", counter: 1, expirationTime: Date.now() - 2000, heartbeatTtlMs:1000, lastHeartbeatAt: Date.now() - 2000};
     setLockMeta(key, meta);
 
-    expect.assertions(1);
+    expect.assertions(2);
     try {
       const ret = await FileLock.withLock(
         key,
@@ -84,8 +86,9 @@ describe('FileLock', () => {
       logger.error(err);
     }
     finally {
-      removeLockFiles(key);
+      try { removeLockFiles(key); } catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
   it("不正なロックファイルを故意に作成し、`invalidTtlMs`時間後にロック成功することを確認する", async () => {
@@ -97,9 +100,9 @@ describe('FileLock', () => {
       expect(await FileLock.withLock(key, () => "completed", { heartbeatTtlMs: 2000, timeoutMs: 2500, invalidTtlMs: 2100 })).toBe("completed")
     }
     finally {
-      removeLockFiles(key);
-      expect(TestLock.isReleasedState(key)).toBeTruthy();
+      try { removeLockFiles(key); } catch (_e) {;};
     }
+    expect(TestLock.isReleasedState(key)).toBeTruthy();
   });
 
 });

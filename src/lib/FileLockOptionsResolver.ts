@@ -1,6 +1,6 @@
 import { LockBaseOptionsResolver } from './LockBaseOptionsResolver.ts';
 import { type FileLockRequiredNumericOptions, type FileLockOptions, type FileLockRequiredOptions } from './FileLockOptions.ts';
-import { typedKeys, type KeyTypeMap, type TimeBasedKey } from './Util.ts';
+import { type KeyTypeMap, type TimeBasedKey } from './Util.ts';
 import { Contracts } from '@ayapapa-npm/contracts-js';
 import { InvalidOptions } from './LockBaseErrors.ts';
 
@@ -51,7 +51,6 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
   /**
    * @internal
    * Transform, and complete options.
-   * @param defaultOptions  User default options
    * @protected
    */
   protected override _normalizeOptions(): void {
@@ -59,11 +58,9 @@ export class FileLockOptionsResolver extends LockBaseOptionsResolver<FileLockOpt
     Contracts.VERIFY_DEBUG(this.options.heartbeatTtlMs != null, 
       "invalid `heartbeatTtlMs`. Maybe a bug.", InvalidOptions, { name: 'heartbeatTtlMs' } )
     if ('invalidTtlMs' in this.options) {
-      // As this has been verified above, it will be used as the definitive value.
-      this.options.invalidTtlMs = Math.max(this.options.invalidTtlMs, this.options.heartbeatTtlMs!)
+      // Since the existence of `heartbeatTtlMs` has already been verified above, 
+      // it is used as a confirmed value.
+      this.options.invalidTtlMs = Math.max(this.options.invalidTtlMs, this.options.heartbeatTtlMs!);
     }
   }
-
 }
-
-export { typedKeys };

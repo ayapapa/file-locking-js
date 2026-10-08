@@ -6,7 +6,7 @@
 
 # Class: ReleaseFailed
 
-Defined in: [src/lib/LockBaseErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L104)
+Defined in: [src/lib/LockBaseErrors.ts:104](https://github.com/ayapapa/file-lock-js/blob/0a08c93e9ea41af1d079173c1d78ce8fe3313a78/src/lib/LockBaseErrors.ts#L104)
 
 Failed to relase lock or decrement lock counter. <br>
 エラーの意味：　（エラー説明に記載すること）
@@ -26,7 +26,7 @@ Failed to relase lock or decrement lock counter. <br>
 
 > **new ReleaseFailed**(`msg`, `params?`): `ReleaseFailed`
 
-Defined in: [src/lib/LockBaseErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L110)
+Defined in: [src/lib/LockBaseErrors.ts:110](https://github.com/ayapapa/file-lock-js/blob/0a08c93e9ea41af1d079173c1d78ce8fe3313a78/src/lib/LockBaseErrors.ts#L110)
 
 Constructor.
 
@@ -76,7 +76,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/40b5479dcc2976b75a985d3d1ba10c2b628b8574/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/0a08c93e9ea41af1d079173c1d78ce8fe3313a78/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 
