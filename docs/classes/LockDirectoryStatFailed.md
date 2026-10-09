@@ -6,7 +6,7 @@
 
 # Class: LockDirectoryStatFailed
 
-Defined in: [src/lib/FileLockErrors.ts:77](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/FileLockErrors.ts#L77)
+Defined in: [src/lib/FileLockErrors.ts:77](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/FileLockErrors.ts#L77)
 
 Lock directory 'Stat' error.
 
@@ -20,7 +20,7 @@ Lock directory 'Stat' error.
 
 > **new LockDirectoryStatFailed**(`fsErrMsg`, `params?`): `LockDirectoryStatFailed`
 
-Defined in: [src/lib/FileLockErrors.ts:83](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/FileLockErrors.ts#L83)
+Defined in: [src/lib/FileLockErrors.ts:83](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/FileLockErrors.ts#L83)
 
 Constructor.
 
@@ -70,7 +70,7 @@ Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 > **code**: `string` = `'ELOCK'`
 
-Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/LockBaseErrors.ts#L8)
+Defined in: [src/lib/LockBaseErrors.ts:8](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/LockBaseErrors.ts#L8)
 
 #### Inherited from
 
@@ -210,7 +210,7 @@ a();
 
 > `static` **historyPasingFailed**(`history`, `causes`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/FileLockErrors.ts#L37)
+Defined in: [src/lib/FileLockErrors.ts:37](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/FileLockErrors.ts#L37)
 
 **`Internal`**
 
@@ -244,7 +244,7 @@ An instance of FileLockError.
 
 > `static` **lockFailedDueToHistory**(`history`, `causes`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/FileLockErrors.ts#L47)
+Defined in: [src/lib/FileLockErrors.ts:47](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/FileLockErrors.ts#L47)
 
 Create a lock acquisition errors caused by history file analysis errors.
  *
@@ -278,7 +278,7 @@ An instance of FileLockError.
 
 > `static` **lockFailedDueToIO**(`key`, `causes`, `msg?`): [`FileLockError`](FileLockError.md)
 
-Defined in: [src/lib/FileLockErrors.ts:26](https://github.com/ayapapa/file-lock-js/blob/64edcff5c4fbfbb5fb9ba5b658e9617a4a4647df/src/lib/FileLockErrors.ts#L26)
+Defined in: [src/lib/FileLockErrors.ts:26](https://github.com/ayapapa/file-lock-js/blob/0bc5a8743c1e3d41d116605b13e69f0885fad553/src/lib/FileLockErrors.ts#L26)
 
 **`Internal`**
 

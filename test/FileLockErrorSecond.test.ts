@@ -451,14 +451,13 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
         causes: [{
           code: "EIO",
           key,
-          message: "Failed to remove old lock sharers.",
+          message: "Failed to add the lock request to lock sharers.",
           causes: [{
             code: "ERMMOON",
             path: path.join(getLockSharerDir(key), '.lock'),
             message: "Couldn't remove the file or directory.(rmSync error!)",
             causes: [
               { code: "ERMMOON", message: "rmSync error!" },
-              //{ code: "ERMMOON", message: "rmSync error!" }
             ]
           }],
         }],

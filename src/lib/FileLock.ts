@@ -654,7 +654,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     // Create the lock sharer directory
     this.#mkdirSync(sharerDir, options, { recursive: true }, "Couldn't create the lock sharer directory.");
     // There might be an old shared information directory, so delete the shared information.
-    await this.#removeOldSharers(options);
+    await this.#removeSharers(options);
     // Add myself as owner into the lock sharer directory
     return this.#addSharer(options);
   }
@@ -1111,17 +1111,18 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param options Lock options.
    * @param msg     Message displayed upon an addition error.
    */
-  async #removeOldSharers(options: AllOptions, msg: string = "Failed to remove old lock sharers."): Promise<void> {
-    const sharers = this.#listSharer(options, "Failed to get the list of lock sharers.");
+  async #removeSharers(options: AllOptions, sharers?: string[], msg: string = "Failed to remove lock sharers."): Promise<void> {
+    sharers = sharers ?? this.#listSharer(options, "Failed to get the list of lock sharers.");
+    if (sharers.length === 0) return;
     try {
       return await this.#share(() => {
         sharers.forEach(path => this.#unlinkSync(path, options));
-      }, options, false);
+      }, options/*, false*/);
     }
     catch (err) {
-      throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, causes: [err] }
-      });
+      const props = { key: this._key, causes: [err] } as Record<string, unknown>;
+      sharers.length === 1 && (props.sharerId = sharers[0]);
+      throw new FileLockError(msg, { code: 'EIO', props });
     }
   }
 
@@ -1131,16 +1132,8 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param options Lock options.
    * @param msg     Error message. 
    */
-  async #removeSharer(options: AllOptions, msg: string = "Failed to remove the lock request from the lock sharer.") {
-    const sharerPath = path.join(options._sharerDir, options._sharerId);
-    try {
-      await this.#share(() => this.#unlinkSync(sharerPath, options), options);
-    }
-    catch (err) {
-      throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
-      });
-    }
+  async #removeSharer(options: AllOptions, msg: string = "Failed to remove the lock request from the lock sharer."): Promise<void> {
+    return this.#removeSharers(options, [path.join(options._sharerDir, options._sharerId)], msg);
   }
 
   /**
@@ -1200,10 +1193,10 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param options   Lock options.
    * @param withLock  To lock or not to lock.
    */
-  async #share(operation: () => void, options: AllOptions, withLock: boolean = true): Promise<void> {
+  async #share(operation: () => void, options: AllOptions/*, withLock: boolean = true*/): Promise<void> {
     const lockPath = path.join(options._sharerDir, '.lock');
 
-    if (withLock) {
+    //if (withLock) {
       // Lock share directory.
       const interval = options._sharerLockIntervalMs;
       const timeout = Date.now() + options._sharerLocktimeoutMs;
@@ -1223,14 +1216,14 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
       } while (true);
 
       if (lastErr instanceof Error) throw Object.assign(lastErr, { path: lockPath });
-    };
+    //};
     
     // Exec operation
     try {
       operation();
     }
     finally {
-     this.#rmSync(lockPath, options, { force: true });
+     /*if (withLock) */this.#rmSync(lockPath, options, { force: true });
     }
   }
 
