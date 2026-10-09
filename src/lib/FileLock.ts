@@ -519,6 +519,9 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     options._contextId  = options._filePath;  // Use the file path as the context ID 
                                               // to avoid issues caused by changes 
                                               // to the lock directory configuration.
+    options._sharerLockIntervalMs = Math.max(options._sharerLockIntervalMs ?? 100, 100);
+    options._sharerLocktimeoutMs = Math.max(options._sharerLocktimeoutMs ?? 5000, 0);
+
   }
 
   /**
@@ -1109,7 +1112,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param msg     Message displayed upon an addition error.
    */
   async #removeOldSharers(options: AllOptions, msg: string = "Failed to remove old lock sharers."): Promise<void> {
-    const sharers = this.#listSharer(options, "Failed to retrieve the list of lock sharers.");
+    const sharers = this.#listSharer(options, "Failed to get the list of lock sharers.");
     try {
       return await this.#share(() => {
         sharers.forEach(path => this.#unlinkSync(path, options));
@@ -1117,7 +1120,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
     }
     catch (err) {
       throw new FileLockError(msg, {
-        code: 'EIO', props: { key: this._key, sharerId: options._sharerId, causes: [err] }
+        code: 'EIO', props: { key: this._key, causes: [err] }
       });
     }
   }
@@ -1128,7 +1131,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
    * @param options Lock options.
    * @param msg     Error message. 
    */
-  async #removeSharer(options: AllOptions, msg: string = "Failed to remove the lock request from the lock sharer directory.") {
+  async #removeSharer(options: AllOptions, msg: string = "Failed to remove the lock request from the lock sharer.") {
     const sharerPath = path.join(options._sharerDir, options._sharerId);
     try {
       await this.#share(() => this.#unlinkSync(sharerPath, options), options);
@@ -1202,8 +1205,8 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
 
     if (withLock) {
       // Lock share directory.
-      const interval = options.pollIntervalMs;
-      const timeout = Date.now() + options.timeoutMs;
+      const interval = options._sharerLockIntervalMs;
+      const timeout = Date.now() + options._sharerLocktimeoutMs;
       let lastErr;
       do {
         try {

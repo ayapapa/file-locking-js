@@ -481,7 +481,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
           code: 'EIO',
           key,
           sharerDir: targetPath,
-          message: "Failed to retrieve the list of lock sharers.",
+          message: "Failed to get the list of lock sharers.",
           causes: [cause2]
     };
 
@@ -516,7 +516,7 @@ describe('なぜかテストが通らない、、、困ったちゃんですな�
     const cause = {
           code: 'EIO',
           key,
-          message: "Failed to remove the lock request from the lock sharer directory.",
+          message: "Failed to remove the lock request from the lock sharer.",
           causes: [cause2]
     };
 
