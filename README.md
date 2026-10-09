@@ -56,7 +56,10 @@ npm install @ayapapa-npm/file-locking-js
 * **Features a simple and safe user interface.** <br>
   Users simply call it like this:
   ```js
-  const ret = await FileLock.withLock('lock key', () => { 'process to run while locked'; return result; }, options);
+  const ret = await FileLock.withLock('lock key', () => {
+    'process to run while locked';
+    return result;
+  }, options);
   // ret === result
   ```
   This eliminates the risk of forgetting to release the lock—a design choice that prioritizes user convenience.
@@ -70,19 +73,15 @@ npm install @ayapapa-npm/file-locking-js
   Additionally, users can specify a maximum number of cache entries, allowing for a balanced trade-off regarding memory usage.
 * **Callback functions is able to have a parameter to monitor the locking status**, like this:
   ```js
-  const ret = await FileLock.withLock(
-    'lock key',
-    (monitor) => {
-      let completed = false;
-      while(completed === false) {
-        if (monitor.cancelled) return 'The operation is cancelled.'
-        const result = (some processing);
-        if (`result means completed.`) completed = true;
-      };
-      return 'The operation is completed.';
-    }, 
-    options
-  );
+  const ret = await FileLock.withLock('lock key', (monitor) => {
+    let completed = false;
+    while(completed === false) {
+      if (monitor.cancelled) return 'The operation is cancelled.'
+      const result = (some processing);
+      if (`result means completed.`) completed = true;
+    };
+    return 'The operation is completed.';
+  }, options);
   console.log(ret); // "The operation is completed."
   ```
   Note1: It is not mandatory to interrupt the process when monitor.cancelled is true.<br>
@@ -159,14 +158,14 @@ npm install @ayapapa-npm/file-locking-js
 
 | Class name | Overview  | Message | Other key properties | How to handle the situation, etc.|
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
-| AlreadyLocked | Found a `lock file` | Lock file already exists. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'ExistingLock' }  | 同じ`lock key`のロック処理が未完了であるため、[Options](#options)の`timeoutMs`を調整することを推奨する。 |
-| AlreadyLocked | Found a `lock file` ongoing update | Lock file already exists and may still be updating. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'Updating' }  | 同じ`lock key`のロック処理が未完了であるため、[Options](#options)の`timeoutMs`を調整することを推奨する。 |
-| AlreadyLocked | Found a `lock file` ongoing initialization | Lock file already exists and may still be initializing. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'Initializing' }  | 何度もこのエラーが継続する場合は、[Options](#options)の`invalidTtlMs`を使用するか、手動で`lock file`の削除を行う。[^handleWithCare2] |
-| AlreadyLocked | Found an invalid `lock file` | Lock file already exists, but its metadata is invalid. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'InvalidMetadata' }  | 何度もこのエラーが継続する場合は、[Options](#options)の`invalidTtlMs`を使用するか、手動で`lock file`の削除を行う。[^handleWithCare2] |
-| AlreadyLocked | Found an `lock file`, but couldn't read it. | The lock file already exists, but its validity could not be determined due to an I/O error. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'MetadataReadError' }  | 何度もこのエラーが継続する場合は、[Options](#options)の`invalidTtlMs`を使用するか、手動で`lock file`の削除を行う。[^handleWithCare2] |
-| DeadlockDetected | Detected a `self-deadlock` | A deadlock was detected. | { code: 'EDEADLK', key: '(`lock key`) } | [Options](#options)の`allowReentry`を使用する([^allowReentry])か、ロジックの変更によりデッドロックを解消する。 |
+| AlreadyLocked | Found a `lock file` | Lock file already exists. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'ExistingLock' }  | Since the locking operation for the same `lock key` has not completed, it is recommended to adjust the `timeoutMs` in [Options](#options). |
+| AlreadyLocked | Found a `lock file` ongoing update | Lock file already exists and may still be updating. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'Updating' }  | Since the locking operation for the same `lock key` has not completed, it is recommended to adjust the `timeoutMs` in [Options](#options). If this error persists, use `invalidTtlMs` in [Options](#options) or manually delete the `lock file`. [^handleWithCare2] |
+| AlreadyLocked | Found a `lock file` ongoing initialization | Lock file already exists and may still be initializing. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'Initializing' }  | Since the locking operation for the same `lock key` has not completed, it is recommended to adjust the `timeoutMs` in [Options](#options). If this error persists, use `invalidTtlMs` in [Options](#options) or manually delete the `lock file`. [^handleWithCare2] |
+| AlreadyLocked | Found an invalid `lock file` | Lock file already exists, but its metadata is invalid. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'InvalidMetadata' }  | If this error persists, use `invalidTtlMs` in [Options](#options) or manually delete the `lock file`. [^handleWithCare2] |
+| AlreadyLocked | Found an `lock file`, but couldn't read it. | The lock file already exists, but its validity could not be determined due to an I/O error. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'MetadataReadError' }  | If this error persists, use `invalidTtlMs` in [Options](#options) or manually delete the `lock file`. [^handleWithCare2] |
+| DeadlockDetected | Detected a `self-deadlock` | A deadlock was detected. | { code: 'EDEADLK', key: '(`lock key`) } | Resolve the deadlock by using `allowReentry` in [Options](#options) ([^allowReentry]) or by modifying the logic. |
 | InvalidOptions | Found invalid option | The value of the specified options('option name') is invalid. | { code: 'EINVAL', name: '(option name)' } | Modification it to valid value. |
-| TTLExceeded | Lock processing time limit exceeded | The maximum processing time('ttlMs' milliseconds) while locked has been exceeded. | { code: 'ETTLEXCEEDED', key: '(`lock key`)', ttlMs: '(`Options.ttlMs`)' } | [Options](#options)の`ttlMs`を調整する。 |
+| TTLExceeded | Lock processing time limit exceeded | The maximum processing time('ttlMs' milliseconds) while locked has been exceeded. | { code: 'ETTLEXCEEDED', key: '(`lock key`)', ttlMs: '(`Options.ttlMs`)' } | Adjust `ttlMs` in [Options](#options). |
 | LockCompromised | Corruption of lock file contents | The lock was compromised during the locking process. | { code: 'ECOMPROMISED', key: '(`lock key`) } | Check for and delete the lock file (specified by `path`). Before deletion, ensure that no process is holding the file.[^handleWithCare1]
 | ReleaseFailed | Failure to release the lock or decrement the lock counter | Processing is interrupted because the lock release or lock counter decrement failed. | { code: 'ERELEASE', key: '(`lock key`)' } | Possible causes include intentional modification of the lock file by another process, file system corruption, or insufficient disk space. In the former case, take the same action as for `LockFileBroken`. In the latter case, check the system status. Additionally, manually delete the `path` and `sharer` entries associated with the error after confirming that no owning process exists for them.[^handleWithCare1] Alternatively, you may simply wait for them to be automatically deleted once specific time intervals (such as `ttlMs`, `heartbeatTtlMs`, or `invalidTtlMs`) have elapsed. |
 
