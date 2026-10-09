@@ -107,41 +107,43 @@ npm install @ayapapa-npm/file-locking-js
   ```
 
 ## Configurations
-| Name | Type | Default | Min | Description | Notes |
-|---|---|---:|---:|---|---|
-| `cache` | `boolean` | `true` | N/A | Enables caching of `FileLock` instances by key. | Set to `false` to disable caching. |
-| `cacheMaxNum` | `number` | `100` | `0` | Maximum number of cached instances. | If set to `0`, caching is effectively disabled even when `cache` is `true`. Values below `0` are treated as `0`. |
-| `cacheTtlMs` | `number` | `10000` | `10000` | Cache expiration time in milliseconds. | Values below `10000` use `10000`. |
-| `defaultOptions` | `FileLockOptions` | `FileLock.getDefaultOptions()` | N/A | Global default options used by `withLock()`. | Applied when options are not explicitly specified in `withLock()`. |
-| `lockDirectory` | `string \| null` | `process.cwd()` | N/A | Directory used to store lock information. | If specified, this value takes highest priority. If the directory does not exist and cannot be created, an error is thrown. |
-| `logger` | `LogProvider` | `console` | N/A | External logger instance. | Must provide `log`, `trace`, `debug`, `info`, `warn`, and `error`. `fatal` is optional. |
-| `_debug` | `boolean` | `false` | N/A | Enables debug mode for this class. | Internal use. When `true`, process-related information is added to the lock info file and history tracking is enabled. |
-| `history` | `boolean` | `false` | N/A | Enables lock information history. | Internal debug option. When `true`, history is appended to `xxxx.json` files under `lockDirectory/history/`. |
-| `maxHistoryEntries` | `number` | `100` | `0` | Maximum number of history entries to retain. | If exceeded, the oldest entries are removed first. Values below `0` are treated as `0`. |
-| `maxHistoryFiles` | `number` | `100` | `0` | Maximum number of history files to retain. | If exceeded, the oldest files are removed first. Values below `0` are treated as `0`. |
+| Name | Type | Default and Min | Description | Notes |
+|---|---|---:|---|---|
+| `cache` | `boolean` | `true` N/A | Enables caching of `FileLock` instances by key. | Set to `false` to disable caching. |
+| `cacheMaxNum` | `number` | `100` `0` | Maximum number of cached instances. | If set to `0`, caching is effectively disabled even when `cache` is `true`. Values below `0` are treated as `0`. |
+| `cacheTtlMs` | `number` | `10000` `10000` | Cache expiration time in milliseconds. | Values below `10000` use `10000`. |
+| `defaultOptions` | `FileLockOptions` | `default options` [^defaultOptions] N/A | Global default options used by `withLock()`. | Applied when options are not explicitly specified in `withLock()`. |
+| `lockDirectory` | `string \| null` | `process.cwd()` N/A | Directory used to store lock information. | If specified, this value takes highest priority. If the directory does not exist and cannot be created, an error is thrown. |
+| `logger` | `LogProvider` | `console` N/A | External logger instance. | Must provide `log`, `trace`, `debug`, `info`, `warn`, and `error`. `fatal` is optional. |
+| `_debug` | `boolean` | `false` N/A | Enables debug mode for this class. | Internal use. When `true`, process-related information is added to the lock info file and history tracking is enabled. |
+| `history` | `boolean` | `false` N/A | Enables lock information history. | Internal debug option. When `true`, history is appended to `xxxx.json` files under `lockDirectory/history/`. |
+| `maxHistoryEntries` | `number` | `100` `0` | Maximum number of history entries to retain. | If exceeded, the oldest entries are removed first. Values below `0` are treated as `0`. |
+| `maxHistoryFiles` | `number` | `100` `0` | Maximum number of history files to retain. | If exceeded, the oldest files are removed first. Values below `0` are treated as `0`. |
 
 > Note:
 > `_debug` and `history` are internal debugging options and are not intended for normal production use.
 
+[^defaultOptions]: You can obtain it using FileLock.getDefaultConfig().
+
 ## Options
-| Name | Type | Default | Min | Description | Notes |
-|---|---|---:|---:|---|---|
-| `allowReentry` | `boolean` | `false` | N/A | Allows re-entering the same lock key within the same process. | Use with care.[^allowReentry] |
-| `heartbeatIntervalMs` | `number` | `1000` | `1000` | Heartbeat update interval in milliseconds while the lock is held. | Cannot be used with `heartbeatIntervalSec`. Values below `1000` are treated as `1000`. |
-| `heartbeatIntervalSec` | `number` | Same as `heartbeatIntervalMs` | Same as `heartbeatIntervalMs` | Heartbeat update interval in seconds while the lock is held. | Cannot be used with `heartbeatIntervalMs`. Internally converted to `heartbeatIntervalMs`. |
-| `heartbeatTtlMs` | `number` | `5000` | `2000` | Heartbeat validity period in milliseconds. | If the last update is within this period, the process is considered alive. Cannot be used with `heartbeatTtlSec`. Values below `2000` are treated as `2000`. |
-| `heartbeatTtlSec` | `number` | Same as `heartbeatTtlMs` | Same as `heartbeatTtlMs` | Heartbeat validity period in seconds. | Cannot be used with `heartbeatTtlMs`. Internally converted to `heartbeatTtlMs`. |
-| `invalidTtlSec` | `number` | Same as `invalidTtlMs` | N/A | Expiration period in seconds for invalid lock files and related items. | Cannot be used with `invalidTtlMs`. Internally converted to `invalidTtlMs`. |
-| `invalidTtlMs` | `number` | Unspecified | `heartbeatTtlMs` | Expiration period in milliseconds for invalid lock files and related items. | If not specified, forced deletion is disabled. Cannot be used with `invalidTtlSec`. Values below `heartbeatTtlMs` are treated as `heartbeatTtlMs`.[^invalidLockFile] |
-| `pollIntervalMs` | `number` | `100` | `100` | Polling interval in milliseconds while waiting for the lock. | Cannot be used with `pollIntervalSec`. `0` also falls back to the default value. Values below `100` are treated as `100`. |
-| `pollIntervalSec` | `number` | Same as `pollIntervalMs` | Same as `pollIntervalMs` | Polling interval in seconds while waiting for the lock. | Cannot be used with `pollIntervalMs`. Internally converted to `pollIntervalMs`. |
-| `retriesOnIOErr` | `number` | `1` | `0` | Number of retries for lock file operations after I/O errors. | Values below `0` are treated as `0`. |
-| `retryIntervalMs` | `number` | `100` | `100` | Retry interval in milliseconds after I/O errors. | Cannot be used with `retryIntervalSec`. Values below `100` are treated as `100`. |
-| `retryIntervalSec` | `number` | Same as `retryIntervalMs` | Same as `retryIntervalMs` | Retry interval in seconds after I/O errors. | Cannot be used with `retryIntervalMs`. Internally converted to `retryIntervalMs`. |
-| `timeoutMs` | `number` | `5000` | `0` | Maximum time to wait for acquiring the lock, in milliseconds. | Cannot be used with `timeoutSec`. `0` means no waiting. Values below `0` are treated as `0`. |
-| `timeoutSec` | `number` | Same as `timeoutMs` | Same as `timeoutMs` | Maximum time to wait for acquiring the lock, in seconds. | Cannot be used with `timeoutMs`. Internally converted to `timeoutMs`. |
-| `ttlMs` | `number` | `5000` | `1000` | Lock time to live in milliseconds. | If execution exceeds this period, `TTLExceeded` is thrown. Cannot be used with `ttlSec`. Values below `1000` are treated as `1000`. |
-| `ttlSec` | `number` | Same as `ttlMs` | Same as `ttlMs` | Lock time to live in seconds. | Cannot be used with `ttlMs`. Internally converted to `ttlMs`. |
+| Name | Type | Default and Min | Description | Notes |
+|---|---|---:|---|---|
+| `allowReentry` | `boolean` | `false` N/A | Allows re-entering the same lock key within the same process. | Use with care.[^allowReentry] |
+| `heartbeatIntervalMs` | `number` | `1000` `1000` | Heartbeat update interval in milliseconds while the lock is held. | Cannot be used with `heartbeatIntervalSec`. Values below `1000` are treated as `1000`. |
+| `heartbeatIntervalSec` | `number` | Same as `heartbeatIntervalMs` | Heartbeat update interval in seconds while the lock is held. | Cannot be used with `heartbeatIntervalMs`. Internally converted to `heartbeatIntervalMs`. |
+| `heartbeatTtlMs` | `number` | `5000` `2000` | Heartbeat validity period in milliseconds. | If the last update is within this period, the process is considered alive. Cannot be used with `heartbeatTtlSec`. Values below `2000` are treated as `2000`. |
+| `heartbeatTtlSec` | `number` | Same as `heartbeatTtlMs` | Heartbeat validity period in seconds. | Cannot be used with `heartbeatTtlMs`. Internally converted to `heartbeatTtlMs`. |
+| `invalidTtlSec` | `number` | Same as `invalidTtlMs` | Expiration period in seconds for invalid lock files and related items. | Cannot be used with `invalidTtlMs`. Internally converted to `invalidTtlMs`. |
+| `invalidTtlMs` | `number` | `Unspecified` `heartbeatTtlMs` | Expiration period in milliseconds for invalid lock files and related items. | If not specified, forced deletion is disabled. Cannot be used with `invalidTtlSec`. Values below `heartbeatTtlMs` are treated as `heartbeatTtlMs`.[^invalidLockFile] |
+| `pollIntervalMs` | `number` | `100` `100` | Polling interval in milliseconds while waiting for the lock. | Cannot be used with `pollIntervalSec`. `0` also falls back to the default value. Values below `100` are treated as `100`. |
+| `pollIntervalSec` | `number` | Same as `pollIntervalMs` | Polling interval in seconds while waiting for the lock. | Cannot be used with `pollIntervalMs`. Internally converted to `pollIntervalMs`. |
+| `retriesOnIOErr` | `number` | `1` `0` | Number of retries for lock file operations after I/O errors. | Values below `0` are treated as `0`. |
+| `retryIntervalMs` | `number` | `100` `100` | Retry interval in milliseconds after I/O errors. | Cannot be used with `retryIntervalSec`. Values below `100` are treated as `100`. |
+| `retryIntervalSec` | `number` | Same as `retryIntervalMs` | Retry interval in seconds after I/O errors. | Cannot be used with `retryIntervalMs`. Internally converted to `retryIntervalMs`. |
+| `timeoutMs` | `number` | `5000` `0` | Maximum time to wait for acquiring the lock, in milliseconds. | Cannot be used with `timeoutSec`. `0` means no waiting. Values below `0` are treated as `0`. |
+| `timeoutSec` | `number` | Same as `timeoutMs` | Maximum time to wait for acquiring the lock, in seconds. | Cannot be used with `timeoutMs`. Internally converted to `timeoutMs`. |
+| `ttlMs` | `number` | `5000` `1000` | Lock time to live in milliseconds. | If execution exceeds this period, `TTLExceeded` is thrown. Cannot be used with `ttlSec`. Values below `1000` are treated as `1000`. |
+| `ttlSec` | `number` | Same as `ttlMs` | Lock time to live in seconds. | Cannot be used with `ttlMs`. Internally converted to `ttlMs`. |
 
 [^allowReentry]:
     Controls behavior when the current process attempts to acquire a lock using a key that it already holds. <br>
@@ -154,7 +156,7 @@ npm install @ayapapa-npm/file-locking-js
 [^invalidLockFile]: The automatic deletion of invalid lock files—triggered by specifying `invalidTtlMs` or `invalidTtlSec`—does not guarantee that there is no active lock owner. It is the user's responsibility to specify appropriate values ​​when configuring these settings. Please determine the values ​​for `invalidTtlMs` or `invalidTtlSec` by taking into account `ttlMs` and `heartbeatTtlMs` as primary reference points (including any adjustments to those values ​​themselves) and considering your specific operating environment.
 
 ## Errors
-主なエラーを以下に記載する。
+
 | Class name | Overview  | Message | Other key properties | How to handle the situation, etc.|
 | --------------- | ------------ | ----------------- | ---------------- | ------------- |
 | AlreadyLocked | Found a `lock file` | Lock file already exists. | { code: 'EALREADYLOCKED', key: '(`lock key`), reason: 'ExistingLock' }  | 同じ`lock key`のロック処理が未完了であるため、[Options](#options)の`timeoutMs`を調整することを推奨する。 |
