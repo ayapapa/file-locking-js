@@ -613,7 +613,7 @@ export class FileLock extends LockBase<FileLockAllOptions, FileLockInternalState
         history = contents ? JSON.parse(contents) : {};
       }
       catch (err) {
-        throw FileLockError.dueToHistory(historyFile, [err]);
+        throw FileLockError.historyPasingFailed(historyFile, [err]);
       }
 
       history[dateTimeStr] = { key: this._key, meta, options };

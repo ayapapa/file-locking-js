@@ -2,13 +2,13 @@
 export interface LockBaseOptions {
   /** 
    * Maximum wait time (in seconds) to acquire the lock. <br>
-   *  Cannot be used in conjunction with `timeoutMs`; it is internally converted to `timeoutMs`. The default value is the same as the default for `timeoutMs`.
+   *  Cannot be used with `timeoutMs`; it is internally converted to `timeoutMs`. The default and minimum values ​​are the same as those for `timeoutMs`.
    */
   timeoutSec?: number;
 
   /**
    * Maximum wait time to acquire the lock [milliseconds]. <br>
-   * Cannot be used in conjunction with timeoutSec. <br>
+   * Cannot be used with `timeoutSec`. <br>
    * `0` does not wait for the preceding unlock. 
    * The minimum value is `0`; if a value lower than this is specified, this minimum value is used.
    * Default is `5000`.
@@ -18,14 +18,14 @@ export interface LockBaseOptions {
   /**
    * Lock validity period (time to live)—i.e., the maximum time [seconds] from lock acquisition 
    * until the callback function completes execution. An error (TTLExceeded) occurs if this period is exceeded.<br>
-   * Cannot be used in conjunction with ttlMs; it is internally converted to ttlMs. Defaults to the default value for ttlMs.
+   * Cannot be used with `ttlMs`; it is internally converted to `ttlMs`. The default and minimum values ​​are the same as those for `ttlMs`.
    */
   ttlSec?: number
 
   /**
    * Lock validity period (time to live): the maximum time [milliseconds] from lock acquisition 
    * until the callback function completes execution. An error (TTLExceeded) occurs if this 
-   * period is exceeded. Cannot be used in conjunction with ttlSec.<br>
+   * period is exceeded. Cannot be used with `ttlSec`.<br>
    * The minimum value is `1000`; if a value lower than this is specified, this minimum value is used.
    * Default is `5000`.
    */
@@ -88,7 +88,7 @@ export const defaultLockBaseOptions: Readonly<LockBaseRequiredOptions> = {
 
 /**
  * @internal
- * Definition of an options type consisting solely of the required numeric properties of LockBaseOptions.
+ * Definition of an options type consisting solely of the required numeric properties of `LockBaseOptions`.
  */
 export type LockBaseRequiredNumericOptions = Pick<LockBaseRequiredOptions, 'timeoutMs' | 'ttlMs'>;
 

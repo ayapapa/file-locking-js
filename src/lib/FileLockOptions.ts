@@ -7,7 +7,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Polling interval (checking if locked) in seconds until timeout.  <br>
    * Internally converted to `pollIntervalMs`. Cannot be used with `pollIntervalMs`. 
-   * Defaults to the default value of `pollIntervalMs`.
+   * The default and minimum values ​​are the same as those for `pollIntervalMs`.
    */
   pollIntervalSec?: number;
 
@@ -23,7 +23,7 @@ export interface FileLockOptions extends LockBaseOptions {
    * Heartbeat interval in seconds while the locked process is running.  <br>
    * The lock file is updated at this interval until the process completes. Internally converted to `heartbeatIntervalMs`. 
    * Cannot be used with `heartbeatIntervalMs`. <br>
-   * Defaults to the default value of `heartbeatIntervalMs`. 
+   * The default and minimum values ​​are the same as those for `heartbeatIntervalMs`. 
    */
   heartbeatIntervalSec?: number;
 
@@ -39,7 +39,7 @@ export interface FileLockOptions extends LockBaseOptions {
    * Validity period in seconds for the last heartbeat update.  <br>
    * If this amount of time has not elapsed since the last update, the process is considered to be still running (heartbeat valid). 
    * Internally converted to `heartbeatTtlMs`. Cannot be used with `heartbeatTtlMs`. 
-   * Defaults to the default value of `heartbeatTtlMs`.
+   * The default and minimum values ​​are the same as those for `heartbeatTtlMs`.
    */
   heartbeatTtlSec?: number;
 
@@ -47,7 +47,7 @@ export interface FileLockOptions extends LockBaseOptions {
    * Validity period in milliseconds for the last heartbeat update.  <br>
    * If this amount of time has not elapsed since the last update, the process is considered to be still running. This cannot be used in conjunction with `heartbeatTtlSec`.
    * Minimum is `2000`; if a value lower than this is specified, this minimum value is used.
-   * Default is `2000`.
+   * Default is `5000`.
    */
   heartbeatTtlMs?: number;
 
@@ -61,7 +61,7 @@ export interface FileLockOptions extends LockBaseOptions {
   /**
    * Interval in seconds between lock file operation retries.  <br>
    * Internally converted to `retryIntervalMs`. Cannot be used together with `retryIntervalMs`. 
-   * Defaults to the default value of `retryIntervalMs`.
+   * The default and minimum values ​​are the same as those for `retryIntervalMs`.
    */
   retryIntervalSec?: number;
 
@@ -77,7 +77,7 @@ export interface FileLockOptions extends LockBaseOptions {
    * Validity period in seconds for the modification time of invalid lock files and related items. <br>
    * If the specified amount of time has elapsed since the modification time of an invalid lock file or related item, it is deemed invalid and forcibly deleted. 
    * Internally converted to `invalidTtlMs`. Cannot be used with `invalidTtlMs`. 
-   * Defaults to the default value of `invalidTtlMs`.
+   * The default and minimum values ​​are the same as those for `invalidTtlMs`.
    */
   invalidTtlSec?: number,
 

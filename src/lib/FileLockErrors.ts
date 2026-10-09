@@ -34,7 +34,7 @@ export class FileLockError extends LockError {
    * @param cause    The parsing error that caused the issue.
    * @returns An instance of FileLockError.
    */
-  public static dueToHistory(history: string, causes: unknown[]): FileLockError {
+  public static historyPasingFailed(history: string, causes: unknown[]): FileLockError {
     return new FileLockError("Failed to parse the history file.", { code: 'EHISTORY', props: { history, causes } });
   }
 

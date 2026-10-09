@@ -18,6 +18,7 @@ export interface LockBaseConfig {
    * This is a debug flag for this class and is intended for use only during development.
    * However, if an external logger is injected, it cannot be controlled; 
    * please adjust the log level yourself as necessary.
+   * Default is `false`.
    */
   _debug?: boolean;
 }
