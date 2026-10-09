@@ -94,13 +94,10 @@ export class InvalidOptions extends LockError {
 };
 
 /** 
- * Failed to relase lock or decrement lock counter. <br>
- * エラーの意味：　（エラー説明に記載すること）
- * ロック解放またはロックカウンターの減算に失敗したことによる処理を中断。
- * ファイルIOエラーによるものと思われるため、システムのチェックをお勧めする。
- * また、ロックファイルやロック共有情報などのファイルやディレクトリが
- * 残ったままの可能性があるため、それらの手動による削除を実施する必要あり。 *  * 
- * ★★★これは、基本クラスのエラーであるため、ファイルの概念は持ち込まない（ただ、上記説明は、ファイルロックのエラー説明に加えて！！）
+ * Processing was interrupted due to a failure to release the lock or decrement the lock counter. 
+ * As this is likely caused by a file I/O error, a system check is recommended. 
+ * Additionally, files or directories such as lock files or shared lock information
+ * may remain, so they must be manually deleted.
  */
 export class ReleaseFailed extends LockError {
   /**
