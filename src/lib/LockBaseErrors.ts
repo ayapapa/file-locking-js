@@ -51,11 +51,12 @@ export class TTLExceeded extends LockError {
    * @param msg   Error message.
    * @param params  Parameters.
    */
-  constructor(msg: string | null, params?: { ttlMs: number, props?: LockErrorProps }) {
+  constructor(msg: string | null, params?: { ttlMs: number, key: string, props?: LockErrorProps }) {
     const ttlMs = params?.ttlMs;
     msg = msg || `The maximum processing time(${ttlMs ?? "options.ttlMs"} milliseconds) while locked has been exceeded.`;
     const props = {...params?.props };
     if (ttlMs != null) props.ttlMs = ttlMs;
+    if (params?.key != null) props.key = params.key;
     super(msg, { code: 'ETTLEXCEEDED', props });
   }
 };

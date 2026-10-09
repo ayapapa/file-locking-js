@@ -427,7 +427,7 @@ export class LockBase <O extends LockBaseRequiredOptions = LockBaseRequiredOptio
     const ttlMs = options.ttlMs;
     const promise = new Promise((_, reject) => {
       id = setTimeout(() => {
-        reject(new TTLExceeded(null, { ttlMs, props: { key: this._key } }));
+        reject(new TTLExceeded(null, { ttlMs, key: this._key }));
       },
       ttlMs);
     });
