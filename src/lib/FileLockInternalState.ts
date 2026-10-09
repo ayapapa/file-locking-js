@@ -8,8 +8,6 @@ export interface FileLockInternalState extends LockBaseInternalState {
   /** Path to the lock file. */
   _filePath: string;
 
-  /** File descriptor. */
-  _fd: number;
 
   /** Path to the lock information update history file. */
   //_historyFilePath: string;
